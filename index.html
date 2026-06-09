@@ -3,24 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Damu SGC - Trazabilidad Ley REP</title>
+    <title>Damu SGC — Trazabilidad Ley REP</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        /* Efecto de degradado futurista/natural para el texto */
-        .text-gradient {
-            background-clip: text;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
+        .text-gradient { background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
 
-    <!-- Barra de Navegación (Naturaleza y Futuro: Verde Esmeralda y Celeste Cian) -->
+    <!-- ═══ NAV ═══ -->
     <nav class="bg-gradient-to-r from-emerald-700 to-cyan-600 text-white shadow-lg w-full p-4 flex justify-between items-center">
-        <div class="flex items-center space-x-2">
+        <div class="flex items-center space-x-2 cursor-pointer" onclick="switchTab('home')">
             <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center">
                 <span class="text-emerald-700 font-bold text-xl">D</span>
             </div>
@@ -29,18 +24,18 @@
         <ul class="flex space-x-6 font-medium items-center">
             <li class="cursor-pointer hover:text-cyan-200 transition" onclick="switchTab('home')">Inicio</li>
             <li class="cursor-pointer hover:text-cyan-200 transition" onclick="switchTab('map')">Mapa Operativo</li>
-            <li class="cursor-pointer bg-white/20 px-4 py-1 rounded-full hover:bg-white/30 transition" onclick="switchTab('profile')">Mi Portal</li>
-            <!-- Pestaña oculta inicialmente -->
-            <li id="nav-ecoticket" class="hidden bg-cyan-500 text-white px-4 py-1 rounded-full shadow-md cursor-pointer hover:bg-cyan-400 transition font-bold" onclick="switchTab('eco-ticket')">Eco-ticket 📊</li>
+            <li class="cursor-pointer bg-white/20 px-4 py-1 rounded-full hover:bg-white/30 transition" onclick="switchTab('auth')">Mi Portal</li>
         </ul>
     </nav>
 
-    <!-- Contenedor Principal -->
     <main class="flex-grow p-8 max-w-6xl mx-auto w-full">
 
-        <!-- PESTAÑA 1: INICIO (LANDING PAGE COMERCIAL) -->
+        <!-- ══════════════════════════════════════
+             PESTAÑA 1: LANDING PAGE
+        ══════════════════════════════════════ -->
         <section id="home" class="tab-content active">
-            <!-- Hero Section -->
+
+            <!-- Hero -->
             <div class="text-center py-16 px-6 bg-white rounded-2xl shadow-sm mb-10 border border-emerald-100 relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 to-cyan-400"></div>
                 <h2 class="text-4xl md:text-5xl font-extrabold mb-6">
@@ -49,13 +44,15 @@
                 <p class="text-lg text-slate-600 max-w-3xl mx-auto mb-10">
                     Conectamos la responsabilidad extendida con la eficiencia logística. Damu SGC asegura trazabilidad, cumplimiento de la Ley REP y optimización de recursos, inspirado en el renacer constante de la naturaleza.
                 </p>
-                <button onclick="switchTab('profile'); toggleAuth('register');" class="bg-gradient-to-r from-emerald-600 to-cyan-500 text-white font-bold py-3 px-8 rounded-full shadow-lg hover:shadow-cyan-500/50 hover:scale-105 transition transform duration-200 text-lg">
+                <button onclick="switchTab('auth'); toggleAuth('register');"
+                    class="bg-gradient-to-r from-emerald-600 to-cyan-500 text-white font-bold py-3 px-8 rounded-full shadow-lg hover:shadow-cyan-500/50 hover:scale-105 transition transform duration-200 text-lg">
                     Integrarse al Sistema Hoy
                 </button>
             </div>
 
-            <!-- Value Proposition Dual (Productores vs Transportistas) -->
+            <!-- Propuesta de valor dual -->
             <div class="grid md:grid-cols-2 gap-8 mb-12">
+
                 <!-- Card Productores -->
                 <div class="bg-emerald-50 rounded-xl p-8 border border-emerald-100 shadow-sm hover:shadow-md transition">
                     <div class="w-12 h-12 bg-emerald-600 text-white rounded-lg flex items-center justify-center text-2xl font-bold mb-4">🏭</div>
@@ -81,46 +78,60 @@
                         <li class="flex items-center text-cyan-700 font-bold">✓ Acceso directo a nuestro sistema propio TMS para gestión integral de flota.</li>
                     </ul>
                 </div>
+
             </div>
         </section>
 
-        <!-- PESTAÑA 2: MAPA (CON GOOGLE MY MAPS) -->
+        <!-- ══════════════════════════════════════
+             PESTAÑA 2: MAPA OPERATIVO
+        ══════════════════════════════════════ -->
         <section id="map" class="tab-content">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100 relative">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100">
                 <h2 class="text-3xl font-bold text-emerald-700 mb-2">Red Satelital de Acopio Damu SGC</h2>
                 <p class="text-slate-600 mb-6">Visualiza nuestra red de puntos de reciclaje e instalaciones de valorización a través del mapa interactivo.</p>
-                
                 <div class="relative w-full h-[600px] rounded-lg overflow-hidden border-2 border-cyan-100 shadow-inner bg-slate-200">
-                    <!-- iFrame de Google My Maps integrado directamente -->
-                    <iframe src="https://www.google.com/maps/d/embed?mid=1Ago0V1u7r5WkSJ1qSDzFb8OorWELTJM&ehbc=2E312F&noprof=1" width="100%" height="100%" frameborder="0" style="border:0;" allowfullscreen></iframe>
+                    <iframe src="https://www.google.com/maps/d/embed?mid=1Ago0V1u7r5WkSJ1qSDzFb8OorWELTJM&ehbc=2E312F&noprof=1"
+                        width="100%" height="100%" frameborder="0" style="border:0;" allowfullscreen></iframe>
                 </div>
             </div>
         </section>
 
-        <!-- PESTAÑA 3: PERFIL Y AUTENTICACIÓN (LOGIN/SIGNUP Y CALCULADORA ECO-TICKET) -->
-        <section id="profile" class="tab-content">
-            
-            <!-- VISTA A: CONTENEDOR DE AUTENTICACIÓN -->
-            <div id="auth-container" class="max-w-md mx-auto bg-white rounded-2xl shadow-lg border border-emerald-100 overflow-hidden">
+        <!-- ══════════════════════════════════════
+             PESTAÑA 3: AUTENTICACIÓN (Login / Registro)
+             Al hacer login → redirige a portal.html
+        ══════════════════════════════════════ -->
+        <section id="auth" class="tab-content">
+            <div class="max-w-md mx-auto bg-white rounded-2xl shadow-lg border border-emerald-100 overflow-hidden">
+
                 <!-- Selector Login / Registro -->
                 <div class="flex border-b border-slate-100">
-                    <button id="btn-tab-login" class="flex-1 py-4 font-bold text-emerald-700 border-b-2 border-emerald-600 bg-emerald-50/50" onclick="toggleAuth('login')">Iniciar Sesión</button>
-                    <button id="btn-tab-register" class="flex-1 py-4 font-bold text-slate-500 hover:bg-slate-50 transition" onclick="toggleAuth('register')">Crear Cuenta</button>
+                    <button id="btn-tab-login"
+                        class="flex-1 py-4 font-bold text-emerald-700 border-b-2 border-emerald-600 bg-emerald-50/50"
+                        onclick="toggleAuth('login')">Iniciar Sesión</button>
+                    <button id="btn-tab-register"
+                        class="flex-1 py-4 font-bold text-slate-500 hover:bg-slate-50 transition"
+                        onclick="toggleAuth('register')">Crear Cuenta</button>
                 </div>
 
                 <div class="p-8">
+
                     <!-- Formulario Login -->
                     <div id="login-form" class="block">
                         <h3 class="text-xl font-bold text-slate-800 mb-6 text-center">Acceso Corporativo Damu</h3>
                         <div class="mb-4">
                             <label class="block text-sm font-semibold text-slate-600 mb-1">RUT Empresa</label>
-                            <input type="text" id="login-rut" value="76.234.567-K" class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-emerald-500 focus:border-emerald-500 bg-slate-50">
+                            <input type="text" id="login-rut" value="76.234.567-K"
+                                class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-emerald-500 focus:border-emerald-500 bg-slate-50">
                         </div>
                         <div class="mb-6">
                             <label class="block text-sm font-semibold text-slate-600 mb-1">Contraseña</label>
-                            <input type="password" id="login-pass" value="123456" class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-emerald-500 focus:border-emerald-500 bg-slate-50">
+                            <input type="password" id="login-pass" value="123456"
+                                class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-emerald-500 focus:border-emerald-500 bg-slate-50">
                         </div>
-                        <button type="button" onclick="loginCompany()" class="w-full bg-gradient-to-r from-emerald-600 to-cyan-500 text-white font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition">Ingresar al Portal</button>
+                        <button type="button" onclick="loginCompany()"
+                            class="w-full bg-gradient-to-r from-emerald-600 to-cyan-500 text-white font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition">
+                            Ingresar al Portal
+                        </button>
                     </div>
 
                     <!-- Formulario Registro -->
@@ -128,11 +139,13 @@
                         <h3 class="text-xl font-bold text-slate-800 mb-4 text-center">Únete a la Red Damu</h3>
                         <div class="flex justify-center space-x-6 mb-6">
                             <label class="flex items-center space-x-2 cursor-pointer">
-                                <input type="radio" name="userType" value="productor" checked onchange="toggleRegForm()" class="text-emerald-600 accent-emerald-600 w-4 h-4">
+                                <input type="radio" name="userType" value="productor" checked onchange="toggleRegForm()"
+                                    class="accent-emerald-600 w-4 h-4">
                                 <span class="text-sm font-semibold text-slate-700">Productor</span>
                             </label>
                             <label class="flex items-center space-x-2 cursor-pointer">
-                                <input type="radio" name="userType" value="transportista" onchange="toggleRegForm()" class="text-cyan-500 accent-cyan-500 w-4 h-4">
+                                <input type="radio" name="userType" value="transportista" onchange="toggleRegForm()"
+                                    class="accent-cyan-500 w-4 h-4">
                                 <span class="text-sm font-semibold text-slate-700">Transportista</span>
                             </label>
                         </div>
@@ -143,178 +156,21 @@
                             <div class="mb-4">
                                 <input type="text" class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-emerald-500 focus:border-emerald-500" placeholder="RUT Empresa">
                             </div>
-                            
-                            <!-- Banner Transportista (TMS) -->
+                            <!-- Banner TMS — visible al seleccionar Transportista -->
                             <div id="tms-banner" class="hidden bg-cyan-50 border border-cyan-200 p-4 rounded-lg mb-6 shadow-inner">
                                 <div class="flex items-start space-x-3">
                                     <span class="text-cyan-600 text-xl">🚚</span>
                                     <p class="text-xs text-cyan-800 font-medium">Al completar el registro de tu flota, recibirás credenciales de acceso a nuestro sistema <strong>TMS (Transport Management System)</strong> integral para planificar tus rutas futuras con Inteligencia Artificial.</p>
                                 </div>
                             </div>
-
-                            <button type="button" onclick="alert('Registro exitoso. Procede a Iniciar Sesión.'); toggleAuth('login');" class="w-full bg-slate-800 text-white font-bold py-3 rounded-lg shadow hover:bg-slate-700 transition">Solicitar Integración</button>
+                            <button type="button"
+                                onclick="alert('Registro exitoso. Procede a Iniciar Sesión.'); toggleAuth('login');"
+                                class="w-full bg-slate-800 text-white font-bold py-3 rounded-lg shadow hover:bg-slate-700 transition">
+                                Solicitar Integración
+                            </button>
                         </form>
                     </div>
-                </div>
-            </div>
 
-            <!-- VISTA B: PERFIL ACTIVO + CALCULADORA (SI ESTÁ LOGEADO) -->
-            <div id="profile-logged-in" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-8">
-                
-                <!-- Columna Izquierda: Identidad y Objetivos -->
-                <div class="bg-white p-8 rounded-2xl shadow-sm border border-emerald-100 h-fit">
-                    <div class="flex flex-col items-center text-center pb-6 border-b border-slate-100 mb-6">
-                        <div class="w-20 h-20 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-2xl flex items-center justify-center text-white text-3xl font-bold mb-4 shadow-lg">M</div>
-                        <h3 class="font-bold text-slate-800 text-xl">Manufacturas Circulares S.A.</h3>
-                        <span class="mt-2 text-xs text-emerald-700 font-bold bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">Productor Nivel Premium</span>
-                    </div>
-                    
-                    <div class="mb-8">
-                        <h4 class="font-bold text-sm text-slate-800 mb-3 flex items-center"><span class="text-emerald-500 mr-2">🎯</span> Definición de Objetivos Anuales</h4>
-                        <label class="block text-xs text-slate-500 mb-2">Meta Institucional REP (Toneladas)</label>
-                        <input type="number" id="rep-target" value="1000" class="w-full border-2 border-slate-200 rounded-lg p-3 text-lg font-bold text-slate-700 focus:ring-cyan-500 focus:border-cyan-500 bg-slate-50" oninput="calculateEcoTicket()">
-                    </div>
-
-                    <button onclick="logoutCompany()" class="w-full text-sm text-red-500 hover:text-white hover:bg-red-500 font-bold border border-red-200 py-3 rounded-lg transition duration-200">Cerrar Sesión Segura</button>
-                </div>
-
-                <!-- Columnas Derechas: Calculadora Eco-Ticket con las 6 Leyes REP -->
-                <div class="lg:col-span-2 bg-white p-8 rounded-2xl shadow-sm border border-emerald-100">
-                    <!-- Acceso directo al Simulador Pro + Dashboard -->
-                    <div class="mb-6 p-4 bg-gradient-to-r from-emerald-50 to-cyan-50 border border-emerald-200 rounded-xl flex items-center justify-between gap-3 flex-wrap">
-                        <div>
-                            <p class="text-sm font-bold text-emerald-800">¿Quieres proyectar tus ingresos por valorización?</p>
-                            <p class="text-xs text-slate-500 mt-0.5">Accede al dashboard avanzado de rentabilidad Ley REP.</p>
-                        </div>
-                        <div class="flex gap-2 flex-shrink-0">
-                            <a href="dashboard.html" class="bg-white border border-emerald-300 text-emerald-700 font-bold py-2.5 px-4 rounded-full shadow-sm hover:bg-emerald-50 transition text-sm whitespace-nowrap">
-                                📊 Dashboard
-                            </a>
-                            <a href="simulador.html" class="bg-gradient-to-r from-emerald-600 to-cyan-500 text-white font-bold py-2.5 px-5 rounded-full shadow-md hover:shadow-cyan-500/40 hover:scale-105 transition transform duration-200 text-sm whitespace-nowrap">
-                                Simulador Pro →
-                            </a>
-                        </div>
-                    </div>
-                    <div class="flex justify-between items-start mb-6">
-                        <div>
-                            <h3 class="text-2xl font-bold text-emerald-800">Cálculo de Volumen (Eco-Ticket)</h3>
-                            <p class="text-sm text-slate-500 mt-1">Declara volúmenes de los 6 productos prioritarios Ley REP.</p>
-                        </div>
-                        <div class="bg-emerald-50 p-2 rounded-lg border border-emerald-100">
-                            <span class="block text-[10px] text-emerald-600 font-bold uppercase tracking-wide text-center">Fondo de Gestión Real</span>
-                            <span id="ecoCost" class="text-2xl font-black text-emerald-800">$0 CLP</span>
-                        </div>
-                    </div>
-                    
-                    <div id="ecoTicketForm" class="space-y-3">
-                        <!-- 1. Envases y embalajes -->
-                        <label class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:border-cyan-400 hover:bg-cyan-50/30 transition group">
-                            <div class="flex items-center space-x-4">
-                                <input type="checkbox" value="18500" class="rep-checkbox w-5 h-5 text-emerald-600 accent-emerald-600 rounded" onchange="toggleInput(this, 'tons-envases')">
-                                <div>
-                                    <span class="text-sm font-bold text-slate-800 block group-hover:text-cyan-700 transition">1. Envases y embalajes</span>
-                                    <span class="text-xs text-slate-500">(Plásticos, cartón, papel, metal, vidrio) - Tarifa referencial: $18.500/t</span>
-                                </div>
-                            </div>
-                            <input type="number" id="tons-envases" min="0" placeholder="Ton." class="w-24 border border-slate-300 rounded p-2 text-sm hidden font-bold text-emerald-700 bg-white" oninput="calculateEcoTicket()">
-                        </label>
-
-                        <!-- 2. Neumáticos fuera de uso -->
-                        <label class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:border-cyan-400 hover:bg-cyan-50/30 transition group">
-                            <div class="flex items-center space-x-4">
-                                <input type="checkbox" value="45000" class="rep-checkbox w-5 h-5 text-emerald-600 accent-emerald-600 rounded" onchange="toggleInput(this, 'tons-neumaticos')">
-                                <div>
-                                    <span class="text-sm font-bold text-slate-800 block group-hover:text-cyan-700 transition">2. Neumáticos fuera de uso</span>
-                                    <span class="text-xs text-slate-500">Tarifa referencial: $45.000/t</span>
-                                </div>
-                            </div>
-                            <input type="number" id="tons-neumaticos" min="0" placeholder="Ton." class="w-24 border border-slate-300 rounded p-2 text-sm hidden font-bold text-emerald-700 bg-white" oninput="calculateEcoTicket()">
-                        </label>
-
-                        <!-- 3. Aparatos eléctricos y electrónicos (RAEE) -->
-                        <label class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:border-cyan-400 hover:bg-cyan-50/30 transition group">
-                            <div class="flex items-center space-x-4">
-                                <input type="checkbox" value="80000" class="rep-checkbox w-5 h-5 text-emerald-600 accent-emerald-600 rounded" onchange="toggleInput(this, 'tons-raee')">
-                                <div>
-                                    <span class="text-sm font-bold text-slate-800 block group-hover:text-cyan-700 transition">3. Aparatos eléctricos y electrónicos (RAEE)</span>
-                                    <span class="text-xs text-slate-500">Tarifa referencial: $80.000/t</span>
-                                </div>
-                            </div>
-                            <input type="number" id="tons-raee" min="0" placeholder="Ton." class="w-24 border border-slate-300 rounded p-2 text-sm hidden font-bold text-emerald-700 bg-white" oninput="calculateEcoTicket()">
-                        </label>
-
-                        <!-- 4. Pilas y baterías -->
-                        <label class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:border-cyan-400 hover:bg-cyan-50/30 transition group">
-                            <div class="flex items-center space-x-4">
-                                <input type="checkbox" value="85000" class="rep-checkbox w-5 h-5 text-emerald-600 accent-emerald-600 rounded" onchange="toggleInput(this, 'tons-pilas')">
-                                <div>
-                                    <span class="text-sm font-bold text-slate-800 block group-hover:text-cyan-700 transition">4. Pilas y baterías</span>
-                                    <span class="text-xs text-slate-500">Tarifa referencial combinada: $85.000/t</span>
-                                </div>
-                            </div>
-                            <input type="number" id="tons-pilas" min="0" placeholder="Ton." class="w-24 border border-slate-300 rounded p-2 text-sm hidden font-bold text-emerald-700 bg-white" oninput="calculateEcoTicket()">
-                        </label>
-
-                        <!-- 5. Aceites lubricantes usados -->
-                        <label class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:border-cyan-400 hover:bg-cyan-50/30 transition group">
-                            <div class="flex items-center space-x-4">
-                                <input type="checkbox" value="25000" class="rep-checkbox w-5 h-5 text-emerald-600 accent-emerald-600 rounded" onchange="toggleInput(this, 'tons-aceites')">
-                                <div>
-                                    <span class="text-sm font-bold text-slate-800 block group-hover:text-cyan-700 transition">5. Aceites lubricantes usados</span>
-                                    <span class="text-xs text-slate-500">Tarifa referencial: $25.000/t</span>
-                                </div>
-                            </div>
-                            <input type="number" id="tons-aceites" min="0" placeholder="Ton." class="w-24 border border-slate-300 rounded p-2 text-sm hidden font-bold text-emerald-700 bg-white" oninput="calculateEcoTicket()">
-                        </label>
-
-                        <!-- 6. Textiles -->
-                        <label class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:border-cyan-400 hover:bg-cyan-50/30 transition group">
-                            <div class="flex items-center space-x-4">
-                                <input type="checkbox" value="15000" class="rep-checkbox w-5 h-5 text-emerald-600 accent-emerald-600 rounded" onchange="toggleInput(this, 'tons-textiles')">
-                                <div>
-                                    <span class="text-sm font-bold text-slate-800 block group-hover:text-cyan-700 transition">6. Textiles</span>
-                                    <span class="text-xs text-slate-500">Tarifa referencial: $15.000/t</span>
-                                </div>
-                            </div>
-                            <input type="number" id="tons-textiles" min="0" placeholder="Ton." class="w-24 border border-slate-300 rounded p-2 text-sm hidden font-bold text-emerald-700 bg-white" oninput="calculateEcoTicket()">
-                        </label>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- PESTAÑA 4: ECO-TICKET (MÉTRICAS Y ANALÍTICA) -->
-        <section id="eco-ticket" class="tab-content">
-            <h2 class="text-3xl font-extrabold text-slate-800 mb-8">Centro de Inteligencia <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-cyan-500">Damu SGC</span></h2>
-            
-            <div class="bg-white p-8 rounded-2xl shadow-sm border border-emerald-100 mb-8 relative overflow-hidden">
-                <div class="absolute right-0 top-0 w-32 h-32 bg-cyan-50 rounded-bl-full -z-10"></div>
-                <h3 class="text-xl font-bold text-emerald-800 mb-2">Métricas Eco-Ticket (Avance Global Ley REP)</h3>
-                <p class="text-sm text-slate-500 mb-6">Correlación matemática entre tu declaración de volúmenes y las metas de perfil.</p>
-                
-                <div class="space-y-3 relative z-10">
-                    <div class="flex justify-between items-end">
-                        <span class="font-bold text-slate-700">Progreso de Valorización</span>
-                        <span id="compliance-pct" class="text-3xl font-black text-emerald-600">0%</span>
-                    </div>
-                    <div class="w-full bg-slate-200 rounded-full h-5 shadow-inner">
-                        <div id="compliance-bar" class="bg-gradient-to-r from-emerald-500 to-cyan-500 h-5 rounded-full transition-all duration-700 shadow-sm" style="width: 0%"></div>
-                    </div>
-                    <div class="flex justify-between text-sm font-bold text-slate-500 pt-2">
-                        <span>Ingreso Trazado: <span id="dash-declared" class="text-slate-800">0 t</span></span>
-                        <span>Objetivo Damu SGC: <span id="dash-target" class="text-slate-800">1000 t</span></span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-6 text-center">
-                <div class="p-6 bg-gradient-to-br from-emerald-50 to-white rounded-2xl border border-emerald-100 shadow-sm">
-                    <span class="block text-4xl font-black text-emerald-700 mb-1">12</span>
-                    <span class="text-sm text-slate-600 uppercase font-bold tracking-widest">Rutas Optimizadas</span>
-                </div>
-                <div class="p-6 bg-gradient-to-br from-cyan-50 to-white rounded-2xl border border-cyan-100 shadow-sm">
-                    <span class="block text-4xl font-black text-cyan-600 mb-1">98.8%</span>
-                    <span class="text-sm text-slate-600 uppercase font-bold tracking-widest">Precisión QR/Barras</span>
                 </div>
             </div>
         </section>
@@ -322,136 +178,56 @@
     </main>
 
     <script>
-        // ----- NAVEGACIÓN -----
+        // ----- NAVEGACIÓN POR PESTAÑAS -----
         function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
         }
 
-        // ----- SISTEMA DE AUTENTICACIÓN (LOGIN/SIGNUP) -----
-        function toggleAuth(type) {
-            const loginForm = document.getElementById('login-form');
-            const registerForm = document.getElementById('register-form');
-            const btnLogin = document.getElementById('btn-tab-login');
-            const btnRegister = document.getElementById('btn-tab-register');
+        // Soporte para ?tab=map en la URL (usado desde portal.html)
+        (function() {
+            const params = new URLSearchParams(window.location.search);
+            const tab = params.get('tab');
+            if (tab) switchTab(tab);
+        })();
 
-            if(type === 'login') {
+        // ----- AUTENTICACIÓN -----
+        function toggleAuth(type) {
+            const loginForm    = document.getElementById('login-form');
+            const registerForm = document.getElementById('register-form');
+            const btnLogin     = document.getElementById('btn-tab-login');
+            const btnRegister  = document.getElementById('btn-tab-register');
+            const activeClass  = 'flex-1 py-4 font-bold text-emerald-700 border-b-2 border-emerald-600 bg-emerald-50/50';
+            const inactiveClass = 'flex-1 py-4 font-bold text-slate-500 hover:bg-slate-50 transition';
+
+            if (type === 'login') {
                 loginForm.classList.remove('hidden');
                 registerForm.classList.add('hidden');
-                
-                btnLogin.className = "flex-1 py-4 font-bold text-emerald-700 border-b-2 border-emerald-600 bg-emerald-50/50";
-                btnRegister.className = "flex-1 py-4 font-bold text-slate-500 hover:bg-slate-50 transition";
+                btnLogin.className    = activeClass;
+                btnRegister.className = inactiveClass;
             } else {
                 loginForm.classList.add('hidden');
                 registerForm.classList.remove('hidden');
-                
-                btnRegister.className = "flex-1 py-4 font-bold text-emerald-700 border-b-2 border-emerald-600 bg-emerald-50/50";
-                btnLogin.className = "flex-1 py-4 font-bold text-slate-500 hover:bg-slate-50 transition";
+                btnRegister.className = activeClass;
+                btnLogin.className    = inactiveClass;
             }
         }
 
-        // Mostrar Banner TMS al seleccionar Transportista
         function toggleRegForm() {
             const isTransportista = document.querySelector('input[name="userType"][value="transportista"]').checked;
-            const tmsBanner = document.getElementById('tms-banner');
-            if(isTransportista) {
-                tmsBanner.classList.remove('hidden');
-            } else {
-                tmsBanner.classList.add('hidden');
-            }
+            document.getElementById('tms-banner').classList.toggle('hidden', !isTransportista);
         }
 
-        // Lógica de Login: Oculta panel de Auth, muestra perfil activo y activa pestaña de Eco-ticket
+        // Login: guarda sesión y redirige a portal.html
         function loginCompany() {
-            document.getElementById('nav-ecoticket').classList.remove('hidden');
-            document.getElementById('auth-container').classList.add('hidden');
-            document.getElementById('profile-logged-in').classList.remove('hidden');
-            calculateEcoTicket(); // Forzar recálculo
+            localStorage.setItem('damu_session', JSON.stringify({
+                empresa: 'Manufacturas Circulares S.A.',
+                rut: document.getElementById('login-rut').value,
+                tipo: 'productor',
+                ts: Date.now()
+            }));
+            window.location.href = 'portal.html';
         }
-
-        function logoutCompany() {
-            document.getElementById('nav-ecoticket').classList.add('hidden');
-            document.getElementById('profile-logged-in').classList.add('hidden');
-            document.getElementById('auth-container').classList.remove('hidden');
-            switchTab('home');
-        }
-
-        // ----- CALCULADORA DEL VOLUMEN (ECO-TICKET) -----
-        function toggleInput(checkbox, inputId) {
-            const input = document.getElementById(inputId);
-            if (checkbox.checked) {
-                input.classList.remove('hidden');
-                input.focus();
-            } else {
-                input.classList.add('hidden');
-                input.value = '';
-            }
-            calculateEcoTicket();
-        }
-
-        function calculateEcoTicket() {
-            let totalCosto = 0;
-            let totalToneladasDeclaradas = 0;
-            const checkboxes = document.querySelectorAll('.rep-checkbox');
-            const categorias = [];
-
-            const labelMap = {
-                'tons-envases':   'Envases y embalajes',
-                'tons-neumaticos':'Neumáticos',
-                'tons-raee':      'RAEE',
-                'tons-pilas':     'Pilas y baterías',
-                'tons-aceites':   'Aceites lubricantes',
-                'tons-textiles':  'Textiles'
-            };
-
-            checkboxes.forEach(cb => {
-                if (cb.checked) {
-                    const costoPorTonelada = parseInt(cb.value);
-                    const inputId = cb.getAttribute('onchange').match(/'([^']+)'/)[1];
-                    const toneladasInput = document.getElementById(inputId);
-                    const toneladas = parseFloat(toneladasInput.value) || 0;
-
-                    totalCosto += (costoPorTonelada * toneladas);
-                    totalToneladasDeclaradas += toneladas;
-                    if (toneladas > 0) categorias.push({ nombre: labelMap[inputId] || inputId, toneladas, costo: costoPorTonelada * toneladas });
-                }
-            });
-
-            document.getElementById('ecoCost').innerText = '$' + totalCosto.toLocaleString('es-CL') + ' CLP';
-            updateDashboardCompliance(totalToneladasDeclaradas);
-
-            // Guardar en localStorage para Dashboard
-            try {
-                const metaEstipulada = parseFloat(document.getElementById('rep-target').value) || 0;
-                localStorage.setItem('damu_ecoticket', JSON.stringify({
-                    empresa: 'Manufacturas Circulares S.A.',
-                    metaREP: metaEstipulada,
-                    totalToneladas: totalToneladasDeclaradas,
-                    totalCosto: totalCosto,
-                    categorias: categorias,
-                    pctCumplimiento: metaEstipulada > 0 ? Math.min((totalToneladasDeclaradas / metaEstipulada) * 100, 100).toFixed(1) : 0,
-                    ts: Date.now()
-                }));
-            } catch(e) {}
-        }
-
-        // Sincronización con las métricas de la pestaña Eco-ticket
-        function updateDashboardCompliance(toneladasDeclaradas) {
-            const metaEstipulada = parseFloat(document.getElementById('rep-target').value) || 0;
-            let porcentaje = 0;
-            
-            if (metaEstipulada > 0) {
-                porcentaje = (toneladasDeclaradas / metaEstipulada) * 100;
-            }
-            
-            const porcentajeBarra = Math.min(porcentaje, 100);
-
-            document.getElementById('compliance-pct').innerText = Math.round(porcentaje) + '%';
-            document.getElementById('compliance-bar').style.width = porcentajeBarra + '%';
-            document.getElementById('dash-declared').innerText = toneladasDeclaradas.toFixed(1) + ' t';
-            document.getElementById('dash-target').innerText = metaEstipulada + ' t';
-        }
-
     </script>
 </body>
 </html>
