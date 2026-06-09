@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Damu SGC — Mapa Operativo de Acopio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .text-gradient { background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+    <!-- ═══ NAV — herramientas disponibles para usuario logueado ═══ -->
+    <nav class="bg-gradient-to-r from-emerald-700 to-cyan-600 text-white shadow-lg w-full p-4 flex justify-between items-center">
+        <a href="index.html" class="flex items-center space-x-2">
+            <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center">
+                <span class="text-emerald-700 font-bold text-xl">D</span>
+            </div>
+            <span class="text-2xl font-bold tracking-wide">Damu SGC</span>
+        </a>
+        <ul class="flex space-x-3 font-medium items-center">
+            <li><a href="index.html" class="hover:text-cyan-200 transition px-2 py-1">Inicio</a></li>
+            <!-- ── Botones de herramientas ── -->
+            <li>
+                <a href="portal.html"
+                    class="bg-white/15 border border-white/30 text-white hover:bg-white/25 transition px-4 py-1.5 rounded-full text-sm font-semibold">
+                    🧾 Eco-Ticket
+                </a>
+            </li>
+            <li>
+                <a href="simulador.html"
+                    class="bg-cyan-500 text-white px-4 py-1.5 rounded-full shadow-md hover:bg-cyan-400 transition font-bold text-sm">
+                    📊 Simulador Pro
+                </a>
+            </li>
+            <!-- ── Añade más herramientas aquí ── -->
+        </ul>
+    </nav>
+
+    <main class="flex-grow p-8 max-w-6xl mx-auto w-full">
+
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100">
+            <!-- Encabezado -->
+            <div class="flex items-start justify-between mb-6">
+                <div>
+                    <h2 class="text-3xl font-bold text-emerald-700 mb-1">Red Satelital de Acopio</h2>
+                    <p class="text-slate-500 text-sm">
+                        Visualiza y gestiona nuestra red de puntos de reciclaje, instalaciones de valorización
+                        y rutas activas de recolección en tiempo real.
+                    </p>
+                </div>
+                <!-- Badge de estado -->
+                <span class="flex-shrink-0 ml-4 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full">
+                    🟢 Red Activa
+                </span>
+            </div>
+
+            <!-- Mapa principal -->
+            <div class="relative w-full rounded-xl overflow-hidden border-2 border-cyan-100 shadow-inner bg-slate-200" style="height: 600px;">
+                <iframe
+                    src="https://www.google.com/maps/d/embed?mid=1Ago0V1u7r5WkSJ1qSDzFb8OorWELTJM&ehbc=2E312F&noprof=1"
+                    width="100%" height="100%" frameborder="0" style="border:0;" allowfullscreen>
+                </iframe>
+            </div>
+
+            <!-- Leyenda de puntos -->
+            <div class="mt-5 flex flex-wrap gap-4 text-xs font-semibold text-slate-600">
+                <span class="flex items-center gap-1.5">
+                    <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>Punto de Acopio
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <span class="w-3 h-3 rounded-full bg-cyan-500 inline-block"></span>Instalación de Valorización
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <span class="w-3 h-3 rounded-full bg-amber-400 inline-block"></span>Ruta Activa
+                </span>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="bg-slate-900 text-slate-400 text-xs py-4 border-t border-slate-800">
+        <div class="max-w-6xl mx-auto px-6 text-center">
+            <p>© 2026 Damu SGC — Plataforma de Trazabilidad y Logística Inversa Ley REP.</p>
+        </div>
+    </footer>
+
+</body>
+</html>

@@ -21,14 +21,19 @@
             </div>
             <span class="text-2xl font-bold tracking-wide">Damu SGC</span>
         </a>
-        <ul class="flex space-x-6 font-medium items-center">
-            <li><a href="index.html" class="hover:text-cyan-200 transition">Inicio</a></li>
-            <li><a href="index.html?tab=map" class="hover:text-cyan-200 transition">Mapa Operativo</a></li>
-            <li class="bg-white/20 px-4 py-1 rounded-full cursor-default">Mi Portal</li>
-            <!-- ── Herramientas: añade más <li> aquí al crecer el proyecto ── -->
+        <ul class="flex space-x-3 font-medium items-center">
+            <li><a href="index.html" class="hover:text-cyan-200 transition px-2 py-1">Inicio</a></li>
+            <!-- ── Botones de herramientas: añade más <li> aquí al crecer el proyecto ── -->
             <li>
-                <a href="simulador.html" class="bg-cyan-500 text-white px-4 py-1 rounded-full shadow-md hover:bg-cyan-400 transition font-bold">
-                    Simulador Pro 📊
+                <a href="mapa.html"
+                    class="bg-white/15 border border-white/30 text-white hover:bg-white/25 transition px-4 py-1.5 rounded-full text-sm font-semibold">
+                    🗺️ Mapa Operativo
+                </a>
+            </li>
+            <li>
+                <a href="simulador.html"
+                    class="bg-cyan-500 text-white px-4 py-1.5 rounded-full shadow-md hover:bg-cyan-400 transition font-bold text-sm">
+                    📊 Simulador Pro
                 </a>
             </li>
         </ul>
@@ -74,9 +79,13 @@
                     </div>
 
                     <!-- ── Accesos a herramientas externas ──
-                         Para conectar una nueva herramienta: copia el bloque <a> y cambia el href -->
+                         Para conectar una nueva herramienta: copia un bloque <a> y cambia el href -->
                     <div class="space-y-2 mb-6">
                         <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Herramientas del Portal</p>
+                        <a href="mapa.html"
+                            class="flex items-center justify-between w-full bg-white border border-emerald-200 text-emerald-700 font-bold py-2.5 px-4 rounded-lg hover:bg-emerald-50 transition text-sm">
+                            <span>🗺️ Mapa Operativo de Acopio</span><span>→</span>
+                        </a>
                         <a href="simulador.html"
                             class="flex items-center justify-between w-full bg-gradient-to-r from-emerald-600 to-cyan-500 text-white font-bold py-2.5 px-4 rounded-lg shadow hover:shadow-cyan-500/40 hover:scale-[1.02] transition text-sm">
                             <span>📊 Simulador de Rentabilidad Pro</span><span>→</span>
