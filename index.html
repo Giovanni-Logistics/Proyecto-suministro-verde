@@ -65,6 +65,7 @@
                         <li class="flex items-center">✓ Simular presupuestos reales con el Eco-Ticket.</li>
                         <li class="flex items-center">✓ Reportar metas de valorización anual (Ley REP).</li>
                         <li class="flex items-center">✓ Obtener certificados de trazabilidad en tiempo real.</li>
+                        <li class="flex items-center text-emerald-700 font-bold">✓ Proyectar ingresos por valorización, CO₂e mitigado y costos operativos con el Simulador de Rentabilidad Pro.</li>
                     </ul>
                 </div>
 
@@ -76,6 +77,7 @@
                     <ul class="space-y-2 text-sm text-slate-700 font-medium">
                         <li class="flex items-center">✓ Asignación dinámica de rutas desde el Mapa de Acopio.</li>
                         <li class="flex items-center">✓ Escaneo de cargas mediante códigos QR/Barras.</li>
+                        <li class="flex items-center">✓ Visualiza KPIs operativos en tiempo real: rutas optimizadas, precisión de escaneo y rentabilidad por viaje.</li>
                         <li class="flex items-center text-cyan-700 font-bold">✓ Acceso directo a nuestro sistema propio TMS para gestión integral de flota.</li>
                     </ul>
                 </div>
@@ -178,15 +180,20 @@
 
                 <!-- Columnas Derechas: Calculadora Eco-Ticket con las 6 Leyes REP -->
                 <div class="lg:col-span-2 bg-white p-8 rounded-2xl shadow-sm border border-emerald-100">
-                    <!-- Acceso directo al Simulador Pro -->
-                    <div class="mb-6 p-4 bg-gradient-to-r from-emerald-50 to-cyan-50 border border-emerald-200 rounded-xl flex items-center justify-between">
+                    <!-- Acceso directo al Simulador Pro + Dashboard -->
+                    <div class="mb-6 p-4 bg-gradient-to-r from-emerald-50 to-cyan-50 border border-emerald-200 rounded-xl flex items-center justify-between gap-3 flex-wrap">
                         <div>
                             <p class="text-sm font-bold text-emerald-800">¿Quieres proyectar tus ingresos por valorización?</p>
                             <p class="text-xs text-slate-500 mt-0.5">Accede al dashboard avanzado de rentabilidad Ley REP.</p>
                         </div>
-                        <a href="simulador.html" class="flex-shrink-0 ml-4 bg-gradient-to-r from-emerald-600 to-cyan-500 text-white font-bold py-2.5 px-5 rounded-full shadow-md hover:shadow-cyan-500/40 hover:scale-105 transition transform duration-200 text-sm whitespace-nowrap">
-                            Abrir Simulador de Rentabilidad Pro →
-                        </a>
+                        <div class="flex gap-2 flex-shrink-0">
+                            <a href="dashboard.html" class="bg-white border border-emerald-300 text-emerald-700 font-bold py-2.5 px-4 rounded-full shadow-sm hover:bg-emerald-50 transition text-sm whitespace-nowrap">
+                                📊 Dashboard
+                            </a>
+                            <a href="simulador.html" class="bg-gradient-to-r from-emerald-600 to-cyan-500 text-white font-bold py-2.5 px-5 rounded-full shadow-md hover:shadow-cyan-500/40 hover:scale-105 transition transform duration-200 text-sm whitespace-nowrap">
+                                Simulador Pro →
+                            </a>
+                        </div>
                     </div>
                     <div class="flex justify-between items-start mb-6">
                         <div>
@@ -386,6 +393,16 @@
             let totalCosto = 0;
             let totalToneladasDeclaradas = 0;
             const checkboxes = document.querySelectorAll('.rep-checkbox');
+            const categorias = [];
+
+            const labelMap = {
+                'tons-envases':   'Envases y embalajes',
+                'tons-neumaticos':'Neumáticos',
+                'tons-raee':      'RAEE',
+                'tons-pilas':     'Pilas y baterías',
+                'tons-aceites':   'Aceites lubricantes',
+                'tons-textiles':  'Textiles'
+            };
 
             checkboxes.forEach(cb => {
                 if (cb.checked) {
@@ -393,14 +410,29 @@
                     const inputId = cb.getAttribute('onchange').match(/'([^']+)'/)[1];
                     const toneladasInput = document.getElementById(inputId);
                     const toneladas = parseFloat(toneladasInput.value) || 0;
-                    
+
                     totalCosto += (costoPorTonelada * toneladas);
                     totalToneladasDeclaradas += toneladas;
+                    if (toneladas > 0) categorias.push({ nombre: labelMap[inputId] || inputId, toneladas, costo: costoPorTonelada * toneladas });
                 }
             });
 
             document.getElementById('ecoCost').innerText = '$' + totalCosto.toLocaleString('es-CL') + ' CLP';
             updateDashboardCompliance(totalToneladasDeclaradas);
+
+            // Guardar en localStorage para Dashboard
+            try {
+                const metaEstipulada = parseFloat(document.getElementById('rep-target').value) || 0;
+                localStorage.setItem('damu_ecoticket', JSON.stringify({
+                    empresa: 'Manufacturas Circulares S.A.',
+                    metaREP: metaEstipulada,
+                    totalToneladas: totalToneladasDeclaradas,
+                    totalCosto: totalCosto,
+                    categorias: categorias,
+                    pctCumplimiento: metaEstipulada > 0 ? Math.min((totalToneladasDeclaradas / metaEstipulada) * 100, 100).toFixed(1) : 0,
+                    ts: Date.now()
+                }));
+            } catch(e) {}
         }
 
         // Sincronización con las métricas de la pestaña Eco-ticket

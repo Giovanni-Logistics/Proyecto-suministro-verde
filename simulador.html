@@ -2,7 +2,7 @@
 <html lang="es"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EcoRetorno: Hub de Logística Inversa — Ley REP</title>
+    <title>Damu SGC — Simulador de Rentabilidad Ley REP</title>
     <style>/* Subconjunto estático de Tailwind — utilidades usadas por EcoRetorno (offline) */
 
 /* ---------- Preflight esencial ---------- */
@@ -283,9 +283,44 @@ label,span,div,a,thead,tbody,tr,section,header,footer,main,template{}
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(15px); } to { transform: none; } }
         input[type=range] { accent-color: #059669; }
+
+        /* ── KPI Progressive Unlock ── */
+        .kpi-locked-overlay {
+            position: absolute; inset: 0; background: rgba(248,250,252,0.92);
+            backdrop-filter: blur(3px); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 20;
+            border-radius: 1rem; transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+        .kpi-locked-overlay.unlocking {
+            opacity: 0; transform: scale(0.96); pointer-events: none;
+        }
+        .kpi-lock-icon { font-size: 1.5rem; margin-bottom: 6px; opacity: 0.5; }
+        .kpi-lock-label { font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.08em; color: #94a3b8; text-align: center; padding: 0 12px; }
+
+        /* toast */
+        #kpi-toast {
+            position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 100;
+            background: linear-gradient(135deg, #059669, #0891b2);
+            color: #fff; padding: 10px 18px; border-radius: 999px;
+            font-size: 12px; font-weight: 700; box-shadow: 0 8px 24px rgba(5,150,105,0.35);
+            transform: translateY(80px); opacity: 0;
+            transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1);
+            pointer-events: none;
+        }
+        #kpi-toast.show { transform: translateY(0); opacity: 1; }
+
+        /* progress bar in header */
+        #kpi-progress-bar {
+            height: 3px; background: linear-gradient(to right, #059669, #06b6d4);
+            transition: width 0.6s ease; border-radius: 999px;
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+
+    <!-- Toast desbloqueado -->
+    <div id="kpi-toast">📊 KPI desbloqueado</div>
 
     <header class="bg-gradient-to-r from-emerald-800 to-teal-900 text-white shadow-xl">
         <div class="max-w-7xl mx-auto px-6 py-5 flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -294,17 +329,24 @@ label,span,div,a,thead,tbody,tr,section,header,footer,main,template{}
                     <svg class="w-7 h-7 text-emerald-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>
                 </div>
                 <div>
-                    <h1 class="text-2xl font-bold tracking-tight">EcoRetorno: Hub de Logística Inversa</h1>
+                    <h1 class="text-2xl font-bold tracking-tight">Damu SGC — Simulador de Rentabilidad</h1>
                     <p class="text-emerald-200 text-xs font-medium uppercase tracking-wider">Valorización de Residuos bajo Ley REP (Decreto 12)</p>
                 </div>
             </div>
             <div class="flex items-center gap-3 border-t sm:border-t-0 pt-3 sm:pt-0 border-emerald-700 w-full sm:w-auto justify-end">
-                <a href="index.html" class="bg-white/15 border border-white/30 text-white hover:bg-white/25 transition px-4 py-1.5 rounded-full text-sm font-semibold flex items-center gap-2">
-                    ← Volver al Portal
+                <!-- Progreso KPIs -->
+                <div class="hidden sm:flex items-center gap-2">
+                    <span class="text-emerald-300 text-[10px] font-bold uppercase tracking-wider" id="kpi-progress-label">0 / 7 KPIs</span>
+                    <div class="w-20 bg-emerald-900 rounded-full overflow-hidden" style="height:4px">
+                        <div id="kpi-progress-bar" style="width:0%"></div>
+                    </div>
+                </div>
+                <a href="dashboard.html" class="bg-white/15 border border-white/30 text-white hover:bg-white/25 transition px-4 py-1.5 rounded-full text-sm font-semibold flex items-center gap-2">
+                    📊 Dashboard
                 </a>
-                <span class="bg-emerald-700/50 border border-emerald-500/30 text-emerald-100 px-3 py-1.5 rounded-lg text-xs font-semibold">
-                    Evaluación Parcial 3 • CSA1906
-                </span>
+                <a href="index.html" class="bg-white/15 border border-white/30 text-white hover:bg-white/25 transition px-4 py-1.5 rounded-full text-sm font-semibold flex items-center gap-2">
+                    ← Portal
+                </a>
             </div>
         </div>
     </header>
@@ -322,7 +364,7 @@ label,span,div,a,thead,tbody,tr,section,header,footer,main,template{}
                 <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
                     <div class="flex items-center gap-3">
                         <span class="text-xl">📋</span>
-                        <h2 class="text-lg font-bold text-slate-800">Estrategias PDCA — EcoRetorno</h2>
+                        <h2 class="text-lg font-bold text-slate-800">Estrategias PDCA — Damu SGC</h2>
                     </div>
                     <button onclick="closeModal('modal-pdca')" class="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 hover:text-slate-800 flex items-center justify-center font-bold text-lg transition-colors" aria-label="Cerrar">×</button>
                 </div>
@@ -330,7 +372,7 @@ label,span,div,a,thead,tbody,tr,section,header,footer,main,template{}
                 <div class="modal-body p-6">
         <section id="pdca">
             <div class="mb-6">
-                <h2 class="text-2xl font-bold text-slate-800">Plan de Acción PHVA — EcoRetorno Ley REP</h2>
+                <h2 class="text-2xl font-bold text-slate-800">Plan de Acción PHVA — Damu SGC Ley REP</h2>
                 <p class="text-slate-500 text-sm mt-1">Tres estrategias bajo el ciclo PHVA para recolectar, valorizar y certificar residuos de envases y embalajes según el Decreto 12 de la Ley REP de Chile.</p>
             </div>
 
@@ -457,7 +499,7 @@ label,span,div,a,thead,tbody,tr,section,header,footer,main,template{}
                 <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
                     <div class="flex items-center gap-3">
                         <span class="text-xl">📅</span>
-                        <h2 class="text-lg font-bold text-slate-800">Carta Gantt Operativa — EcoRetorno</h2>
+                        <h2 class="text-lg font-bold text-slate-800">Carta Gantt Operativa — Damu SGC</h2>
                     </div>
                     <button onclick="closeModal('modal-gantt')" class="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 hover:text-slate-800 flex items-center justify-center font-bold text-lg transition-colors" aria-label="Cerrar">×</button>
                 </div>
@@ -817,6 +859,7 @@ label,span,div,a,thead,tbody,tr,section,header,footer,main,template{}
 
                     <!-- ━━━ KPI 1: Rentabilidad Operativa Neta ━━━ -->
                     <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200" id="cardRentabilidad">
+                        <div class="kpi-locked-overlay" id="lock-kpi1"><span class="kpi-lock-icon">🔒</span><span class="kpi-lock-label">Ajusta variables<br>de Mercado</span></div>
                         <div class="absolute top-0 right-0 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider bg-slate-100 text-slate-500" id="badgeRentabilidad">Rentabilidad</div>
                         <div>
                             <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Rentabilidad Operativa Neta</h3>
@@ -846,6 +889,7 @@ label,span,div,a,thead,tbody,tr,section,header,footer,main,template{}
 
                     <!-- ━━━ KPI 2: Eficiencia Volumétrica / Saturación ━━━ -->
                     <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200" id="cardEficiencia">
+                        <div class="kpi-locked-overlay" id="lock-kpi2"><span class="kpi-lock-icon">🔒</span><span class="kpi-lock-label">Ajusta variables<br>de Flota</span></div>
                         <div class="absolute top-0 right-0 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider" id="badgeEficiencia">Saturación Flota</div>
                         <div>
                             <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Eficiencia Volumétrica</h3>
@@ -863,6 +907,7 @@ label,span,div,a,thead,tbody,tr,section,header,footer,main,template{}
 
                     <!-- ━━━ KPI 3: ROI & Payback ━━━ -->
                     <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200" id="cardROI">
+                        <div class="kpi-locked-overlay" id="lock-kpi3"><span class="kpi-lock-icon">🔒</span><span class="kpi-lock-label">Ingresa Volumen<br>Recuperado</span></div>
                         <div class="absolute top-0 right-0 bg-slate-100 text-slate-500 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider">ROI & Payback</div>
                         <div>
                             <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Retorno de Inversión</h3>
@@ -889,6 +934,7 @@ label,span,div,a,thead,tbody,tr,section,header,footer,main,template{}
 
                     <!-- ━━━ KPI 4: Balance de Carbono Neto ━━━ -->
                     <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200" id="cardCarbono">
+                        <div class="kpi-locked-overlay" id="lock-kpi4"><span class="kpi-lock-icon">🔒</span><span class="kpi-lock-label">Ajusta variables<br>de Flota</span></div>
                         <div class="absolute top-0 right-0 bg-slate-100 text-slate-500 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider">Balance CO₂</div>
                         <div>
                             <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Balance de Carbono Neto</h3>
@@ -914,6 +960,7 @@ label,span,div,a,thead,tbody,tr,section,header,footer,main,template{}
 
                     <!-- ━━━ KPI 5: Cumplimiento Ley REP — ancho completo ━━━ -->
                     <div class="sm:col-span-2 p-5 rounded-2xl border-2 flex flex-col gap-3 relative overflow-hidden transition-all duration-300" id="cardMeta">
+                        <div class="kpi-locked-overlay" id="lock-kpi5"><span class="kpi-lock-icon">🔒</span><span class="kpi-lock-label">Ingresa Volumen Recuperado<br>para ver cumplimiento REP</span></div>
                         <div class="absolute top-0 right-0 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider" id="badgeMeta">Ley REP</div>
                         <div class="flex items-start gap-4">
                             <div class="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center" id="iconMeta">
@@ -941,6 +988,7 @@ label,span,div,a,thead,tbody,tr,section,header,footer,main,template{}
 
                     <!-- ━━━ KPI 6: Costo por Tonelada Recuperada ━━━ -->
                     <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200" id="cardCostoPorTon">
+                        <div class="kpi-locked-overlay" id="lock-kpi6"><span class="kpi-lock-icon">🔒</span><span class="kpi-lock-label">Ingresa Volumen<br>Recuperado</span></div>
                         <div class="absolute top-0 right-0 bg-slate-100 text-slate-500 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider" id="badgeCostoPorTon">Eficiencia Operac.</div>
                         <div>
                             <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Costo por Tonelada Recuperada</h3>
@@ -965,6 +1013,7 @@ label,span,div,a,thead,tbody,tr,section,header,footer,main,template{}
 
                     <!-- ━━━ KPI 7: Multa REP Evitada Proyectada ━━━ -->
                     <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200" id="cardMulta">
+                        <div class="kpi-locked-overlay" id="lock-kpi7"><span class="kpi-lock-icon">🔒</span><span class="kpi-lock-label">Ingresa Volumen<br>Recuperado</span></div>
                         <div class="absolute top-0 right-0 bg-slate-100 text-slate-500 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider" id="badgeMulta">Art. 48 Ley REP</div>
                         <div>
                             <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Multa REP Evitada Proyectada</h3>
@@ -993,7 +1042,7 @@ label,span,div,a,thead,tbody,tr,section,header,footer,main,template{}
 
     <footer class="bg-slate-900 text-slate-400 text-xs py-4 border-t border-slate-800 mt-12">
         <div class="max-w-7xl mx-auto px-6 text-center flex flex-col sm:flex-row justify-between items-center gap-2">
-            <p>© 2026 EcoRetorno — Hub de Logística Inversa · Prototipo Ingeniería en Gestión Logística.</p>
+            <p>© 2026 Damu SGC — Plataforma de Trazabilidad y Logística Inversa Ley REP.</p>
             <p class="text-slate-500">Diseñado estructuralmente para simulación de métricas medioambientales.</p>
         </div>
     </footer>
@@ -1091,14 +1140,80 @@ label,span,div,a,thead,tbody,tr,section,header,footer,main,template{}
     });
   }
 
+  // ── Estado de desbloqueo progresivo ──
+  var unlocked = { kpi1: false, kpi2: false, kpi3: false, kpi4: false, kpi5: false, kpi6: false, kpi7: false };
+
+  function showToast(msg) {
+    var t = document.getElementById('kpi-toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(function() { t.classList.remove('show'); }, 2500);
+  }
+
+  function unlockKPI(id, label) {
+    if (unlocked[id]) return;
+    unlocked[id] = true;
+    var overlay = document.getElementById('lock-' + id);
+    if (!overlay) return;
+    overlay.classList.add('unlocking');
+    setTimeout(function() { overlay.style.display = 'none'; }, 500);
+    showToast('📊 ' + label + ' desbloqueado');
+    updateProgress();
+  }
+
+  function updateProgress() {
+    var count = Object.values(unlocked).filter(Boolean).length;
+    var pct = Math.round((count / 7) * 100);
+    var bar = document.getElementById('kpi-progress-bar');
+    var lbl = document.getElementById('kpi-progress-label');
+    if (bar) bar.style.width = pct + '%';
+    if (lbl) lbl.textContent = count + ' / 7 KPIs';
+  }
+
+  function onMarketChange() {
+    unlockKPI('kpi1', 'Rentabilidad Neta');
+    actualizarSimulador();
+  }
+  function onFleetChange() {
+    unlockKPI('kpi2', 'Eficiencia Volumétrica');
+    unlockKPI('kpi4', 'Balance CO₂');
+    actualizarSimulador();
+  }
+  function onVolumeChange() {
+    var v = parseFloat(sKmVacio.value);
+    nVolumen.value = sKmVacio.value;
+    if (v > 0) {
+      unlockKPI('kpi3', 'ROI & Payback');
+      unlockKPI('kpi5', 'Cumplimiento Ley REP');
+      unlockKPI('kpi6', 'Costo por Tonelada');
+      unlockKPI('kpi7', 'Multa REP Evitada');
+    }
+    actualizarSimulador();
+  }
+
   syncPair(sDiesel,      nDiesel);
   syncPair(sCarton,      nCarton);
   syncPair(sPET,         nPET);
   syncPair(sRendimiento, nRendimiento);
   syncPair(sDistancia,   nDistancia);
-  syncPair(sKmVacio,     nVolumen);
+  // Override volume slider with progressive logic
+  sKmVacio.addEventListener('input', onVolumeChange);
+  nVolumen.addEventListener('input', function() {
+    var v = parseFloat(nVolumen.value);
+    if (!isNaN(v)) { v = Math.min(Math.max(v, 0), 500); sKmVacio.value = v; nVolumen.value = v; }
+    onVolumeChange();
+  });
   sCombustible.addEventListener('input', actualizarSimulador);
   sMantencion.addEventListener('input',  actualizarSimulador);
+
+  // Override market sliders with unlock logic
+  [sDiesel, nDiesel, sCarton, nCarton, sPET, nPET].forEach(function(el) {
+    el.addEventListener('input', onMarketChange);
+  });
+  // Override fleet sliders with unlock logic
+  [sRendimiento, nRendimiento, sDistancia, nDistancia].forEach(function(el) {
+    el.addEventListener('input', onFleetChange);
+  });
 
   function clp(n) { return '$' + Math.round(n).toLocaleString('es-CL'); }
 
@@ -1288,6 +1403,25 @@ label,span,div,a,thead,tbody,tr,section,header,footer,main,template{}
       'Acumulado 12 meses: ' + co2Anual.toFixed(2) + ' tCO\u2082e/a\u00f1o evitadas';
 
     evaluarMetaAmbiental(toneladas);
+
+    // ── Guardar estado en localStorage para Dashboard ──
+    try {
+      localStorage.setItem('damu_simulador', JSON.stringify({
+        toneladas: toneladas,
+        rentNeta: rentNeta,
+        ingresos: ingresos,
+        opexTotal: opexTotal,
+        saturacion: saturacion,
+        co2Neto: co2Neto,
+        co2Anual: co2Anual,
+        viajesNec: viajesNec,
+        costoPorTon: toneladas > 0 ? opexTotal / toneladas : 0,
+        tFaltantes: Math.max(0, META_REP_TON - toneladas),
+        multaAnual: Math.max(0, META_REP_TON - toneladas) > 0 ? Math.max(0, META_REP_TON - toneladas) * MULTA_POR_TON * 12 : 0,
+        pctMeta: Math.min((toneladas / META_REP_TON) * 100, 100).toFixed(1),
+        ts: Date.now()
+      }));
+    } catch(e) {}
 
     // ════════════════════════════════════════════════════
     // KPI 6 — Costo por Tonelada Recuperada
