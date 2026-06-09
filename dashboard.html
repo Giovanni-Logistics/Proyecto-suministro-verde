@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Integrado — Damu SGC</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .stat-card { transition: box-shadow 0.2s, transform 0.2s; }
+        .stat-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.08); transform: translateY(-1px); }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
+        .fade-up { animation: fadeUp 0.45s ease both; }
+        .fade-up-2 { animation: fadeUp 0.45s 0.1s ease both; }
+        .fade-up-3 { animation: fadeUp 0.45s 0.2s ease both; }
+        .bar-fill { transition: width 0.8s cubic-bezier(0.34,1.1,0.64,1); }
+        .gauge-ring { transition: stroke-dashoffset 1s cubic-bezier(0.34,1.1,0.64,1); }
+        .no-data-state { display: none; }
+        .no-data-state.visible { display: block; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-emerald-800 to-cyan-700 text-white shadow-xl">
+        <div class="max-w-7xl mx-auto px-6 py-5 flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div class="flex items-center gap-3">
+                <div class="bg-emerald-600 p-2.5 rounded-xl shadow-inner">
+                    <svg class="w-7 h-7 text-emerald-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight">Dashboard Integrado Damu SGC</h1>
+                    <p class="text-emerald-200 text-xs font-medium uppercase tracking-wider">Vinculación Portal Eco-Ticket ↔ Simulador de Rentabilidad</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap justify-end">
+                <span id="last-updated" class="text-emerald-300 text-xs font-medium"></span>
+                <a href="index.html" class="bg-white/15 border border-white/30 text-white hover:bg-white/25 transition px-4 py-1.5 rounded-full text-sm font-semibold">← Portal</a>
+                <a href="simulador.html" class="bg-white/15 border border-white/30 text-white hover:bg-white/25 transition px-4 py-1.5 rounded-full text-sm font-semibold">Simulador →</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl w-full mx-auto px-6 py-8 space-y-8">
+
+        <!-- Sin datos -->
+        <div id="no-data" class="no-data-state">
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-12 text-center">
+                <div class="text-5xl mb-4">📊</div>
+                <h2 class="text-xl font-bold text-slate-700 mb-2">Aún no hay datos sincronizados</h2>
+                <p class="text-slate-500 text-sm mb-6">Para ver el dashboard integrado, primero debes interactuar con el <strong>Portal Damu SGC</strong> (Eco-Ticket) y el <strong>Simulador de Rentabilidad</strong>.</p>
+                <div class="flex gap-3 justify-center flex-wrap">
+                    <a href="index.html" class="bg-gradient-to-r from-emerald-600 to-cyan-500 text-white font-bold py-2.5 px-6 rounded-full shadow hover:scale-105 transition text-sm">Ir al Portal →</a>
+                    <a href="simulador.html" class="bg-slate-800 text-white font-bold py-2.5 px-6 rounded-full shadow hover:bg-slate-700 transition text-sm">Ir al Simulador →</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════
+             BLOQUE 1 — Encabezado empresa + estado
+        ══════════════════════════════════════ -->
+        <div id="data-container" class="hidden space-y-8">
+
+            <!-- Empresa + 3 KPIs clave -->
+            <div class="grid md:grid-cols-4 gap-4 fade-up">
+                <!-- Empresa -->
+                <div class="md:col-span-1 bg-white rounded-2xl border border-emerald-100 shadow-sm p-6 flex flex-col items-center text-center stat-card">
+                    <div class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mb-3 shadow">M</div>
+                    <h3 class="font-bold text-slate-800 text-base" id="hdr-empresa">—</h3>
+                    <span class="mt-1.5 text-xs text-emerald-700 font-bold bg-emerald-50 px-3 py-0.5 rounded-full border border-emerald-100">Productor Nivel Premium</span>
+                    <div class="mt-4 w-full border-t border-slate-100 pt-4 text-xs text-slate-500">
+                        Meta REP anual: <span class="font-bold text-slate-700" id="hdr-meta">—</span> ton
+                    </div>
+                </div>
+
+                <!-- Brecha Declarado vs Recuperado -->
+                <div class="md:col-span-3 grid sm:grid-cols-3 gap-4">
+                    <!-- Eco-Ticket (declarado) -->
+                    <div class="bg-emerald-50 rounded-2xl border border-emerald-200 shadow-sm p-5 stat-card relative overflow-hidden">
+                        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-t-2xl"></div>
+                        <p class="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">Eco-Ticket · Declarado</p>
+                        <div class="text-3xl font-black text-emerald-700" id="kpi-declarado">— t</div>
+                        <div class="text-xs text-emerald-600 mt-0.5">Toneladas declaradas a REP</div>
+                        <div class="mt-3 text-xs text-slate-600">Costo gestión: <span class="font-bold" id="kpi-costo-eco">—</span></div>
+                    </div>
+
+                    <!-- Simulador (proyectado) -->
+                    <div class="bg-cyan-50 rounded-2xl border border-cyan-200 shadow-sm p-5 stat-card relative overflow-hidden">
+                        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-400 to-blue-400 rounded-t-2xl"></div>
+                        <p class="text-[10px] font-black uppercase tracking-widest text-cyan-600 mb-1">Simulador · Proyectado</p>
+                        <div class="text-3xl font-black text-cyan-700" id="kpi-recuperado">— t</div>
+                        <div class="text-xs text-cyan-600 mt-0.5">Toneladas recuperadas/mes</div>
+                        <div class="mt-3 text-xs text-slate-600">Rentabilidad: <span class="font-bold" id="kpi-rent">—</span></div>
+                    </div>
+
+                    <!-- Brecha -->
+                    <div class="bg-white rounded-2xl border-2 shadow-sm p-5 stat-card relative overflow-hidden" id="brecha-card">
+                        <div class="absolute top-0 left-0 w-full h-1 rounded-t-2xl" id="brecha-bar-top"></div>
+                        <p class="text-[10px] font-black uppercase tracking-widest mb-1" id="brecha-label-small">Brecha</p>
+                        <div class="text-3xl font-black" id="kpi-brecha">—</div>
+                        <div class="text-xs mt-0.5" id="brecha-subtitle">ton declaradas vs recuperadas</div>
+                        <div class="mt-3 text-xs font-bold" id="brecha-estado">—</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════
+                 BLOQUE 2 — Gauge REP + Barras por categoría + CO₂
+            ══════════════════════════════════════ -->
+            <div class="grid lg:grid-cols-3 gap-6 fade-up-2">
+
+                <!-- Gauge cumplimiento REP -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 stat-card flex flex-col items-center">
+                    <h3 class="text-sm font-bold text-slate-700 mb-4 self-start">Cumplimiento Ley REP</h3>
+                    <div class="relative w-40 h-40">
+                        <svg viewBox="0 0 120 120" class="w-full h-full -rotate-90">
+                            <circle cx="60" cy="60" r="50" fill="none" stroke="#e2e8f0" stroke-width="10"/>
+                            <circle cx="60" cy="60" r="50" fill="none" id="gauge-eco"
+                                stroke="#10b981" stroke-width="10"
+                                stroke-dasharray="314" stroke-dashoffset="314"
+                                stroke-linecap="round" class="gauge-ring"/>
+                            <circle cx="60" cy="60" r="50" fill="none" id="gauge-sim"
+                                stroke="#06b6d4" stroke-width="4" stroke-dasharray="314" stroke-dashoffset="314"
+                                stroke-linecap="round" class="gauge-ring" opacity="0.7"/>
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span class="text-2xl font-black text-slate-700" id="gauge-pct">0%</span>
+                            <span class="text-[10px] text-slate-400 font-bold">REP</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 w-full space-y-1.5 text-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full bg-emerald-500 shrink-0"></span>
+                            <span class="text-slate-600">Eco-Ticket declarado</span>
+                            <span class="ml-auto font-bold" id="gauge-lbl-eco">0%</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full bg-cyan-500 shrink-0"></span>
+                            <span class="text-slate-600">Simulador proyectado</span>
+                            <span class="ml-auto font-bold" id="gauge-lbl-sim">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Barras por categoría REP -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 stat-card">
+                    <h3 class="text-sm font-bold text-slate-700 mb-4">Distribución por Categoría REP</h3>
+                    <div id="categorias-container" class="space-y-3">
+                        <p class="text-xs text-slate-400 italic">Sin categorías declaradas en el Eco-Ticket.</p>
+                    </div>
+                </div>
+
+                <!-- CO₂ + Eficiencia -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 stat-card space-y-4">
+                    <h3 class="text-sm font-bold text-slate-700">Indicadores Ambientales</h3>
+                    <div class="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">Balance CO₂ Neto (mes)</p>
+                        <div class="text-xl font-black text-emerald-700" id="co2-neto">— kg CO₂e</div>
+                        <div class="text-xs text-emerald-600 mt-0.5">Acum. 12 meses: <span class="font-bold" id="co2-anual">—</span></div>
+                    </div>
+                    <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Saturación de Flota</p>
+                        <div class="text-xl font-black text-slate-700" id="saturacion-val">—%</div>
+                        <div class="h-2 bg-slate-200 rounded-full mt-2 overflow-hidden">
+                            <div class="h-full rounded-full bar-fill bg-slate-300" id="saturacion-bar" style="width:0%"></div>
+                        </div>
+                    </div>
+                    <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Costo por Tonelada</p>
+                        <div class="text-xl font-black text-slate-700" id="costo-ton">— CLP/ton</div>
+                        <p class="text-[10px] text-slate-400 mt-0.5">Ref. eficiente: $8.000–$18.000 CLP/ton</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════
+                 BLOQUE 3 — Análisis de brecha + Recomendaciones
+            ══════════════════════════════════════ -->
+            <div class="grid md:grid-cols-2 gap-6 fade-up-3">
+
+                <!-- Análisis financiero -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 stat-card">
+                    <h3 class="text-sm font-bold text-slate-700 mb-4">Análisis Financiero Integrado</h3>
+                    <div class="space-y-3" id="fin-rows">
+                        <div class="flex justify-between text-sm border-b border-slate-100 pb-2">
+                            <span class="text-slate-500">Costo gestión Eco-Ticket</span>
+                            <span class="font-bold text-rose-600" id="fin-eco">—</span>
+                        </div>
+                        <div class="flex justify-between text-sm border-b border-slate-100 pb-2">
+                            <span class="text-slate-500">Ingresos por reciclaje (Simulador)</span>
+                            <span class="font-bold text-emerald-600" id="fin-ingresos">—</span>
+                        </div>
+                        <div class="flex justify-between text-sm border-b border-slate-100 pb-2">
+                            <span class="text-slate-500">OPEX logística (Simulador)</span>
+                            <span class="font-bold text-rose-500" id="fin-opex">—</span>
+                        </div>
+                        <div class="flex justify-between text-sm border-b border-slate-100 pb-2">
+                            <span class="text-slate-500">Multa REP evitada (proyectada)</span>
+                            <span class="font-bold text-amber-600" id="fin-multa">—</span>
+                        </div>
+                        <div class="flex justify-between text-sm pt-1">
+                            <span class="font-bold text-slate-700">Balance neto estimado</span>
+                            <span class="font-black text-lg" id="fin-balance">—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recomendaciones -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 stat-card">
+                    <h3 class="text-sm font-bold text-slate-700 mb-4">Recomendaciones del Sistema</h3>
+                    <div id="recomendaciones" class="space-y-3 text-xs text-slate-600">
+                        <p class="text-slate-400 italic">Cargando análisis…</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pie de actualización -->
+            <div class="text-center text-xs text-slate-400 pb-4 fade-up-3">
+                Los datos se sincronizan automáticamente desde el Portal (Eco-Ticket) y el Simulador de Rentabilidad.
+                <br>Recarga esta página después de actualizar cualquiera de los paneles.
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="bg-slate-900 text-slate-400 text-xs py-4 border-t border-slate-800">
+        <div class="max-w-7xl mx-auto px-6 text-center flex flex-col sm:flex-row justify-between items-center gap-2">
+            <p>© 2026 Damu SGC — Dashboard Integrado · Prototipo Ingeniería en Gestión Logística.</p>
+            <p class="text-slate-500">Evaluación Parcial 3 · CSA1906</p>
+        </div>
+    </footer>
+
+<script>
+/* ========================================================
+   DASHBOARD INTEGRADO — lee localStorage de ambos paneles
+   ======================================================== */
+
+function clp(n) {
+    if (n == null || isNaN(n)) return '—';
+    return '$' + Math.round(n).toLocaleString('es-CL') + ' CLP';
+}
+function fmt(n, dec, suffix) {
+    if (n == null || isNaN(n)) return '—';
+    return (dec != null ? n.toFixed(dec) : Math.round(n).toLocaleString('es-CL')) + (suffix || '');
+}
+function timeSince(ts) {
+    if (!ts) return '';
+    var diff = Math.floor((Date.now() - ts) / 1000);
+    if (diff < 60)  return 'hace ' + diff + ' s';
+    if (diff < 3600) return 'hace ' + Math.floor(diff/60) + ' min';
+    return 'hace ' + Math.floor(diff/3600) + ' h';
+}
+
+var eco = null, sim = null;
+try { eco = JSON.parse(localStorage.getItem('damu_ecoticket')); } catch(e) {}
+try { sim = JSON.parse(localStorage.getItem('damu_simulador')); } catch(e) {}
+
+var hasData = eco || sim;
+
+if (!hasData) {
+    document.getElementById('no-data').classList.add('visible');
+} else {
+    document.getElementById('data-container').classList.remove('hidden');
+
+    // ── Timestamp ──
+    var latestTs = Math.max(eco ? eco.ts||0 : 0, sim ? sim.ts||0 : 0);
+    if (latestTs) document.getElementById('last-updated').textContent = 'Actualizado ' + timeSince(latestTs);
+
+    // ── Empresa ──
+    document.getElementById('hdr-empresa').textContent = eco ? eco.empresa : 'Empresa';
+    document.getElementById('hdr-meta').textContent = eco ? fmt(eco.metaREP) : '—';
+
+    // ── KPIs declarado / recuperado / brecha ──
+    var tonEco = eco ? (eco.totalToneladas || 0) : null;
+    var tonSim = sim ? (sim.toneladas || 0) : null;
+
+    document.getElementById('kpi-declarado').textContent = tonEco != null ? fmt(tonEco, 1, ' t') : '— t';
+    document.getElementById('kpi-costo-eco').textContent = eco ? clp(eco.totalCosto) : '—';
+    document.getElementById('kpi-recuperado').textContent = tonSim != null ? fmt(tonSim, 1, ' t') : '— t';
+    document.getElementById('kpi-rent').textContent = sim ? clp(sim.rentNeta) : '—';
+
+    // Brecha
+    if (tonEco != null && tonSim != null) {
+        var brecha = tonEco - tonSim;
+        var brechaCard = document.getElementById('brecha-card');
+        var brechaVal  = document.getElementById('kpi-brecha');
+        var brechaSub  = document.getElementById('brecha-subtitle');
+        var brechaEst  = document.getElementById('brecha-estado');
+        var brechaTop  = document.getElementById('brecha-bar-top');
+        var brechaLbl  = document.getElementById('brecha-label-small');
+
+        brechaVal.textContent = (brecha >= 0 ? '+' : '') + fmt(brecha, 1, ' t');
+        brechaSub.textContent = 'declarado − recuperado';
+
+        if (brecha <= 0) {
+            // Simulador cubre o supera lo declarado — ideal
+            brechaCard.className = brechaCard.className.replace('bg-white border-2', 'bg-emerald-50 border-2 border-emerald-300');
+            brechaVal.className = 'text-3xl font-black text-emerald-700';
+            brechaTop.className = 'absolute top-0 left-0 w-full h-1 rounded-t-2xl bg-gradient-to-r from-emerald-400 to-cyan-400';
+            brechaLbl.className = 'text-[10px] font-black uppercase tracking-widest mb-1 text-emerald-600';
+            brechaEst.className = 'mt-3 text-xs font-bold text-emerald-600';
+            brechaEst.textContent = '✅ Simulador cubre la declaración';
+        } else if (brecha < 50) {
+            brechaCard.className = brechaCard.className.replace('bg-white border-2', 'bg-amber-50 border-2 border-amber-300');
+            brechaVal.className = 'text-3xl font-black text-amber-700';
+            brechaTop.className = 'absolute top-0 left-0 w-full h-1 rounded-t-2xl bg-gradient-to-r from-amber-400 to-orange-400';
+            brechaLbl.className = 'text-[10px] font-black uppercase tracking-widest mb-1 text-amber-600';
+            brechaEst.className = 'mt-3 text-xs font-bold text-amber-600';
+            brechaEst.textContent = '⚠ Brecha menor — amplía rutas';
+        } else {
+            brechaCard.className = brechaCard.className.replace('bg-white border-2', 'bg-rose-50 border-2 border-rose-300');
+            brechaVal.className = 'text-3xl font-black text-rose-700';
+            brechaTop.className = 'absolute top-0 left-0 w-full h-1 rounded-t-2xl bg-gradient-to-r from-rose-400 to-red-400';
+            brechaLbl.className = 'text-[10px] font-black uppercase tracking-widest mb-1 text-rose-600';
+            brechaEst.className = 'mt-3 text-xs font-bold text-rose-600';
+            brechaEst.textContent = '🚨 Brecha crítica — riesgo Art. 48';
+        }
+    } else {
+        document.getElementById('kpi-brecha').textContent = '—';
+        document.getElementById('brecha-estado').textContent = 'Usa ambos paneles para ver la brecha';
+    }
+
+    // ── Gauge REP ──
+    var metaREP = eco ? (eco.metaREP || 0) : 0;
+    var pctEco = eco ? parseFloat(eco.pctCumplimiento || 0) : 0;
+    var pctSim = sim ? parseFloat(sim.pctMeta || 0) : 0;
+
+    // Mostrar el mayor como gauge principal
+    var pctMax = Math.max(pctEco, pctSim);
+    document.getElementById('gauge-pct').textContent = pctMax.toFixed(0) + '%';
+    document.getElementById('gauge-lbl-eco').textContent = pctEco.toFixed(1) + '%';
+    document.getElementById('gauge-lbl-sim').textContent = pctSim.toFixed(1) + '%';
+
+    // SVG gauges — circumference 314
+    var circumference = 314;
+    setTimeout(function() {
+        var gaugeEco = document.getElementById('gauge-eco');
+        var gaugeSim = document.getElementById('gauge-sim');
+        gaugeEco.style.strokeDashoffset = circumference - (Math.min(pctEco, 100) / 100) * circumference;
+        gaugeSim.style.strokeDashoffset = circumference - (Math.min(pctSim, 100) / 100) * circumference;
+    }, 100);
+
+    // ── Categorías ──
+    var catContainer = document.getElementById('categorias-container');
+    var cats = eco ? (eco.categorias || []) : [];
+    if (cats.length > 0) {
+        var totalCatTons = cats.reduce(function(a, c) { return a + c.toneladas; }, 0);
+        catContainer.innerHTML = '';
+        cats.forEach(function(cat) {
+            var pct = totalCatTons > 0 ? (cat.toneladas / totalCatTons * 100) : 0;
+            var div = document.createElement('div');
+            div.innerHTML =
+                '<div class="flex justify-between text-xs mb-1">' +
+                    '<span class="font-semibold text-slate-600">' + cat.nombre + '</span>' +
+                    '<span class="text-slate-500">' + cat.toneladas.toFixed(1) + ' t</span>' +
+                '</div>' +
+                '<div class="h-2 bg-slate-100 rounded-full overflow-hidden">' +
+                    '<div class="h-full rounded-full bar-fill bg-gradient-to-r from-emerald-500 to-cyan-500" style="width:0%" data-pct="' + pct + '"></div>' +
+                '</div>';
+            catContainer.appendChild(div);
+        });
+        // Animate bars
+        setTimeout(function() {
+            catContainer.querySelectorAll('[data-pct]').forEach(function(bar) {
+                bar.style.width = bar.getAttribute('data-pct') + '%';
+            });
+        }, 150);
+    } else {
+        catContainer.innerHTML = '<p class="text-xs text-slate-400 italic">Sin categorías declaradas en el Eco-Ticket.</p>';
+    }
+
+    // ── Indicadores ambientales ──
+    if (sim) {
+        var co2Label = sim.co2Neto != null
+            ? (sim.co2Neto >= 0 ? '+' : '') + Math.round(sim.co2Neto).toLocaleString('es-CL') + ' kg CO₂e'
+            : '— kg CO₂e';
+        document.getElementById('co2-neto').textContent = co2Label;
+        document.getElementById('co2-neto').className = 'text-xl font-black mt-0.5 ' + (sim.co2Neto >= 0 ? 'text-emerald-700' : 'text-rose-600');
+        document.getElementById('co2-anual').textContent = sim.co2Anual != null ? sim.co2Anual.toFixed(2) + ' tCO₂e/año' : '—';
+
+        var sat = sim.saturacion || 0;
+        document.getElementById('saturacion-val').textContent = sat.toFixed(1) + '%';
+        var satBar = document.getElementById('saturacion-bar');
+        satBar.className = 'h-full rounded-full bar-fill ' + (sat >= 75 ? 'bg-emerald-500' : sat >= 40 ? 'bg-amber-400' : 'bg-rose-400');
+        setTimeout(function() { satBar.style.width = Math.min(sat, 100) + '%'; }, 200);
+
+        var cpt = sim.costoPorTon;
+        document.getElementById('costo-ton').textContent = cpt > 0 ? clp(Math.round(cpt)) + '/ton' : '—';
+        document.getElementById('costo-ton').className = 'text-xl font-black ' + (cpt > 0 && cpt < 12000 ? 'text-emerald-700' : cpt <= 20000 ? 'text-amber-600' : 'text-rose-600');
+    }
+
+    // ── Financiero ──
+    var ecoCosto = eco ? eco.totalCosto : 0;
+    var simIngresos = sim ? sim.ingresos : 0;
+    var simOpex = sim ? sim.opexTotal : 0;
+    var simMulta = sim ? sim.multaAnual : 0;
+    var balanceNeto = (simIngresos || 0) - (ecoCosto || 0) - (simOpex || 0) + (simMulta || 0);
+
+    document.getElementById('fin-eco').textContent = eco ? clp(ecoCosto) : '—';
+    document.getElementById('fin-ingresos').textContent = sim ? clp(simIngresos) : '—';
+    document.getElementById('fin-opex').textContent = sim ? clp(simOpex) : '—';
+    document.getElementById('fin-multa').textContent = sim ? clp(simMulta) : '—';
+    var balEl = document.getElementById('fin-balance');
+    balEl.textContent = eco && sim ? clp(balanceNeto) : '—';
+    balEl.className = 'font-black text-lg ' + (balanceNeto >= 0 ? 'text-emerald-600' : 'text-rose-600');
+
+    // ── Recomendaciones ──
+    var recDiv = document.getElementById('recomendaciones');
+    var recs = [];
+
+    if (!eco) recs.push({ color:'amber', icon:'📋', msg: 'Completa el <strong>Eco-Ticket</strong> en el Portal para declarar toneladas por categoría REP.' });
+    if (!sim) recs.push({ color:'cyan', icon:'📊', msg: 'Usa el <strong>Simulador de Rentabilidad</strong> para proyectar operaciones de logística inversa.' });
+
+    if (eco && sim) {
+        var brecha2 = (tonEco || 0) - (tonSim || 0);
+        if (brecha2 > 50) recs.push({ color:'rose', icon:'🚨', msg: 'Brecha crítica de <strong>' + brecha2.toFixed(0) + ' ton</strong>. Aumenta el Volumen Recuperado en el Simulador o contrata más rutas backhauling.' });
+        else if (brecha2 > 0) recs.push({ color:'amber', icon:'⚠️', msg: 'Brecha de <strong>' + brecha2.toFixed(0) + ' ton</strong>. Optimiza el factor de compactación de fardos para cerrar la diferencia.' });
+        else recs.push({ color:'emerald', icon:'✅', msg: 'Excelente: el Simulador cubre la declaración Eco-Ticket. La operación de logística inversa es suficiente para cumplir la Ley REP.' });
+
+        if (sim.saturacion < 40) recs.push({ color:'rose', icon:'🚛', msg: 'Saturación de flota baja (<strong>' + sim.saturacion.toFixed(0) + '%</strong>). Aumenta el factor de compactación o consolida rutas para reducir viajes vacíos.' });
+        if (sim.rentNeta < 0) recs.push({ color:'rose', icon:'💸', msg: 'Rentabilidad negativa. Revisa el precio del PET o Cartón en Variables de Mercado para mejorar los ingresos por reciclaje.' });
+        if (sim.tFaltantes > 0) recs.push({ color:'amber', icon:'⚖️', msg: 'Faltan <strong>' + sim.tFaltantes.toFixed(0) + ' ton</strong> para cumplir la meta REP del Decreto 12. Exposición regulatoria Art. 48: ' + clp(sim.multaAnual) + '/año.' });
+        if (sim.rentNeta > 0 && sim.tFaltantes === 0) recs.push({ color:'emerald', icon:'🏆', msg: 'Operación óptima: rentabilidad positiva y cumplimiento REP alcanzado. Considera escalar volumen para maximizar ingresos por reciclaje.' });
+    }
+
+    if (recs.length === 0) recs.push({ color:'slate', icon:'💡', msg: 'Interactúa con ambos paneles para generar recomendaciones personalizadas.' });
+
+    var colorMap = {
+        emerald: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+        amber: 'bg-amber-50 border-amber-200 text-amber-800',
+        rose: 'bg-rose-50 border-rose-200 text-rose-800',
+        cyan: 'bg-cyan-50 border-cyan-200 text-cyan-800',
+        slate: 'bg-slate-50 border-slate-200 text-slate-700'
+    };
+
+    recDiv.innerHTML = recs.map(function(r) {
+        return '<div class="flex items-start gap-2.5 p-3 rounded-xl border ' + colorMap[r.color] + '">' +
+            '<span class="text-base shrink-0">' + r.icon + '</span>' +
+            '<p class="text-xs leading-relaxed">' + r.msg + '</p>' +
+            '</div>';
+    }).join('');
+}
+</script>
+</body>
+</html>
