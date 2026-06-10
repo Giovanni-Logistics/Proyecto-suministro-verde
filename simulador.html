@@ -437,6 +437,36 @@
       </div>`
     ).join('');
   }
+
+  // ── Conexión dinámica con la Calculadora Eco-Ticket ──────────────────
+  (function cargarDesdeEcoTicket() {
+    var raw = localStorage.getItem('toneladas_ley_rep');
+    if (!raw) return;
+    var val = parseFloat(raw);
+    if (isNaN(val) || val <= 0) return;
+
+    // Pre-llenar el campo de toneladas
+    document.getElementById('s-tons').value = val;
+
+    // Notificación visual en el panel izquierdo
+    var panelBody = document.querySelector('.panel .panel-body');
+    if (panelBody) {
+      var notif = document.createElement('div');
+      notif.style.cssText = [
+        'background:#e8f5ee', 'border:1px solid #d0e8da', 'border-radius:8px',
+        'padding:.55rem .9rem', 'font-size:.78rem', 'color:#2d7a4f',
+        'font-weight:600', 'margin-bottom:.9rem',
+        'display:flex', 'align-items:center', 'gap:.5rem'
+      ].join(';');
+      notif.innerHTML =
+        '<span>⚡</span> Datos importados desde la Calculadora Eco-Ticket: ' +
+        '<strong>' + val + ' t declaradas</strong>';
+      panelBody.insertBefore(notif, panelBody.firstChild);
+    }
+
+    // Disparar el árbol de cálculo completo (OPEX, CO₂e, balance)
+    recalc();
+  })();
 </script>
 </body>
 </html>

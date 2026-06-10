@@ -204,6 +204,10 @@
         <p class="text-xs text-slate-400 mt-2 leading-relaxed">
           * Estimación referencial. Valores reales dependen de condiciones específicas del gestor autorizado.
         </p>
+        <a href="simulador.html" id="et-sim-link"
+          class="flex items-center justify-center gap-2 w-full mt-3 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-xl text-sm transition-colors no-underline">
+          🧮 Proyectar en Simulador Pro →
+        </a>
       </div>
 
     </div><!-- /form -->
@@ -400,6 +404,9 @@
     const precio = parseFloat(document.getElementById('et-precio').value) || 0;
 
     if (!tons) return;
+
+    // Persistir toneladas declaradas para el Simulador Pro
+    localStorage.setItem('toneladas_ley_rep', tons);
 
     const t       = tarifas[cat];
     const tval    = tons * meta;
