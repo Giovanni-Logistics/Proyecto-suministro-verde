@@ -1,1619 +1,442 @@
 <!DOCTYPE html>
-<html lang="es"><head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Damu SGC — Simulador de Rentabilidad Ley REP</title>
-    <style>/* Subconjunto estático de Tailwind — utilidades usadas por EcoRetorno (offline) */
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Simulador de Rentabilidad — Damu SGC</title>
+  <style>
+    :root {
+      --verde:    #2d7a4f;
+      --verde-cl: #3fa66e;
+      --verde-bg: #e8f5ee;
+      --gris-os:  #1a1a2e;
+      --gris-me:  #2c3e50;
+      --blanco:   #ffffff;
+      --texto:    #333;
+      --borde:    #d0e8da;
+      --acento:   #f0a500;
+      --azul:     #2980b9;
+      --rojo:     #e74c3c;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Segoe UI',sans-serif; color:var(--texto); background:#f7faf8; }
 
-/* ---------- Preflight esencial ---------- */
-*,::before,::after{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}
-html{line-height:1.5;-webkit-text-size-adjust:100%;font-family:ui-sans-serif,system-ui,sans-serif,"Apple Color Emoji","Segoe UI Emoji"}
-body{margin:0;line-height:inherit}
-h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit;margin:0}
-p{margin:0}
-button{font-family:inherit;font-size:100%;font-weight:inherit;line-height:inherit;color:inherit;margin:0;padding:0;background:transparent;background-image:none;cursor:pointer}
-svg{display:block;vertical-align:middle}
-table{border-collapse:collapse;text-indent:0;border-color:inherit}
-th,td{padding:0;text-align:inherit}
-label,span,div,a,thead,tbody,tr,section,header,footer,main,template{}
+    /* ── NAV ── */
+    nav {
+      background:var(--gris-os); display:flex; align-items:center;
+      justify-content:space-between; padding:0 2rem; height:64px;
+      position:sticky; top:0; z-index:100;
+    }
+    .nav-logo { display:flex; align-items:center; gap:.75rem; text-decoration:none; }
+    .nav-logo .badge {
+      width:38px; height:38px; border-radius:50%; background:var(--verde);
+      color:#fff; display:flex; align-items:center; justify-content:center;
+      font-weight:800; font-size:1.1rem;
+    }
+    .nav-logo span { color:#fff; font-weight:700; font-size:1.1rem; }
+    .nav-logo small { color:#8abeaa; font-size:.7rem; display:block; margin-top:-2px; }
+    nav ul { list-style:none; display:flex; gap:1.5rem; }
+    nav ul a {
+      color:#ccc; text-decoration:none; font-size:.9rem;
+      padding:.4rem .8rem; border-radius:6px; transition:.2s;
+    }
+    nav ul a:hover, nav ul a.active { background:var(--verde); color:#fff; }
+    .nav-back {
+      background:transparent; color:#8abeaa; border:1px solid #3a5a4a;
+      padding:.4rem 1rem; border-radius:20px; font-size:.82rem;
+      text-decoration:none; transition:.2s;
+    }
+    .nav-back:hover { background:var(--verde); color:#fff; }
 
-/* ---------- Base ---------- */
-.font-sans{font-family:ui-sans-serif,system-ui,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji"}
-.antialiased{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
-.min-h-screen{min-height:100vh}
+    /* ── HERO ── */
+    .hero {
+      background:linear-gradient(135deg, #0f3d2a, var(--verde));
+      color:#fff; padding:2.5rem 2rem; text-align:center;
+    }
+    .hero-badge {
+      display:inline-block; background:rgba(255,255,255,.15);
+      border:1px solid rgba(255,255,255,.3); color:#c8f0d8;
+      padding:.3rem 1rem; border-radius:20px; font-size:.78rem; margin-bottom:.8rem;
+    }
+    .hero h1 { font-size:clamp(1.4rem,3vw,2rem); font-weight:800; margin-bottom:.4rem; }
+    .hero p { color:#b0d8c0; font-size:.9rem; max-width:520px; margin:0 auto; line-height:1.6; }
 
-/* ---------- Display / layout ---------- */
-.flex{display:flex}
-.grid{display:grid}
-.inline-block{display:inline-block}
-.flex-col{flex-direction:column}
-.flex-grow{flex-grow:1}
-.items-center{align-items:center}
-.items-start{align-items:flex-start}
-.justify-between{justify-content:space-between}
-.justify-center{justify-content:center}
-.relative{position:relative}
-.absolute{position:absolute}
-.sticky{position:sticky}
-.overflow-hidden{overflow:hidden}
-.overflow-x-auto{overflow-x:auto}
-.shrink-0{flex-shrink:0}
+    /* ── LAYOUT ── */
+    .main {
+      max-width:1080px; margin:0 auto; padding:2rem 1.5rem;
+      display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;
+    }
+    @media(max-width:700px){ .main { grid-template-columns:1fr; } nav ul { display:none; } }
 
-/* gaps */
-.gap-1{gap:.25rem}
-.gap-2{gap:.5rem}
-.gap-2\.5{gap:.625rem}
-.gap-3{gap:.75rem}
-.gap-4{gap:1rem}
-.gap-8{gap:2rem}
+    /* ── PANEL ── */
+    .panel {
+      background:#fff; border:1px solid var(--borde); border-radius:16px;
+      overflow:hidden;
+    }
+    .panel-header {
+      padding:1rem 1.4rem; background:#f5faf7;
+      border-bottom:1px solid var(--borde);
+      display:flex; align-items:center; gap:.5rem;
+    }
+    .panel-header h2 { font-size:.95rem; font-weight:700; color:var(--gris-me); }
+    .panel-header p { font-size:.75rem; color:#888; margin-top:.1rem; }
+    .panel-body { padding:1.4rem; }
 
-/* space-between helpers */
-.space-x-2>*+*{margin-left:.5rem}
-.space-y-5>*+*{margin-top:1.25rem}
+    /* ── FORM ── */
+    .form-group { margin-bottom:.9rem; }
+    .form-group label { display:block; font-size:.78rem; color:#555; margin-bottom:.3rem; font-weight:600; }
+    .form-group input, .form-group select {
+      width:100%; padding:.6rem .85rem; border:1px solid #cde0d4;
+      border-radius:8px; font-size:.88rem; outline:none; transition:.2s; background:#fafffe;
+    }
+    .form-group input:focus, .form-group select:focus {
+      border-color:var(--verde-cl); box-shadow:0 0 0 3px rgba(63,166,110,.15);
+    }
+    .form-group .hint { font-size:.71rem; color:#999; margin-top:.2rem; }
 
-/* grid columns */
-.grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
-.grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .slider-wrap { display:flex; align-items:center; gap:.8rem; }
+    .slider-wrap input[type=range] { flex:1; accent-color:var(--verde); }
+    .slider-val {
+      min-width:42px; text-align:center; font-weight:700;
+      color:var(--verde); font-size:.9rem;
+    }
 
-/* ---------- Sizing ---------- */
-.w-full{width:100%}
-.w-1\/3{width:33.333333%}
-.w-2{width:.5rem}.h-2{height:.5rem}
-.w-3{width:.75rem}.h-3{height:.75rem}
-.w-4{width:1rem}.h-4{height:1rem}
-.w-5{width:1.25rem}.h-5{height:1.25rem}
-.w-6{width:1.5rem}.h-6{height:1.5rem}
-.w-7{width:1.75rem}.h-7{height:1.75rem}
-.max-w-7xl{max-width:80rem}
-.min-w-\[800px\]{min-width:800px}
+    .btn-calc {
+      width:100%; padding:.8rem; background:var(--verde); color:#fff;
+      border:none; border-radius:10px; font-size:.95rem; font-weight:700;
+      cursor:pointer; transition:.2s; margin-top:.6rem;
+    }
+    .btn-calc:hover { background:var(--verde-cl); }
 
-/* ---------- Spacing ---------- */
-.mx-auto{margin-left:auto;margin-right:auto}
-.mt-0\.5{margin-top:.125rem}
-.mt-1{margin-top:.25rem}
-.mt-2{margin-top:.5rem}
-.mt-3{margin-top:.75rem}
-.mt-4{margin-top:1rem}
-.mt-12{margin-top:3rem}
-.mb-1{margin-bottom:.25rem}
-.mb-1\.5{margin-bottom:.375rem}
-.mb-5{margin-bottom:1.25rem}
-.mb-6{margin-bottom:1.5rem}
-.pt-3{padding-top:.75rem}
-.pb-3{padding-bottom:.75rem}
-.pl-6{padding-left:1.5rem}
-.p-2\.5{padding:.625rem}
-.p-4{padding:1rem}
-.p-5{padding:1.25rem}
-.p-6{padding:1.5rem}
-.px-2{padding-left:.5rem;padding-right:.5rem}
-.px-2\.5{padding-left:.625rem;padding-right:.625rem}
-.px-3{padding-left:.75rem;padding-right:.75rem}
-.px-5{padding-left:1.25rem;padding-right:1.25rem}
-.px-6{padding-left:1.5rem;padding-right:1.5rem}
-.py-0\.5{padding-top:.125rem;padding-bottom:.125rem}
-.py-1{padding-top:.25rem;padding-bottom:.25rem}
-.py-1\.5{padding-top:.375rem;padding-bottom:.375rem}
-.py-2\.5{padding-top:.625rem;padding-bottom:.625rem}
-.py-3{padding-top:.75rem;padding-bottom:.75rem}
-.py-4{padding-top:1rem;padding-bottom:1rem}
-.py-5{padding-top:1.25rem;padding-bottom:1.25rem}
-.py-8{padding-top:2rem;padding-bottom:2rem}
+    /* ── RESULTADOS ── */
+    .result-panel { grid-column: span 2; }
+    @media(max-width:700px){ .result-panel { grid-column:span 1; } }
 
-/* positional */
-.top-0{top:0}
-.top-0\.5{top:.125rem}
-.right-0{right:0}
-.-left-\[7px\]{left:-7px}
-.-left-\[5px\]{left:-5px}
-.z-50{z-index:50}
+    .result-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:1rem; margin-bottom:1.4rem; }
+    .result-kpi {
+      background:var(--verde-bg); border:1px solid var(--borde);
+      border-radius:12px; padding:1rem; text-align:center;
+    }
+    .result-kpi .icon { font-size:1.4rem; }
+    .result-kpi .lbl { font-size:.72rem; color:#555; margin:.3rem 0 .2rem; }
+    .result-kpi .val { font-size:1.3rem; font-weight:800; color:var(--verde); }
+    .result-kpi.neg .val { color:var(--rojo); }
+    .result-kpi.neu .val { color:var(--acento); }
 
-/* ---------- Typography ---------- */
-.text-\[10px\]{font-size:10px;line-height:1}
-.text-xs{font-size:.75rem;line-height:1rem}
-.text-sm{font-size:.875rem;line-height:1.25rem}
-.text-base{font-size:1rem;line-height:1.5rem}
-.text-lg{font-size:1.125rem;line-height:1.75rem}
-.text-xl{font-size:1.25rem;line-height:1.75rem}
-.text-2xl{font-size:1.5rem;line-height:2rem}
-.text-3xl{font-size:1.875rem;line-height:2.25rem}
-.font-medium{font-weight:500}
-.font-semibold{font-weight:600}
-.font-bold{font-weight:700}
-.font-extrabold{font-weight:800}
-.font-black{font-weight:900}
-.uppercase{text-transform:uppercase}
-.tracking-tight{letter-spacing:-.025em}
-.tracking-wide{letter-spacing:.025em}
-.tracking-wider{letter-spacing:.05em}
-.leading-tight{line-height:1.25}
-.leading-relaxed{line-height:1.625}
-.text-left{text-align:left}
-.text-center{text-align:center}
-.text-right{text-align:right}
-.whitespace-nowrap{white-space:nowrap}
+    /* ── TABLA DESGLOSE ── */
+    .desglose { width:100%; border-collapse:collapse; font-size:.83rem; }
+    .desglose th {
+      background:#f5faf7; padding:.6rem .9rem; text-align:left;
+      font-size:.75rem; color:#666; font-weight:700; border-bottom:2px solid var(--borde);
+    }
+    .desglose td { padding:.6rem .9rem; border-bottom:1px solid #f0f5f2; }
+    .desglose tr:last-child td { border:none; font-weight:700; color:var(--verde); }
+    .desglose tr:hover td { background:#f9fffe; }
+    .tag {
+      display:inline-block; padding:.15rem .55rem; border-radius:8px;
+      font-size:.7rem; font-weight:700;
+    }
+    .tag.costo   { background:#fde8e8; color:#c0392b; }
+    .tag.ingreso { background:#d4edda; color:#155724; }
 
-/* ---------- Colors: text ---------- */
-.text-white{color:#fff}
-.text-slate-400{color:#94a3b8}
-.text-slate-500{color:#64748b}
-.text-slate-600{color:#475569}
-.text-slate-700{color:#334155}
-.text-slate-800{color:#1e293b}
-.text-emerald-100{color:#d1fae5}
-.text-emerald-200{color:#a7f3d0}
-.text-emerald-600{color:#059669}
-.text-emerald-700{color:#047857}
-.text-blue-600{color:#2563eb}
-.text-blue-700{color:#1d4ed8}
-.text-teal-600{color:#0d9488}
-.text-orange-600{color:#ea580c}
-.text-yellow-700{color:#a16207}
-.text-purple-700{color:#7e22ce}
-.text-rose-400{color:#fb7185}
-.text-rose-500{color:#f43f5e}
-.text-rose-600{color:#e11d48}
-.text-rose-700{color:#be123c}
-.text-amber-600{color:#d97706}
-.text-amber-700{color:#b45309}
+    /* ── GRÁFICO BARRAS ── */
+    .chart-wrap { margin-top:1.2rem; }
+    .chart-wrap h4 { font-size:.82rem; font-weight:700; color:var(--gris-me); margin-bottom:.6rem; }
+    .bar-chart { display:flex; flex-direction:column; gap:.5rem; }
+    .bar-row { display:flex; align-items:center; gap:.6rem; font-size:.78rem; }
+    .bar-label { min-width:130px; color:#555; text-align:right; }
+    .bar-track { flex:1; height:18px; background:#f0f5f2; border-radius:10px; overflow:hidden; }
+    .bar-fill { height:100%; border-radius:10px; transition:width .6s ease; }
+    .bar-amount { min-width:80px; color:#333; font-weight:600; font-size:.75rem; }
 
-/* ---------- Colors: background ---------- */
-.bg-white{background-color:#fff}
-.bg-slate-50{background-color:#f8fafc}
-.bg-slate-100{background-color:#f1f5f9}
-.bg-slate-200{background-color:#e2e8f0}
-.bg-slate-900{background-color:#0f172a}
-.bg-emerald-50{background-color:#ecfdf5}
-.bg-emerald-100{background-color:#d1fae5}
-.bg-emerald-500{background-color:#10b981}
-.bg-emerald-600{background-color:#059669}
-.bg-emerald-700\/50{background-color:rgba(4,120,87,.5)}
-.bg-emerald-50\/20{background-color:rgba(236,253,245,.2)}
-.bg-blue-50{background-color:#eff6ff}
-.bg-blue-100{background-color:#dbeafe}
-.bg-blue-400{background-color:#60a5fa}
-.bg-blue-500{background-color:#3b82f6}
-.bg-teal-50{background-color:#f0fdfa}
-.bg-orange-50{background-color:#fff7ed}
-.bg-yellow-50{background-color:#fefce8}
-.bg-yellow-100{background-color:#fef9c3}
-.bg-yellow-400{background-color:#facc15}
-.bg-yellow-500{background-color:#eab308}
-.bg-purple-50{background-color:#faf5ff}
-.bg-purple-100{background-color:#f3e8ff}
-.bg-purple-400{background-color:#c084fc}
-.bg-purple-500{background-color:#a855f7}
-.bg-rose-50{background-color:#fff1f2}
-.bg-rose-100{background-color:#ffe4e6}
-.bg-rose-500{background-color:#f43f5e}
-.bg-rose-50\/20{background-color:rgba(255,241,242,.2)}
-.bg-amber-100{background-color:#fef3c7}
-.bg-amber-500{background-color:#f59e0b}
-.bg-amber-50\/10{background-color:rgba(255,251,235,.1)}
-.bg-slate-50\/50{background-color:rgba(248,250,252,.5)}
+    /* ── DISCLAIMER ── */
+    .disclaimer {
+      background:#fff8e8; border:1px solid #fce8a0; border-radius:10px;
+      padding:.8rem 1rem; font-size:.75rem; color:#7a5c00; margin-top:1rem;
+      display:flex; gap:.5rem;
+    }
 
-/* gradients */
-.bg-gradient-to-r{background-image:linear-gradient(to right,var(--tw-grad-from),var(--tw-grad-to))}
-.bg-gradient-to-b{background-image:linear-gradient(to bottom,var(--tw-grad-from),var(--tw-grad-to))}
-.from-emerald-800{--tw-grad-from:#065f46}
-.to-teal-900{--tw-grad-to:#134e4a}
-.from-slate-50{--tw-grad-from:#f8fafc}
-.to-white{--tw-grad-to:#fff}
+    /* ── ESTADO INICIAL ── */
+    .empty-state {
+      text-align:center; padding:2.5rem 1rem; color:#aaa;
+    }
+    .empty-state .icon { font-size:2.5rem; margin-bottom:.6rem; }
+    .empty-state p { font-size:.85rem; }
 
-/* ---------- Borders ---------- */
-.border{border-width:1px}
-.border-2{border-width:2px}
-.border-b{border-bottom-width:1px}
-.border-t{border-top-width:1px}
-.border-l-2{border-left-width:2px}
-.border-collapse{border-collapse:collapse}
-.border-white{border-color:#fff}
-.border-slate-100{border-color:#f1f5f9}
-.border-slate-200{border-color:#e2e8f0}
-.border-slate-200\/60{border-color:rgba(226,232,240,.6)}
-.border-slate-800{border-color:#1e293b}
-.border-emerald-200{border-color:#a7f3d0}
-.border-emerald-200\/50{border-color:rgba(167,243,208,.5)}
-.border-emerald-500\/30{border-color:rgba(16,185,129,.3)}
-.border-emerald-700{border-color:#047857}
-.border-blue-100{border-color:#dbeafe}
-.border-yellow-100{border-color:#fef9c3}
-.border-purple-100{border-color:#f3e8ff}
-.border-rose-100{border-color:#ffe4e6}
-.border-rose-200{border-color:#fecdd3}
-.border-amber-200{border-color:#fde68a}
-.divide-y>*+*{border-top-width:1px}
-.divide-slate-100>*+*{border-color:#f1f5f9}
-
-/* radius */
-.rounded{border-radius:.25rem}
-.rounded-md{border-radius:.375rem}
-.rounded-lg{border-radius:.5rem}
-.rounded-xl{border-radius:.75rem}
-.rounded-2xl{border-radius:1rem}
-.rounded-full{border-radius:9999px}
-.rounded-bl-xl{border-bottom-left-radius:.75rem}
-
-/* ---------- Shadows ---------- */
-.shadow-sm{box-shadow:0 1px 2px 0 rgba(0,0,0,.05)}
-.shadow-md{box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -2px rgba(0,0,0,.1)}
-.shadow-xl{box-shadow:0 20px 25px -5px rgba(0,0,0,.1),0 8px 10px -6px rgba(0,0,0,.1)}
-.shadow-inner{box-shadow:inset 0 2px 4px 0 rgba(0,0,0,.05)}
-
-/* ---------- Transitions / animation ---------- */
-.transition-all{transition-property:all;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}
-.transition-colors{transition-property:color,background-color,border-color,fill,stroke;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}
-.transition-shadow{transition-property:box-shadow;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}
-.duration-200{transition-duration:.2s}
-.duration-300{transition-duration:.3s}
-.cursor-pointer{cursor:pointer}
-@keyframes pulse{50%{opacity:.5}}
-.animate-pulse{animation:pulse 2s cubic-bezier(.4,0,.6,1) infinite}
-
-/* ---------- Hover ---------- */
-.hover\:shadow-md:hover{box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -2px rgba(0,0,0,.1)}
-.hover\:bg-slate-50:hover{background-color:#f8fafc}
-.hover\:bg-slate-50\/50:hover{background-color:rgba(248,250,252,.5)}
-.hover\:text-emerald-600:hover{color:#059669}
-.hover\:border-emerald-300:hover{border-color:#6ee7b7}
-
-/* ---------- Responsive: sm (>=640px) ---------- */
-@media (min-width:640px){
-  .sm\:flex-row{flex-direction:row}
-  .sm\:text-right{text-align:right}
-  .sm\:border-t-0{border-top-width:0}
-  .sm\:pt-0{padding-top:0}
-  .sm\:w-auto{width:auto}
-  .sm\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
-}
-
-/* ---------- Responsive: lg (>=1024px) ---------- */
-@media (min-width:1024px){
-  .lg\:grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
-  .lg\:col-span-1{grid-column:span 1 / span 1}
-  .lg\:col-span-2{grid-column:span 2 / span 2}
-}
-</style>
-    
-    <style>
-        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.55); backdrop-filter: blur(3px); z-index: 50; overflow-y: auto; padding: 2rem 1rem; align-items: flex-start; justify-content: center; }
-        .modal-overlay.open { display: flex; animation: fadeIn 0.2s ease-out; }
-        .modal-box { background: #fff; border-radius: 1.25rem; width: 100%; max-width: 1100px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 25px 60px rgba(0,0,0,0.25); animation: slideUp 0.3s ease-out; }
-        .modal-body { overflow-y: auto; flex: 1; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { transform: translateY(15px); } to { transform: none; } }
-        input[type=range] { accent-color: #059669; }
-
-        /* ── KPI Progressive Unlock ── */
-        .kpi-locked-overlay {
-            position: absolute; inset: 0; background: rgba(248,250,252,0.92);
-            backdrop-filter: blur(3px); display: flex; flex-direction: column;
-            align-items: center; justify-content: center; z-index: 20;
-            border-radius: 1rem; transition: opacity 0.5s ease, transform 0.5s ease;
-        }
-        .kpi-locked-overlay.unlocking {
-            opacity: 0; transform: scale(0.96); pointer-events: none;
-        }
-        .kpi-lock-icon { font-size: 1.5rem; margin-bottom: 6px; opacity: 0.5; }
-        .kpi-lock-label { font-size: 10px; font-weight: 700; text-transform: uppercase;
-            letter-spacing: 0.08em; color: #94a3b8; text-align: center; padding: 0 12px; }
-
-        /* toast */
-        #kpi-toast {
-            position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 100;
-            background: linear-gradient(135deg, #059669, #0891b2);
-            color: #fff; padding: 10px 18px; border-radius: 999px;
-            font-size: 12px; font-weight: 700; box-shadow: 0 8px 24px rgba(5,150,105,0.35);
-            transform: translateY(80px); opacity: 0;
-            transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1);
-            pointer-events: none;
-        }
-        #kpi-toast.show { transform: translateY(0); opacity: 1; }
-
-        /* progress bar in header */
-        #kpi-progress-bar {
-            height: 3px; background: linear-gradient(to right, #059669, #06b6d4);
-            transition: width 0.6s ease; border-radius: 999px;
-        }
-    </style>
+    footer {
+      background:var(--gris-os); color:#8abeaa;
+      padding:2rem; text-align:center; font-size:.82rem; margin-top:2rem;
+    }
+    footer strong { color:#fff; }
+    footer .links { display:flex; gap:1.5rem; justify-content:center; margin-top:.8rem; flex-wrap:wrap; }
+    footer .links a { color:#8abeaa; text-decoration:none; }
+    footer .links a:hover { color:#fff; }
+  </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+<body>
 
-    <!-- Toast desbloqueado -->
-    <div id="kpi-toast">📊 KPI desbloqueado</div>
+<!-- ── NAV ── -->
+<nav>
+  <a class="nav-logo" href="index.html">
+    <div class="badge">D</div>
+    <div>
+      <span>Damu SGC</span>
+      <small>Trazabilidad Ley REP</small>
+    </div>
+  </a>
+  <ul>
+    <li><a href="index.html">Inicio</a></li>
+    <li><a href="portal.html">Portal</a></li>
+    <li><a href="productores.html">Productores</a></li>
+    <li><a href="transportistas.html">Transportistas</a></li>
+    <li><a href="simulador.html" class="active">Simulador</a></li>
+    <li><a href="dashboard.html">Dashboard</a></li>
+  </ul>
+  <a href="index.html" class="nav-back">← Volver</a>
+</nav>
 
-    <header class="bg-gradient-to-r from-emerald-800 to-teal-900 text-white shadow-xl">
-        <div class="max-w-7xl mx-auto px-6 py-5 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div class="flex items-center gap-3">
-                <div class="bg-emerald-600 p-2.5 rounded-xl shadow-inner">
-                    <svg class="w-7 h-7 text-emerald-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>
-                </div>
-                <div>
-                    <h1 class="text-2xl font-bold tracking-tight">Damu SGC — Simulador de Rentabilidad</h1>
-                    <p class="text-emerald-200 text-xs font-medium uppercase tracking-wider">Valorización de Residuos bajo Ley REP (Decreto 12)</p>
-                </div>
-            </div>
-            <div class="flex items-center gap-3 border-t sm:border-t-0 pt-3 sm:pt-0 border-emerald-700 w-full sm:w-auto justify-end">
-                <!-- Progreso KPIs -->
-                <div class="hidden sm:flex items-center gap-2">
-                    <span class="text-emerald-300 text-[10px] font-bold uppercase tracking-wider" id="kpi-progress-label">0 / 7 KPIs</span>
-                    <div class="w-20 bg-emerald-900 rounded-full overflow-hidden" style="height:4px">
-                        <div id="kpi-progress-bar" style="width:0%"></div>
-                    </div>
-                </div>
-                <a href="mapa.html" class="bg-white/15 border border-white/30 text-white hover:bg-white/25 transition px-4 py-1.5 rounded-full text-sm font-semibold flex items-center gap-2">
-                    🗺️ Mapa
-                </a>
-                <a href="productores.html" class="bg-white/15 border border-white/30 text-white hover:bg-white/25 transition px-4 py-1.5 rounded-full text-sm font-semibold flex items-center gap-2">
-                    🧾 Eco-Ticket
-                </a>
-                <a href="dashboard.html" class="bg-white/15 border border-white/30 text-white hover:bg-white/25 transition px-4 py-1.5 rounded-full text-sm font-semibold flex items-center gap-2">
-                    📋 Dashboard
-                </a>
-                <button onclick="logoutCompany()" class="bg-red-500/80 border border-red-400/40 text-white hover:bg-red-500 transition px-4 py-1.5 rounded-full text-sm font-semibold">
-                    Cerrar Sesión
-                </button>
-            </div>
+<!-- ── HERO ── -->
+<div class="hero">
+  <div class="hero-badge">🧮 Simulador de Rentabilidad Pro</div>
+  <h1>Proyecta tus costos e ingresos de valorización</h1>
+  <p>Ingresa los parámetros de tu operación y obtén una estimación de costos, ingresos potenciales y CO₂e mitigado según tu categoría REP.</p>
+</div>
+
+<!-- ── MAIN GRID ── -->
+<div class="main">
+
+  <!-- PANEL IZQUIERDO: PARÁMETROS PRODUCTORES -->
+  <div class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>🏭 Parámetros del Productor</h2>
+        <p>Datos de tu operación anual</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="form-group">
+        <label>Categoría REP</label>
+        <select id="s-cat" onchange="recalc()">
+          <option value="envases">Envases y embalajes</option>
+          <option value="neumaticos">Neumáticos</option>
+          <option value="pilas">Pilas y baterías</option>
+          <option value="raee">Aparatos eléctricos (RAEE)</option>
+          <option value="aceites">Aceites lubricantes</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Toneladas puestas en el mercado / año</label>
+        <input type="number" id="s-tons" placeholder="Ej: 200" min="1" oninput="recalc()"/>
+        <div class="hint">Dato de tu declaración ante el SMA</div>
+      </div>
+      <div class="form-group">
+        <label>Meta de valorización aplicable (%)</label>
+        <div class="slider-wrap">
+          <input type="range" id="s-meta" min="5" max="80" value="25" oninput="updSlider('s-meta','sv-meta'); recalc()"/>
+          <span class="slider-val" id="sv-meta">25%</span>
         </div>
-    </header>
+        <div class="hint">Porcentaje mínimo exigido por el Decreto 12 según año y categoría</div>
+      </div>
+      <div class="form-group">
+        <label>Región de operación</label>
+        <select id="s-region" onchange="recalc()">
+          <option value="1">Región Metropolitana</option>
+          <option value="1.08">Valparaíso</option>
+          <option value="1.12">Biobío</option>
+          <option value="1.2">Otra región</option>
+        </select>
+      </div>
+    </div>
+  </div>
 
-    <!-- navegación de pestañas eliminada -->
-
-    <main class="flex-grow max-w-7xl w-full mx-auto px-6 py-8">
-
-        <!-- ═══════════════════════════════════════════
-             MODAL PDCA
-        ═══════════════════════════════════════════ -->
-        <div id="modal-pdca" class="modal-overlay" onclick="closeModal('modal-pdca', event)">
-            <div class="modal-box p-0 overflow-hidden">
-                <!-- Cabecera del modal -->
-                <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
-                    <div class="flex items-center gap-3">
-                        <span class="text-xl">📋</span>
-                        <h2 class="text-lg font-bold text-slate-800">Estrategias PDCA — Damu SGC</h2>
-                    </div>
-                    <button onclick="closeModal('modal-pdca')" class="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 hover:text-slate-800 flex items-center justify-center font-bold text-lg transition-colors" aria-label="Cerrar">×</button>
-                </div>
-                <!-- Contenido PDCA -->
-                <div class="modal-body p-6">
-        <section id="pdca">
-            <div class="mb-6">
-                <h2 class="text-2xl font-bold text-slate-800">Plan de Acción PHVA — Damu SGC Ley REP</h2>
-                <p class="text-slate-500 text-sm mt-1">Tres estrategias bajo el ciclo PHVA para recolectar, valorizar y certificar residuos de envases y embalajes según el Decreto 12 de la Ley REP de Chile.</p>
-            </div>
-
-            <div class="grid lg:grid-cols-3 gap-8">
-                <!-- ── Estrategia 01 ── -->
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col hover:shadow-md transition-shadow duration-300">
-                    <div class="p-5 bg-gradient-to-b from-slate-50 to-white border-b border-slate-100 flex items-start gap-4">
-                        <div class="bg-blue-50 p-2.5 rounded-xl text-blue-600">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
-                        </div>
-                        <div>
-                            <span class="text-xs font-bold text-blue-600 uppercase tracking-wide">Estrategia 01</span>
-                            <h3 class="font-bold text-lg text-slate-800 leading-tight mt-0.5">Red de Recolección Backhauling</h3>
-                            <p class="text-xs text-slate-400 mt-0.5">Retorno de Envases y Embalajes</p>
-                        </div>
-                    </div>
-                    <div class="p-6 flex-grow space-y-5">
-                        <div class="relative pl-6 border-l-2 border-slate-200">
-                            <span class="absolute -left-[7px] top-0.5 w-3 h-3 rounded-full bg-blue-500 border-2 border-white"></span>
-                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Planificar (P)</h4>
-                            <p class="text-sm text-slate-600 mt-1">Mapear rutas de retorno vacío.</p>
-                        </div>
-                        <div class="relative pl-6 border-l-2 border-slate-200">
-                            <span class="absolute -left-[7px] top-0.5 w-3 h-3 rounded-full bg-yellow-500 border-2 border-white"></span>
-                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Hacer (H)</h4>
-                            <p class="text-sm text-slate-600 mt-1">Recolectar cartón y PET desde clientes.</p>
-                        </div>
-                        <div class="relative pl-6 border-l-2 border-slate-200">
-                            <span class="absolute -left-[7px] top-0.5 w-3 h-3 rounded-full bg-purple-500 border-2 border-white"></span>
-                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Verificar (V)</h4>
-                            <p class="text-sm text-slate-600 mt-1">Medir toneladas recuperadas mensuales.</p>
-                        </div>
-                        <div class="relative pl-6">
-                            <span class="absolute -left-[5px] top-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></span>
-                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Actuar (A)</h4>
-                            <p class="text-sm text-slate-600 mt-1">Optimizar consolidación de carga en camiones.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ── Estrategia 02 ── -->
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col hover:shadow-md transition-shadow duration-300">
-                    <div class="p-5 bg-gradient-to-b from-slate-50 to-white border-b border-slate-100 flex items-start gap-4">
-                        <div class="bg-teal-50 p-2.5 rounded-xl text-teal-600">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
-                        </div>
-                        <div>
-                            <span class="text-xs font-bold text-teal-600 uppercase tracking-wide">Estrategia 02</span>
-                            <h3 class="font-bold text-lg text-slate-800 leading-tight mt-0.5">Centro de Valorización y Compactación</h3>
-                            <p class="text-xs text-slate-400 mt-0.5">Acopio, Fardos y Venta a Recicladoras</p>
-                        </div>
-                    </div>
-                    <div class="p-6 flex-grow space-y-5">
-                        <div class="relative pl-6 border-l-2 border-slate-200">
-                            <span class="absolute -left-[7px] top-0.5 w-3 h-3 rounded-full bg-blue-500 border-2 border-white"></span>
-                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Planificar (P)</h4>
-                            <p class="text-sm text-slate-600 mt-1">Diseñar layout en bodega para acopio.</p>
-                        </div>
-                        <div class="relative pl-6 border-l-2 border-slate-200">
-                            <span class="absolute -left-[7px] top-0.5 w-3 h-3 rounded-full bg-yellow-500 border-2 border-white"></span>
-                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Hacer (H)</h4>
-                            <p class="text-sm text-slate-600 mt-1">Instalar maquinaria compactadora de fardos.</p>
-                        </div>
-                        <div class="relative pl-6 border-l-2 border-slate-200">
-                            <span class="absolute -left-[7px] top-0.5 w-3 h-3 rounded-full bg-purple-500 border-2 border-white"></span>
-                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Verificar (V)</h4>
-                            <p class="text-sm text-slate-600 mt-1">Controlar calidad y peso de los fardos.</p>
-                        </div>
-                        <div class="relative pl-6">
-                            <span class="absolute -left-[5px] top-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></span>
-                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Actuar (A)</h4>
-                            <p class="text-sm text-slate-600 mt-1">Estandarizar proceso para venta a recicladoras.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ── Estrategia 03 ── -->
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col hover:shadow-md transition-shadow duration-300">
-                    <div class="p-5 bg-gradient-to-b from-slate-50 to-white border-b border-slate-100 flex items-start gap-4">
-                        <div class="bg-orange-50 p-2.5 rounded-xl text-orange-600">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
-                        </div>
-                        <div>
-                            <span class="text-xs font-bold text-orange-600 uppercase tracking-wide">Estrategia 03</span>
-                            <h3 class="font-bold text-lg text-slate-800 leading-tight mt-0.5">Trazabilidad y Certificación REP</h3>
-                            <p class="text-xs text-slate-400 mt-0.5">Registro, Auditoría y Declaración al Sistema de Gestión</p>
-                        </div>
-                    </div>
-                    <div class="p-6 flex-grow space-y-5">
-                        <div class="relative pl-6 border-l-2 border-slate-200">
-                            <span class="absolute -left-[7px] top-0.5 w-3 h-3 rounded-full bg-blue-500 border-2 border-white"></span>
-                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Planificar (P)</h4>
-                            <p class="text-sm text-slate-600 mt-1">Cotizar software de registro de masa.</p>
-                        </div>
-                        <div class="relative pl-6 border-l-2 border-slate-200">
-                            <span class="absolute -left-[7px] top-0.5 w-3 h-3 rounded-full bg-yellow-500 border-2 border-white"></span>
-                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Hacer (H)</h4>
-                            <p class="text-sm text-slate-600 mt-1">Integrar pesaje en el ERP del Centro de Distribución.</p>
-                        </div>
-                        <div class="relative pl-6 border-l-2 border-slate-200">
-                            <span class="absolute -left-[7px] top-0.5 w-3 h-3 rounded-full bg-purple-500 border-2 border-white"></span>
-                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Verificar (V)</h4>
-                            <p class="text-sm text-slate-600 mt-1">Auditar la trazabilidad del residuo vendido.</p>
-                        </div>
-                        <div class="relative pl-6">
-                            <span class="absolute -left-[5px] top-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></span>
-                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Actuar (A)</h4>
-                            <p class="text-sm text-slate-600 mt-1">Declarar las toneladas mitigadas ante el Sistema de Gestión.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-                </div><!-- /scroll -->
-            </div><!-- /modal-box -->
-        </div><!-- /modal-pdca -->
-
-        <!-- ═══════════════════════════════════════════
-             MODAL GANTT
-        ═══════════════════════════════════════════ -->
-        <div id="modal-gantt" class="modal-overlay" onclick="closeModal('modal-gantt', event)">
-            <div class="modal-box p-0 overflow-hidden">
-                <!-- Cabecera del modal -->
-                <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
-                    <div class="flex items-center gap-3">
-                        <span class="text-xl">📅</span>
-                        <h2 class="text-lg font-bold text-slate-800">Carta Gantt Operativa — Damu SGC</h2>
-                    </div>
-                    <button onclick="closeModal('modal-gantt')" class="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 hover:text-slate-800 flex items-center justify-center font-bold text-lg transition-colors" aria-label="Cerrar">×</button>
-                </div>
-                <!-- Contenido Gantt -->
-                <div class="modal-body p-6">
-        <section id="gantt">
-            <!-- Leyenda -->
-            <div class="flex flex-wrap gap-4 mb-4 text-xs text-slate-500">
-                <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-blue-500 inline-block"></span>Fase 1 — Recolección</span>
-                <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-amber-500 inline-block"></span>Fase 2 — Bodega</span>
-                <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-purple-500 inline-block"></span>Fase 3 — Regulación</span>
-                <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-rose-300 border border-rose-400 inline-block"></span>CAPEX</span>
-                <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-emerald-200 border border-emerald-400 inline-block"></span>OPEX</span>
-            </div>
-
-            <div class="overflow-x-auto rounded-xl border border-slate-300 shadow-sm">
-                <div style="min-width:820px">
-
-                    <!-- ENCABEZADOS -->
-                    <div class="grid border-b-2 border-slate-400 bg-slate-100 text-[11px] font-black uppercase tracking-wider text-slate-600" style="grid-template-columns:2.2fr 1fr 0.5fr 0.5fr 0.5fr 0.5fr 0.9fr 0.9fr">
-                        <div class="px-3 py-2.5 border-r border-slate-300">Actividad</div>
-                        <div class="px-3 py-2.5 border-r border-slate-300">Responsable</div>
-                        <div class="px-2 py-2.5 border-r border-slate-300 text-center bg-slate-200">M1</div>
-                        <div class="px-2 py-2.5 border-r border-slate-300 text-center bg-slate-200">M2</div>
-                        <div class="px-2 py-2.5 border-r border-slate-300 text-center bg-slate-200">M3</div>
-                        <div class="px-2 py-2.5 border-r border-slate-300 text-center bg-slate-200">M4</div>
-                        <div class="px-3 py-2.5 border-r border-slate-300 text-center text-rose-700">CAPEX CLP</div>
-                        <div class="px-3 py-2.5 text-center text-emerald-700">OPEX CLP</div>
-                    </div>
-
-                    <!-- FASE 1 -->
-                    <div class="grid border-b border-slate-300" style="grid-template-columns:2.2fr 1fr 0.5fr 0.5fr 0.5fr 0.5fr 0.9fr 0.9fr">
-                        <div class="col-span-8 px-4 py-2 bg-blue-600 text-white text-[11px] font-black uppercase tracking-widest">Fase 1 — Recolección Backhauling</div>
-                    </div>
-
-                    <!-- A1 -->
-                    <div class="grid border-b border-slate-200 bg-white hover:bg-blue-50/30 transition-colors" style="grid-template-columns:2.2fr 1fr 0.5fr 0.5fr 0.5fr 0.5fr 0.9fr 0.9fr">
-                        <div class="px-3 py-3 border-r border-slate-200 text-sm text-slate-700 font-medium flex items-center gap-2"><span class="shrink-0 w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-black flex items-center justify-center">1</span>Revisar rutas y buscar retornos vacíos.</div>
-                        <div class="px-3 py-3 border-r border-slate-200 text-xs text-slate-500 flex items-center">Analista Transportes</div>
-                        <div class="p-1.5 border-r border-slate-200"><div class="w-full h-8 bg-blue-500 rounded"></div></div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="px-3 py-3 border-r border-slate-200 text-center text-xs text-slate-400 font-semibold flex items-center justify-center">$0</div>
-                        <div class="px-3 py-3 text-center text-xs font-bold text-emerald-700 flex items-center justify-center">$150.000 <span class="text-[10px] text-slate-400 ml-1">(único)</span></div>
-                    </div>
-
-                    <!-- A2 -->
-                    <div class="grid border-b border-slate-200 bg-white hover:bg-blue-50/30 transition-colors" style="grid-template-columns:2.2fr 1fr 0.5fr 0.5fr 0.5fr 0.5fr 0.9fr 0.9fr">
-                        <div class="px-3 py-3 border-r border-slate-200 text-sm text-slate-700 font-medium flex items-center gap-2"><span class="shrink-0 w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-black flex items-center justify-center">2</span>Acordar recolección con clientes.</div>
-                        <div class="px-3 py-3 border-r border-slate-200 text-xs text-slate-500 flex items-center">Jefe de Transporte</div>
-                        <div class="p-1.5 border-r border-slate-200"><div class="w-full h-8 bg-blue-400 rounded"></div></div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="px-3 py-3 border-r border-slate-200 text-center text-xs text-slate-400 font-semibold flex items-center justify-center">$0</div>
-                        <div class="px-3 py-3 text-center text-xs font-bold text-emerald-700 flex items-center justify-center">$100.000</div>
-                    </div>
-
-                    <!-- A3 -->
-                    <div class="grid border-b border-slate-300 bg-white hover:bg-blue-50/30 transition-colors" style="grid-template-columns:2.2fr 1fr 0.5fr 0.5fr 0.5fr 0.5fr 0.9fr 0.9fr">
-                        <div class="px-3 py-3 border-r border-slate-200 text-sm text-slate-700 font-medium flex items-center gap-2"><span class="shrink-0 w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-black flex items-center justify-center">3</span>Probar recolección en ruta.</div>
-                        <div class="px-3 py-3 border-r border-slate-200 text-xs text-slate-500 flex items-center">Supervisor de Flota</div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="p-1.5 border-r border-slate-200"><div class="w-full h-8 bg-blue-600 rounded"></div></div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="px-3 py-3 border-r border-slate-200 text-center text-xs text-slate-400 font-semibold flex items-center justify-center">$0</div>
-                        <div class="px-3 py-3 text-center text-xs font-bold text-emerald-700 flex items-center justify-center">$350.000/mes</div>
-                    </div>
-
-                    <!-- FASE 2 -->
-                    <div class="grid border-b border-slate-300" style="grid-template-columns:2.2fr 1fr 0.5fr 0.5fr 0.5fr 0.5fr 0.9fr 0.9fr">
-                        <div class="col-span-8 px-4 py-2 bg-amber-500 text-white text-[11px] font-black uppercase tracking-widest">Fase 2 — Centro de Valorización y Compactación</div>
-                    </div>
-
-                    <!-- A4 -->
-                    <div class="grid border-b border-slate-200 bg-white hover:bg-amber-50/30 transition-colors" style="grid-template-columns:2.2fr 1fr 0.5fr 0.5fr 0.5fr 0.5fr 0.9fr 0.9fr">
-                        <div class="px-3 py-3 border-r border-slate-200 text-sm text-slate-700 font-medium flex items-center gap-2"><span class="shrink-0 w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-black flex items-center justify-center">4</span>Adecuar espacio en bodega.</div>
-                        <div class="px-3 py-3 border-r border-slate-200 text-xs text-slate-500 flex items-center">Jefe de Operaciones</div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="p-1.5 border-r border-slate-200"><div class="w-full h-8 bg-amber-400 rounded"></div></div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="px-3 py-3 border-r border-slate-200 text-center text-xs font-bold text-rose-600 flex items-center justify-center">$650.000</div>
-                        <div class="px-3 py-3 text-center text-xs text-slate-400 font-semibold flex items-center justify-center">$0</div>
-                    </div>
-
-                    <!-- A5 -->
-                    <div class="grid border-b border-slate-200 bg-white hover:bg-amber-50/30 transition-colors" style="grid-template-columns:2.2fr 1fr 0.5fr 0.5fr 0.5fr 0.5fr 0.9fr 0.9fr">
-                        <div class="px-3 py-3 border-r border-slate-200 text-sm text-slate-700 font-medium flex items-center gap-2"><span class="shrink-0 w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-black flex items-center justify-center">5</span>Comprar e instalar compactadora.</div>
-                        <div class="px-3 py-3 border-r border-slate-200 text-xs text-slate-500 flex items-center">Técnico de Mantención</div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="p-1.5 border-r border-slate-200"><div class="w-full h-8 bg-amber-500 rounded"></div></div>
-                        <div class="p-1.5 border-r border-slate-200"><div class="w-full h-8 bg-amber-400 rounded"></div></div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="px-3 py-3 border-r border-slate-200 text-center text-xs font-bold text-rose-600 flex items-center justify-center">$4.500.000</div>
-                        <div class="px-3 py-3 text-center text-xs font-bold text-emerald-700 flex items-center justify-center">$120.000/mes</div>
-                    </div>
-
-                    <!-- A6 -->
-                    <div class="grid border-b border-slate-300 bg-white hover:bg-amber-50/30 transition-colors" style="grid-template-columns:2.2fr 1fr 0.5fr 0.5fr 0.5fr 0.5fr 0.9fr 0.9fr">
-                        <div class="px-3 py-3 border-r border-slate-200 text-sm text-slate-700 font-medium flex items-center gap-2"><span class="shrink-0 w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-black flex items-center justify-center">6</span>Probar compactadora y pesar fardos.</div>
-                        <div class="px-3 py-3 border-r border-slate-200 text-xs text-slate-500 flex items-center">Supervisor de Bodega</div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="p-1.5 border-r border-slate-200"><div class="w-full h-8 bg-amber-600 rounded"></div></div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="px-3 py-3 border-r border-slate-200 text-center text-xs font-bold text-rose-600 flex items-center justify-center">$200.000</div>
-                        <div class="px-3 py-3 text-center text-xs font-bold text-emerald-700 flex items-center justify-center">$50.000</div>
-                    </div>
-
-                    <!-- FASE 3 -->
-                    <div class="grid border-b border-slate-300" style="grid-template-columns:2.2fr 1fr 0.5fr 0.5fr 0.5fr 0.5fr 0.9fr 0.9fr">
-                        <div class="col-span-8 px-4 py-2 bg-purple-600 text-white text-[11px] font-black uppercase tracking-widest">Fase 3 — Trazabilidad y Certificación REP</div>
-                    </div>
-
-                    <!-- A7 -->
-                    <div class="grid border-b border-slate-200 bg-white hover:bg-purple-50/30 transition-colors" style="grid-template-columns:2.2fr 1fr 0.5fr 0.5fr 0.5fr 0.5fr 0.9fr 0.9fr">
-                        <div class="px-3 py-3 border-r border-slate-200 text-sm text-slate-700 font-medium flex items-center gap-2"><span class="shrink-0 w-5 h-5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-black flex items-center justify-center">7</span>Comprar e instalar software de pesaje.</div>
-                        <div class="px-3 py-3 border-r border-slate-200 text-xs text-slate-500 flex items-center">Soporte TI Logística</div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="p-1.5 border-r border-slate-200"><div class="w-full h-8 bg-purple-500 rounded"></div></div>
-                        <div class="p-1.5 border-r border-slate-200"><div class="w-full h-8 bg-purple-400 rounded"></div></div>
-                        <div class="px-3 py-3 border-r border-slate-200 text-center text-xs font-bold text-rose-600 flex items-center justify-center">$1.200.000</div>
-                        <div class="px-3 py-3 text-center text-xs font-bold text-emerald-700 flex items-center justify-center">$80.000/mes</div>
-                    </div>
-
-                    <!-- A8 -->
-                    <div class="grid border-b border-slate-200 bg-white hover:bg-purple-50/30 transition-colors" style="grid-template-columns:2.2fr 1fr 0.5fr 0.5fr 0.5fr 0.5fr 0.9fr 0.9fr">
-                        <div class="px-3 py-3 border-r border-slate-200 text-sm text-slate-700 font-medium flex items-center gap-2"><span class="shrink-0 w-5 h-5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-black flex items-center justify-center">8</span>Capacitar al personal.</div>
-                        <div class="px-3 py-3 border-r border-slate-200 text-xs text-slate-500 flex items-center">Ingeniero Logístico</div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="p-1.5 border-r border-slate-200"><div class="w-full h-8 bg-purple-600 rounded"></div></div>
-                        <div class="px-3 py-3 border-r border-slate-200 text-center text-xs font-bold text-rose-600 flex items-center justify-center">$350.000</div>
-                        <div class="px-3 py-3 text-center text-xs text-slate-400 font-semibold flex items-center justify-center">$0</div>
-                    </div>
-
-                    <!-- A9 -->
-                    <div class="grid border-b border-slate-200 bg-white hover:bg-purple-50/30 transition-colors" style="grid-template-columns:2.2fr 1fr 0.5fr 0.5fr 0.5fr 0.5fr 0.9fr 0.9fr">
-                        <div class="px-3 py-3 border-r border-slate-200 text-sm text-slate-700 font-medium flex items-center gap-2"><span class="shrink-0 w-5 h-5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-black flex items-center justify-center">9</span>Hacer primera declaración Ley REP.</div>
-                        <div class="px-3 py-3 border-r border-slate-200 text-xs text-slate-500 flex items-center">Enc. Sustentabilidad</div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="p-1.5 border-r border-slate-200 bg-slate-50"></div>
-                        <div class="p-1.5 border-r border-slate-200"><div class="w-full h-8 bg-emerald-500 rounded"></div></div>
-                        <div class="px-3 py-3 border-r border-slate-200 text-center text-xs font-bold text-rose-600 flex items-center justify-center">$500.000</div>
-                        <div class="px-3 py-3 text-center text-xs text-slate-400 font-semibold flex items-center justify-center">$0</div>
-                    </div>
-
-                    <!-- TOTALES -->
-                    <div class="grid border-t-2 border-slate-400 bg-slate-100" style="grid-template-columns:2.2fr 1fr 0.5fr 0.5fr 0.5fr 0.5fr 0.9fr 0.9fr">
-                        <div class="px-3 py-3 border-r border-slate-300 text-[11px] font-black text-slate-600 uppercase tracking-wider col-span-2">Totales</div>
-                        <div class="p-1.5 border-r border-slate-300 text-center text-[10px] font-bold text-slate-500 flex items-center justify-center">M1</div>
-                        <div class="p-1.5 border-r border-slate-300 text-center text-[10px] font-bold text-slate-500 flex items-center justify-center">M2</div>
-                        <div class="p-1.5 border-r border-slate-300 text-center text-[10px] font-bold text-slate-500 flex items-center justify-center">M3</div>
-                        <div class="p-1.5 border-r border-slate-300 text-center text-[10px] font-bold text-slate-500 flex items-center justify-center">M4</div>
-                        <div class="px-3 py-3 border-r border-slate-300 text-center text-sm font-black text-rose-700">$7.400.000</div>
-                        <div class="px-3 py-3 text-center text-sm font-black text-emerald-700">$200.000/mes</div>
-                    </div>
-
-                </div>
-            </div>
-        </section>
-                </div><!-- /scroll -->
-            </div><!-- /modal-box -->
-        </div><!-- /modal-gantt -->
-
-        <!-- ═══════════════════════════════════════════
-             SIMULADOR — Pantalla principal siempre visible
-        ═══════════════════════════════════════════ -->
-        <section id="simulador">
-            <!-- Botones eliminados — PDCA disponible en EcoRetorno_Estrategias_PDCA.docx y Gantt en EcoRetorno_Carta_Gantt.xlsx -->
-            <div class="mb-6">
-                <h2 class="text-2xl font-bold text-slate-800">Simulador de Rentabilidad — Logística Inversa Ley REP</h2>
-                <p class="text-slate-500 text-sm mt-1">Proyecta los ingresos por valorización de materiales, el CO₂e mitigado y el costo operativo de retorno en el mercado chileno de reciclaje (valores en CLP).</p>
-            </div>
-
-            <div class="grid lg:grid-cols-3 gap-8">
-                <!-- ── Panel de controles ── -->
-                <!-- ── Panel de controles Full Pro ── -->
-                <div class="lg:col-span-1 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
-
-                    <!-- Cabecera del panel -->
-                    <div class="px-5 py-4 bg-gradient-to-r from-slate-800 to-slate-700 flex items-center gap-2">
-                        <svg class="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"></path></svg>
-                        <h3 class="text-sm font-bold text-white tracking-tight">Panel de Variables — Full Pro</h3>
-                    </div>
-
-                    <div class="flex-1 overflow-y-auto px-5 py-4 space-y-5">
-
-                        <!-- ── GRUPO 1: Variables de Mercado ── -->
-                        <div>
-                            <div class="flex items-center gap-2 mb-3">
-                                <span class="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
-                                <span class="text-[10px] font-black text-blue-600 uppercase tracking-widest">Variables de Mercado</span>
-                            </div>
-
-                            <!-- Precio Diésel -->
-                            <div class="mb-4">
-                                <div class="flex justify-between items-center mb-1">
-                                    <label class="text-xs font-semibold text-slate-600">Precio Diésel (CLP/Litro)</label>
-                                    <div class="flex items-center gap-1">
-                                        <span class="text-[10px] text-slate-400 font-medium">$</span>
-                                        <input type="number" id="numDiesel" min="800" max="1300" value="1050" step="10"
-                                            class="w-20 text-sm font-black text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2 py-0.5 text-right focus:outline-none focus:ring-2 focus:ring-blue-300">
-                                    </div>
-                                </div>
-                                <input type="range" id="sliderDiesel" min="800" max="1300" value="1050" step="10"
-                                    class="w-full h-1.5 bg-slate-200 rounded-lg cursor-pointer accent-blue-500">
-                                <div class="flex justify-between text-[10px] text-slate-400 mt-0.5">
-                                    <span>$800</span><span>Def: $1.050</span><span>$1.300</span>
-                                </div>
-                            </div>
-
-                            <!-- Precio Cartón -->
-                            <div class="mb-4">
-                                <div class="flex justify-between items-center mb-1">
-                                    <label class="text-xs font-semibold text-slate-600">Precio Cartón (CLP/kg)</label>
-                                    <div class="flex items-center gap-1">
-                                        <span class="text-[10px] text-slate-400 font-medium">$</span>
-                                        <input type="number" id="numCarton" min="30" max="100" value="60" step="1"
-                                            class="w-20 text-sm font-black text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-0.5 text-right focus:outline-none focus:ring-2 focus:ring-emerald-300">
-                                    </div>
-                                </div>
-                                <input type="range" id="sliderCarton" min="30" max="100" value="60" step="1"
-                                    class="w-full h-1.5 bg-slate-200 rounded-lg cursor-pointer accent-emerald-500">
-                                <div class="flex justify-between text-[10px] text-slate-400 mt-0.5">
-                                    <span>$30</span><span>Def: $60/kg</span><span>$100</span>
-                                </div>
-                            </div>
-
-                            <!-- Precio PET -->
-                            <div>
-                                <div class="flex justify-between items-center mb-1">
-                                    <label class="text-xs font-semibold text-slate-600">Precio Plástico PET (CLP/kg)</label>
-                                    <div class="flex items-center gap-1">
-                                        <span class="text-[10px] text-slate-400 font-medium">$</span>
-                                        <input type="number" id="numPET" min="100" max="350" value="200" step="5"
-                                            class="w-20 text-sm font-black text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-2 py-0.5 text-right focus:outline-none focus:ring-2 focus:ring-teal-300">
-                                    </div>
-                                </div>
-                                <input type="range" id="sliderPET" min="100" max="350" value="200" step="5"
-                                    class="w-full h-1.5 bg-slate-200 rounded-lg cursor-pointer accent-teal-500">
-                                <div class="flex justify-between text-[10px] text-slate-400 mt-0.5">
-                                    <span>$100</span><span>Def: $200/kg</span><span>$350</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="border-t border-slate-100"></div>
-
-                        <!-- ── GRUPO 2: Variables Operativas de Flota ── -->
-                        <div>
-                            <div class="flex items-center gap-2 mb-3">
-                                <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-                                <span class="text-[10px] font-black text-amber-600 uppercase tracking-widest">Variables Operativas de Flota</span>
-                            </div>
-
-                            <!-- Rendimiento camión -->
-                            <div class="mb-4">
-                                <div class="flex justify-between items-center mb-1">
-                                    <label class="text-xs font-semibold text-slate-600">Rendimiento Camión (km/litro)</label>
-                                    <input type="number" id="numRendimiento" min="2.0" max="6.0" value="3.5" step="0.1"
-                                        class="w-20 text-sm font-black text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-0.5 text-right focus:outline-none focus:ring-2 focus:ring-amber-300">
-                                </div>
-                                <input type="range" id="sliderRendimiento" min="2.0" max="6.0" value="3.5" step="0.1"
-                                    class="w-full h-1.5 bg-slate-200 rounded-lg cursor-pointer accent-amber-500">
-                                <div class="flex justify-between text-[10px] text-slate-400 mt-0.5">
-                                    <span>2.0 km/L</span><span>Def: 3.5</span><span>6.0 km/L</span>
-                                </div>
-                            </div>
-
-                            <!-- Distancia ruta -->
-                            <div>
-                                <div class="flex justify-between items-center mb-1">
-                                    <label class="text-xs font-semibold text-slate-600">Distancia Ruta Backhauling (km)</label>
-                                    <input type="number" id="numDistancia" min="10" max="200" value="50" step="5"
-                                        class="w-20 text-sm font-black text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-0.5 text-right focus:outline-none focus:ring-2 focus:ring-amber-300">
-                                </div>
-                                <input type="range" id="sliderDistancia" min="10" max="200" value="50" step="5"
-                                    class="w-full h-1.5 bg-slate-200 rounded-lg cursor-pointer accent-amber-500">
-                                <div class="flex justify-between text-[10px] text-slate-400 mt-0.5">
-                                    <span>10 km</span><span>Def: 50 km</span><span>200 km</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="border-t border-slate-100"></div>
-
-                        <!-- ── GRUPO 3: Variables de Eficiencia ── -->
-                        <div>
-                            <div class="flex items-center gap-2 mb-3">
-                                <span class="w-2 h-2 rounded-full bg-purple-500 shrink-0"></span>
-                                <span class="text-[10px] font-black text-purple-600 uppercase tracking-widest">Variables de Eficiencia</span>
-                            </div>
-
-                            <!-- Volumen recuperado -->
-                            <div class="mb-4">
-                                <div class="flex justify-between items-center mb-1">
-                                    <label class="text-xs font-semibold text-slate-600">Volumen Recuperado (Ton/mes)</label>
-                                    <div class="flex items-center gap-1">
-                                        <input type="number" id="numVolumen" min="0" max="500" value="0" step="1"
-                                            class="w-20 text-sm font-black text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-2 py-0.5 text-right focus:outline-none focus:ring-2 focus:ring-purple-300">
-                                        <span class="text-[10px] text-slate-400 font-medium">ton</span>
-                                    </div>
-                                </div>
-                                <input type="range" id="sliderRutas" min="0" max="500" value="0" step="1"
-                                    class="w-full h-1.5 bg-slate-200 rounded-lg cursor-pointer accent-purple-500">
-                                <div class="flex justify-between text-[10px] text-slate-400 mt-0.5">
-                                    <span>0</span><span class="text-rose-500 font-bold">⚑ Meta REP: 200 ton</span><span>500</span>
-                                </div>
-                            </div>
-
-                            <!-- Proporción Cartón/PET — mantenemos sliderFrio para compatibilidad JS -->
-                            <div class="mb-4">
-                                <div class="flex justify-between items-center mb-1">
-                                    <label class="text-xs font-semibold text-slate-600">Proporción Cartón vs PET (%)</label>
-                                    <span id="valFrio" class="text-sm font-black text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-2 py-0.5">50% Cartón</span>
-                                </div>
-                                <input type="range" id="sliderFrio" min="0" max="100" value="50" step="1"
-                                    class="w-full h-1.5 bg-slate-200 rounded-lg cursor-pointer accent-purple-500">
-                                <div class="flex justify-between text-[10px] text-slate-400 mt-0.5">
-                                    <span>100% PET</span><span>50 / 50</span><span>100% Cartón</span>
-                                </div>
-                            </div>
-
-                            <!-- Densidad de Carga — mantenemos sliderRetorno para compatibilidad JS -->
-                            <div>
-                                <div class="flex justify-between items-center mb-1">
-                                    <label class="text-xs font-semibold text-slate-600">Factor de Compactación de Fardos (×cap.)</label>
-                                    <span id="valRetorno" class="text-sm font-black text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-2 py-0.5">0%</span>
-                                </div>
-                                <input type="range" id="sliderRetorno" min="50" max="100" value="70" step="1"
-                                    class="w-full h-1.5 bg-slate-200 rounded-lg cursor-pointer accent-purple-500">
-                                <div class="flex justify-between text-[10px] text-slate-400 mt-0.5">
-                                    <span>0.5× (mínimo)</span><span>0.75× (estándar)</span><span>1.0× (fardo denso)</span>
-                                </div>
-                            </div>
-                        </div>
-
-                    </div><!-- /scroll interior -->
-
-                    <!-- Pie informativo -->
-                    <div class="px-5 py-3 bg-slate-50 border-t border-slate-200">
-                        <p class="text-[10px] text-slate-400 leading-relaxed">
-                            <span class="font-bold text-slate-500">Precios en CLP/kg</span> · Factor CO₂e: Cartón 0,101 tCO₂e/ton · PET 0,780 tCO₂e/ton · Umbral Ley REP: 200 ton/mes
-                        </p>
-                    </div>
-                </div>
-
-                <!-- ── Grid de KPIs Full Pro v2 ── -->
-                <div class="lg:col-span-2 grid sm:grid-cols-2 gap-4" id="kpiGrid">
-
-                    <!-- ━━━ KPI 1: Rentabilidad Operativa Neta ━━━ -->
-                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200" id="cardRentabilidad">
-                        <div class="kpi-locked-overlay" id="lock-kpi1"><span class="kpi-lock-icon">🔒</span><span class="kpi-lock-label">Ajusta variables<br>de Mercado</span></div>
-                        <div class="absolute top-0 right-0 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider bg-slate-100 text-slate-500" id="badgeRentabilidad">Rentabilidad</div>
-                        <div>
-                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Rentabilidad Operativa Neta</h3>
-                            <div class="text-2xl font-black mt-2 tracking-tight text-slate-400" id="kpiRentabilidad">$0</div>
-                            <div class="text-[10px] font-semibold text-slate-400 mt-0.5" id="subRentabilidad">CLP/mes</div>
-                            <p class="text-[10px] text-slate-400 leading-relaxed mt-1">Diferencia entre ingresos por venta de material reciclado y el costo operativo de transporte + planta. Principal palanca: precio de mercado del PET.</p>
-                        </div>
-                        <div class="mt-3 space-y-1">
-                            <div class="flex justify-between text-[11px]">
-                                <span class="text-slate-400">Ingresos venta material</span>
-                                <span class="font-bold text-emerald-600" id="desgIngresos">$0</span>
-                            </div>
-                            <div class="flex justify-between text-[11px]">
-                                <span class="text-slate-400">OPEX combustible ruta</span>
-                                <span class="font-bold text-rose-500" id="desgCombustible">$0</span>
-                            </div>
-                            <div class="flex justify-between text-[11px]">
-                                <span class="text-slate-400">OPEX planta (operario+energía)</span>
-                                <span class="font-bold text-rose-400" id="desgPlanta">$0</span>
-                            </div>
-                            <div class="flex justify-between text-[11px] pt-1 border-t border-slate-100">
-                                <span class="font-bold text-slate-500" id="desgViajes">0 viajes necesarios</span>
-                                <span class="text-slate-400" id="desgCapacidad">Cap. efectiva: — ton/viaje</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ━━━ KPI 2: Eficiencia Volumétrica / Saturación ━━━ -->
-                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200" id="cardEficiencia">
-                        <div class="kpi-locked-overlay" id="lock-kpi2"><span class="kpi-lock-icon">🔒</span><span class="kpi-lock-label">Ajusta variables<br>de Flota</span></div>
-                        <div class="absolute top-0 right-0 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider" id="badgeEficiencia">Saturación Flota</div>
-                        <div>
-                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Eficiencia Volumétrica</h3>
-                            <div class="text-2xl font-black mt-2 tracking-tight" id="kpiEficiencia">0%</div>
-                            <div class="text-[10px] font-semibold text-slate-400 mt-0.5">Saturación real = ton / (viajes × cap. efectiva)</div>
-                            <p class="text-[10px] text-slate-400 leading-relaxed mt-1">Qué fracción de la capacidad contratada se ocupa con carga real. Saturación baja = camiones vacíos = OPEX desperdiciado. Palanca: factor de compactación.</p>
-                        </div>
-                        <div class="mt-3">
-                            <div class="h-2.5 rounded-full w-full overflow-hidden bg-slate-100 mb-2">
-                                <div class="h-full rounded-full transition-all duration-500 bg-slate-300" id="barEficiencia" style="width:0%"></div>
-                            </div>
-                            <div class="text-xs font-bold mt-1" id="alertaEficiencia">Sin compactación activa</div>
-                        </div>
-                    </div>
-
-                    <!-- ━━━ KPI 3: ROI & Payback ━━━ -->
-                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200" id="cardROI">
-                        <div class="kpi-locked-overlay" id="lock-kpi3"><span class="kpi-lock-icon">🔒</span><span class="kpi-lock-label">Ingresa Volumen<br>Recuperado</span></div>
-                        <div class="absolute top-0 right-0 bg-slate-100 text-slate-500 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider">ROI & Payback</div>
-                        <div>
-                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Retorno de Inversión</h3>
-                            <div class="text-2xl font-black text-slate-400 mt-2 tracking-tight" id="kpiPayback">— meses</div>
-                            <div class="text-[10px] font-semibold text-slate-400 mt-0.5">Recuperación CAPEX compactadora $4.500.000</div>
-                            <p class="text-[10px] text-slate-400 leading-relaxed mt-1">Meses necesarios para recuperar la inversión en maquinaria usando la rentabilidad neta mensual. Payback &lt;6 meses es óptimo para activos de reciclaje en Chile.</p>
-                        </div>
-                        <div class="mt-3 space-y-1">
-                            <div class="flex justify-between text-[11px]">
-                                <span class="text-slate-400">CAPEX maquinaria</span>
-                                <span class="font-bold text-slate-600">$4.500.000</span>
-                            </div>
-                            <div class="flex justify-between text-[11px]">
-                                <span class="text-slate-400">Rentab. neta/mes</span>
-                                <span class="font-bold text-slate-600" id="roiRentMes">$0</span>
-                            </div>
-                            <div class="flex justify-between text-[11px]">
-                                <span class="text-slate-400">OPEX total/mes</span>
-                                <span class="font-bold text-slate-500" id="roiOpexTotal">$0</span>
-                            </div>
-                            <div class="text-[11px] font-bold mt-1 pt-1 border-t border-slate-100" id="roiMensaje">Genere rentabilidad positiva para calcular</div>
-                        </div>
-                    </div>
-
-                    <!-- ━━━ KPI 4: Balance de Carbono Neto ━━━ -->
-                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200" id="cardCarbono">
-                        <div class="kpi-locked-overlay" id="lock-kpi4"><span class="kpi-lock-icon">🔒</span><span class="kpi-lock-label">Ajusta variables<br>de Flota</span></div>
-                        <div class="absolute top-0 right-0 bg-slate-100 text-slate-500 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider">Balance CO₂</div>
-                        <div>
-                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Balance de Carbono Neto</h3>
-                            <div class="text-2xl font-black text-slate-400 mt-2 tracking-tight" id="kpiCarbono">0 kg CO₂e</div>
-                            <div class="text-[10px] font-semibold mt-0.5" id="subCarbono">Neto = Evitado − Emitido</div>
-                            <p class="text-[10px] text-slate-400 leading-relaxed mt-1">Captura el impacto climático neto: emisiones evitadas por reciclar menos las generadas por el camión. Fuente factores: ANIR Chile / IPCC AR6.</p>
-                        </div>
-                        <div class="mt-3 space-y-1">
-                            <div class="flex justify-between text-[11px]">
-                                <span class="text-slate-400">CO₂e evitado (reciclaje)</span>
-                                <span class="font-bold text-emerald-600" id="co2Evitado">0 kg</span>
-                            </div>
-                            <div class="flex justify-between text-[11px]">
-                                <span class="text-slate-400">CO₂e emitido (diésel)</span>
-                                <span class="font-bold text-rose-500" id="co2Emitido">0 kg</span>
-                            </div>
-                            <div class="flex justify-between text-[11px] pt-1 border-t border-slate-100">
-                                <span class="font-bold text-slate-500">Acum. 12 meses</span>
-                                <span class="text-slate-500 font-bold" id="co2Anual">0 tCO₂e/año</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ━━━ KPI 5: Cumplimiento Ley REP — ancho completo ━━━ -->
-                    <div class="sm:col-span-2 p-5 rounded-2xl border-2 flex flex-col gap-3 relative overflow-hidden transition-all duration-300" id="cardMeta">
-                        <div class="kpi-locked-overlay" id="lock-kpi5"><span class="kpi-lock-icon">🔒</span><span class="kpi-lock-label">Ingresa Volumen Recuperado<br>para ver cumplimiento REP</span></div>
-                        <div class="absolute top-0 right-0 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider" id="badgeMeta">Ley REP</div>
-                        <div class="flex items-start gap-4">
-                            <div class="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center" id="iconMeta">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" id="svgMeta"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path></svg>
-                            </div>
-                            <div class="flex-grow min-w-0">
-                                <h3 class="text-xs font-bold uppercase tracking-wider mb-1" id="labelMeta">Evaluación Ley REP — Decreto 12</h3>
-                                <p class="text-lg font-black tracking-tight leading-tight" id="textoMeta">Sin volumen recuperado</p>
-                                <p class="text-[10px] text-slate-400 leading-relaxed mt-1">Meta de recolección mensual exigida por el Decreto 12. El incumplimiento expone a la empresa a multas bajo Art. 48 Ley 20.920. Principal palanca: volumen recuperado.</p>
-                            </div>
-                            <div class="shrink-0 text-right">
-                                <div class="text-3xl font-black tracking-tight" id="pctMeta">0 ton</div>
-                                <div class="text-[10px] font-bold uppercase tracking-wider opacity-70" id="metaRef">/ meta 200 ton</div>
-                                <div class="text-[10px] font-bold mt-1" id="co2HuellaChile">0% meta HuellaChile</div>
-                            </div>
-                        </div>
-                        <div class="h-2.5 rounded-full w-full overflow-hidden" id="barBg">
-                            <div class="h-full rounded-full transition-all duration-500" id="barFill" style="width:0%"></div>
-                        </div>
-                        <p class="text-xs font-medium leading-relaxed" id="descMeta">
-                            Active el slider de Volumen para proyectar el cumplimiento regulatorio.
-                        </p>
-                        <p class="text-[10px] text-slate-400 leading-relaxed" id="acumCO2Anual">Acumulado 12 meses: — tCO₂e/año evitadas</p>
-                    </div>
-
-                    <!-- ━━━ KPI 6: Costo por Tonelada Recuperada ━━━ -->
-                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200" id="cardCostoPorTon">
-                        <div class="kpi-locked-overlay" id="lock-kpi6"><span class="kpi-lock-icon">🔒</span><span class="kpi-lock-label">Ingresa Volumen<br>Recuperado</span></div>
-                        <div class="absolute top-0 right-0 bg-slate-100 text-slate-500 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider" id="badgeCostoPorTon">Eficiencia Operac.</div>
-                        <div>
-                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Costo por Tonelada Recuperada</h3>
-                            <div class="text-2xl font-black text-slate-400 mt-2 tracking-tight" id="kpiCostoPorTon">— CLP/ton</div>
-                            <div class="text-[10px] font-semibold text-slate-400 mt-0.5" id="subCostoPorTon">OPEX total / toneladas recuperadas</div>
-                            <p class="text-[10px] text-slate-400 leading-relaxed mt-1">Eficiencia operacional del sistema: mide cuánto cuesta recuperar cada tonelada. Permite comparar directamente con tarifas de recicladores externos (ANIR/Reciclaje Chile 2023: rango eficiente $8.000–$18.000 CLP/ton).</p>
-                        </div>
-                        <div class="mt-3 space-y-1">
-                            <div class="flex justify-between text-[11px]">
-                                <span class="text-slate-400">Referencia eficiente</span>
-                                <span class="text-slate-500 font-semibold">$8.000 – $18.000</span>
-                            </div>
-                            <div class="flex justify-between text-[11px]">
-                                <span class="text-slate-400">Zona alerta</span>
-                                <span class="text-amber-500 font-semibold">$12.000 – $20.000</span>
-                            </div>
-                            <div class="flex justify-between text-[11px] pt-1 border-t border-slate-100">
-                                <span class="font-bold text-slate-500" id="cptMensaje">Ingrese toneladas para calcular</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ━━━ KPI 7: Multa REP Evitada Proyectada ━━━ -->
-                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200" id="cardMulta">
-                        <div class="kpi-locked-overlay" id="lock-kpi7"><span class="kpi-lock-icon">🔒</span><span class="kpi-lock-label">Ingresa Volumen<br>Recuperado</span></div>
-                        <div class="absolute top-0 right-0 bg-slate-100 text-slate-500 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider" id="badgeMulta">Art. 48 Ley REP</div>
-                        <div>
-                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Multa REP Evitada Proyectada</h3>
-                            <div class="text-2xl font-black text-slate-400 mt-2 tracking-tight" id="kpiMulta">$0 CLP/año</div>
-                            <div class="text-[10px] font-semibold text-slate-400 mt-0.5" id="subMulta">Exposición regulatoria estimada</div>
-                            <p class="text-[10px] text-slate-400 leading-relaxed mt-1">Ahorro regulatorio estimado: cuánto deja de arriesgar la empresa al cumplir la meta de toneladas del Decreto 12. No reemplaza asesoría legal. Base: $150.000 CLP/ton faltante (proxy Art. 48).</p>
-                        </div>
-                        <div class="mt-3 space-y-1">
-                            <div class="flex justify-between text-[11px]">
-                                <span class="text-slate-400">Toneladas faltantes</span>
-                                <span class="font-bold text-slate-600" id="multaTonFaltantes">— ton</span>
-                            </div>
-                            <div class="flex justify-between text-[11px]">
-                                <span class="text-slate-400">Proxy multa unitario</span>
-                                <span class="text-slate-500 font-semibold">$150.000 CLP/ton</span>
-                            </div>
-                            <div class="text-[11px] font-bold mt-1 pt-1 border-t border-slate-100" id="multaMensaje">Calcule con toneladas activas</div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-        </section>
-
-    </main>
-
-    <footer class="bg-slate-900 text-slate-400 text-xs py-4 border-t border-slate-800 mt-12">
-        <div class="max-w-7xl mx-auto px-6 text-center flex flex-col sm:flex-row justify-between items-center gap-2">
-            <p>© 2026 Damu SGC — Plataforma de Trazabilidad y Logística Inversa Ley REP.</p>
-            <p class="text-slate-500">Diseñado estructuralmente para simulación de métricas medioambientales.</p>
+  <!-- PANEL DERECHO: PARÁMETROS TRANSPORTISTAS -->
+  <div class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>🚚 Parámetros del Transporte</h2>
+        <p>Variables logísticas de recolección</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="form-group">
+        <label>Frecuencia de retiro</label>
+        <select id="s-freq" onchange="recalc()">
+          <option value="12">Mensual (12 retiros/año)</option>
+          <option value="4">Trimestral (4 retiros/año)</option>
+          <option value="2">Semestral (2 retiros/año)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Distancia promedio al centro de valorización (km)</label>
+        <div class="slider-wrap">
+          <input type="range" id="s-km" min="5" max="300" value="40" oninput="updSlider('s-km','sv-km'); recalc()"/>
+          <span class="slider-val" id="sv-km">40 km</span>
         </div>
-    </footer>
+      </div>
+      <div class="form-group">
+        <label>Precio de valorización estimado (CLP/ton)</label>
+        <input type="number" id="s-precio" placeholder="Ej: 85000" min="0" oninput="recalc()"/>
+        <div class="hint">Precio que paga el gestor por recibir el residuo valorizable</div>
+      </div>
+      <div class="form-group">
+        <label>% de residuo valorizable (calidad del material)</label>
+        <div class="slider-wrap">
+          <input type="range" id="s-calidad" min="20" max="100" value="70" oninput="updSlider('s-calidad','sv-calidad'); recalc()"/>
+          <span class="slider-val" id="sv-calidad">70%</span>
+        </div>
+        <div class="hint">No todo el residuo recolectado es apto para valorización</div>
+      </div>
+      <button class="btn-calc" onclick="recalc()">Calcular proyección</button>
+    </div>
+  </div>
+
+  <!-- PANEL RESULTADOS -->
+  <div class="panel result-panel">
+    <div class="panel-header">
+      <div>
+        <h2>📊 Resultados de la Proyección</h2>
+        <p>Estimación anual basada en los parámetros ingresados</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div id="resultado-vacio" class="empty-state">
+        <div class="icon">🧮</div>
+        <p>Ingresa los parámetros y haz clic en <strong>Calcular proyección</strong></p>
+      </div>
+      <div id="resultado-contenido" style="display:none">
+
+        <div class="result-grid" id="kpi-grid"></div>
+
+        <h4 style="font-size:.88rem;font-weight:700;color:var(--gris-me);margin-bottom:.8rem;">Desglose operativo anual</h4>
+        <table class="desglose" id="tabla-desglose"></table>
+
+        <div class="chart-wrap">
+          <h4>Distribución de costos</h4>
+          <div class="bar-chart" id="bar-chart"></div>
+        </div>
+
+        <div class="disclaimer">
+          ⚠️ Estimación referencial basada en rangos operativos del mercado chileno de logística inversa. Los valores reales dependen de condiciones específicas de cada operación y gestor autorizado.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<footer>
+  <strong>Damu SGC</strong> — Trazabilidad Ley REP · Chile
+  <div class="links">
+    <a href="index.html">Inicio</a>
+    <a href="portal.html">Portal</a>
+    <a href="productores.html">Productores</a>
+    <a href="transportistas.html">Transportistas</a>
+    <a href="simulador.html">Simulador</a>
+    <a href="dashboard.html">Dashboard</a>
+  </div>
+  <p style="margin-top:.8rem;font-size:.75rem;color:#4a7a5e;">© 2025 Damu SGC · Todos los derechos reservados</p>
+</footer>
+
 <script>
-  /* =====================================================================
-     MODALES — PDCA y Gantt
-     -----------------------------------------------------------------------
-     El CSS define:  .modal-overlay          → display:none  (oculto)
-                     .modal-overlay.open     → display:flex  (visible)
-     ===================================================================== */
+  // Tarifas base CLP/ton por categoría
+  const tarifas = {
+    envases:    { reco:18000, trans:12000, val:22000, co2:0.8 },
+    neumaticos: { reco:25000, trans:18000, val:30000, co2:1.4 },
+    pilas:      { reco:35000, trans:20000, val:45000, co2:0.4 },
+    raee:       { reco:40000, trans:25000, val:50000, co2:1.1 },
+    aceites:    { reco:22000, trans:15000, val:28000, co2:0.9 },
+  };
 
-  function openModal(id) {
-    document.getElementById(id).classList.add('open');
-    document.body.style.overflow = 'hidden';
+  function updSlider(id, vid) {
+    const v  = document.getElementById(id).value;
+    const el = document.getElementById(vid);
+    if (id === 's-meta')    el.textContent = v + '%';
+    else if (id === 's-km') el.textContent = v + ' km';
+    else                    el.textContent = v + '%';
   }
 
-  function logoutCompany() {
-    localStorage.removeItem('damu_session');
-    window.location.href = 'index.html';
+  function fmt(n)  { return '$' + Math.round(n).toLocaleString('es-CL') + ' CLP'; }
+  function fmtT(n) { return n.toFixed(1) + ' t'; }
+
+  function recalc() {
+    const cat     = document.getElementById('s-cat').value;
+    const tons    = parseFloat(document.getElementById('s-tons').value) || 0;
+    const meta    = parseFloat(document.getElementById('s-meta').value) / 100;
+    const regMult = parseFloat(document.getElementById('s-region').value);
+    const freq    = parseInt(document.getElementById('s-freq').value);
+    const km      = parseFloat(document.getElementById('s-km').value);
+    const precio  = parseFloat(document.getElementById('s-precio').value) || 0;
+    const calidad = parseFloat(document.getElementById('s-calidad').value) / 100;
+
+    if (!tons) return;
+
+    const t        = tarifas[cat];
+    const tonsVal  = tons * meta;
+    const tonsUtil = tonsVal * calidad;
+
+    // Más distancia = más costo de transporte
+    const kmFactor   = 1 + (km - 40) * 0.003;
+
+    const costoReco  = tonsVal * t.reco  * regMult;
+    const costoTrans = tonsVal * t.trans * regMult * kmFactor * (12 / freq);
+    const costoVal   = tonsVal * t.val   * regMult;
+    const costoTotal = costoReco + costoTrans + costoVal;
+
+    const ingresoVal = tonsUtil * precio;
+    const balance    = ingresoVal - costoTotal;
+    const co2        = tonsUtil * t.co2;
+
+    document.getElementById('resultado-vacio').style.display     = 'none';
+    document.getElementById('resultado-contenido').style.display = 'block';
+
+    // KPIs
+    const kpis = [
+      { icon:'⚖️',  lbl:'Toneladas a valorizar',     val: fmtT(tonsVal),  cls:'' },
+      { icon:'♻️',  lbl:'Toneladas valorizables',     val: fmtT(tonsUtil), cls:'' },
+      { icon:'💸',  lbl:'Costo total estimado',       val: fmt(costoTotal), cls:'neg' },
+      { icon:'💰',  lbl:'Ingreso por valorización',   val: precio ? fmt(ingresoVal) : 'Sin precio', cls:'' },
+      { icon:'📊',  lbl:'Balance estimado',           val: precio ? fmt(balance) : '—', cls: balance >= 0 ? '' : 'neg' },
+      { icon:'🌿',  lbl:'CO₂e mitigado (est.)',       val: co2.toFixed(1) + ' tCO₂e', cls:'' },
+    ];
+    document.getElementById('kpi-grid').innerHTML = kpis.map(k =>
+      `<div class="result-kpi ${k.cls}">
+        <div class="icon">${k.icon}</div>
+        <div class="lbl">${k.lbl}</div>
+        <div class="val">${k.val}</div>
+      </div>`
+    ).join('');
+
+    // Tabla desglose
+    const filas = [
+      ['Recolección en origen',   costoReco,  'costo'],
+      ['Transporte al gestor',    costoTrans, 'costo'],
+      ['Proceso de valorización', costoVal,   'costo'],
+      ['Total costos operativos', costoTotal, 'costo'],
+    ];
+    document.getElementById('tabla-desglose').innerHTML =
+      `<thead><tr><th>Ítem</th><th>Tipo</th><th>Monto estimado / año</th></tr></thead><tbody>` +
+      filas.map(([lbl, monto, tipo]) =>
+        `<tr><td>${lbl}</td><td><span class="tag ${tipo}">${tipo === 'costo' ? 'Costo' : 'Ingreso'}</span></td><td>${fmt(monto)}</td></tr>`
+      ).join('') +
+      `</tbody>`;
+
+    // Barras
+    const maxVal    = Math.max(costoReco, costoTrans, costoVal);
+    const barras    = [
+      { lbl:'Recolección',  val:costoReco,  color:'#e74c3c' },
+      { lbl:'Transporte',   val:costoTrans, color:'#f0a500' },
+      { lbl:'Valorización', val:costoVal,   color:'#2980b9' },
+    ];
+    document.getElementById('bar-chart').innerHTML = barras.map(b =>
+      `<div class="bar-row">
+        <div class="bar-label">${b.lbl}</div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${maxVal ? Math.round(b.val / maxVal * 100) : 0}%; background:${b.color}"></div>
+        </div>
+        <div class="bar-amount">${fmt(b.val)}</div>
+      </div>`
+    ).join('');
   }
-
-  function closeModal(id, event) {
-    // Si viene de onclick en el overlay, solo cierra si el clic fue en el fondo
-    if (event) {
-      var box = document.querySelector('#' + id + ' .modal-box');
-      if (box && box.contains(event.target)) return;
-    }
-    document.getElementById(id).classList.remove('open');
-    document.body.style.overflow = '';
-  }
-
-  // Cerrar con tecla Escape
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-      ['modal-pdca', 'modal-gantt'].forEach(function(id) {
-        document.getElementById(id).classList.remove('open');
-      });
-      document.body.style.overflow = '';
-    }
-  });
-
-  /* =====================================================================
-     SIMULADOR FULL PRO v2 — LOGÍSTICA INVERSA LEY REP (CHILE)
-     -----------------------------------------------------------------------
-     Cadena causal encadenada:
-       factorCompact (0.5–1.0)  →  CAP_EFECTIVO
-       CAP_EFECTIVO + toneladas →  viajesNec
-       viajesNec + distancia    →  litrosTotales → opexCombust
-       toneladas × $2.500       →  opexPlanta
-       opexTotal = opexCombust + opexPlanta
-       rentNeta  = ingresos − opexTotal         → KPI1, KPI3
-       saturación real          = ton/(viajes×cap_ef) → KPI2
-       co2Neto × 12 / 1000      → acumulado anual     → KPI4→KPI5
-       opexTotal / toneladas    → costoPorTon          → KPI6
-       max(0,200−ton)×150000    → multaEvitada         → KPI7
-
-     Constantes:
-       CAP_CAMION   = 15 ton/viaje (carga bruta)
-       OPEX_PLANTA  = $2.500 CLP/ton (operario + energía planta)
-       CAPEX_MAQUIN = $4.500.000 CLP
-       META_HuellaChile_30 = referencia reducción 30% al 2030
-       FACTOR_DIESEL = 2.68 kg CO₂e / litro
-     ===================================================================== */
-
-  var CAP_CAMION    = 15;
-  var OPEX_POR_TON  = 2500;
-  var CAPEX_MAQUIN  = 4500000;
-  var CO2_CARTON    = 101;
-  var CO2_PET       = 780;
-  var FACTOR_DIESEL = 2.68;
-  var META_REP_TON  = 200;
-  var MULTA_POR_TON = 150000;
-
-  // ── Referencias controles Mercado ──
-  var sDiesel      = document.getElementById('sliderDiesel');
-  var nDiesel      = document.getElementById('numDiesel');
-  var sCarton      = document.getElementById('sliderCarton');
-  var nCarton      = document.getElementById('numCarton');
-  var sPET         = document.getElementById('sliderPET');
-  var nPET         = document.getElementById('numPET');
-
-  // ── Referencias controles Flota ──
-  var sRendimiento = document.getElementById('sliderRendimiento');
-  var nRendimiento = document.getElementById('numRendimiento');
-  var sDistancia   = document.getElementById('sliderDistancia');
-  var nDistancia   = document.getElementById('numDistancia');
-
-  // ── Referencias controles Eficiencia ──
-  var sKmVacio     = document.getElementById('sliderRutas');
-  var nVolumen     = document.getElementById('numVolumen');
-  var sCombustible = document.getElementById('sliderFrio');
-  var sMantencion  = document.getElementById('sliderRetorno');  // factor compact %50–100
-
-  function syncPair(slider, number) {
-    slider.addEventListener('input', function() { number.value = slider.value; actualizarSimulador(); });
-    number.addEventListener('input', function() {
-      var v = parseFloat(number.value);
-      if (!isNaN(v)) { v = Math.min(Math.max(v, parseFloat(slider.min)), parseFloat(slider.max)); slider.value = v; number.value = v; }
-      actualizarSimulador();
-    });
-  }
-
-  // ── Estado de desbloqueo progresivo ──
-  var unlocked = { kpi1: false, kpi2: false, kpi3: false, kpi4: false, kpi5: false, kpi6: false, kpi7: false };
-
-  function showToast(msg) {
-    var t = document.getElementById('kpi-toast');
-    t.textContent = msg;
-    t.classList.add('show');
-    setTimeout(function() { t.classList.remove('show'); }, 2500);
-  }
-
-  function unlockKPI(id, label) {
-    if (unlocked[id]) return;
-    unlocked[id] = true;
-    var overlay = document.getElementById('lock-' + id);
-    if (!overlay) return;
-    overlay.classList.add('unlocking');
-    setTimeout(function() { overlay.style.display = 'none'; }, 500);
-    showToast('📊 ' + label + ' desbloqueado');
-    updateProgress();
-  }
-
-  function updateProgress() {
-    var count = Object.values(unlocked).filter(Boolean).length;
-    var pct = Math.round((count / 7) * 100);
-    var bar = document.getElementById('kpi-progress-bar');
-    var lbl = document.getElementById('kpi-progress-label');
-    if (bar) bar.style.width = pct + '%';
-    if (lbl) lbl.textContent = count + ' / 7 KPIs';
-  }
-
-  function onMarketChange() {
-    unlockKPI('kpi1', 'Rentabilidad Neta');
-    actualizarSimulador();
-  }
-  function onFleetChange() {
-    unlockKPI('kpi2', 'Eficiencia Volumétrica');
-    unlockKPI('kpi4', 'Balance CO₂');
-    actualizarSimulador();
-  }
-  function onVolumeChange() {
-    var v = parseFloat(sKmVacio.value);
-    nVolumen.value = sKmVacio.value;
-    if (v > 0) {
-      unlockKPI('kpi3', 'ROI & Payback');
-      unlockKPI('kpi5', 'Cumplimiento Ley REP');
-      unlockKPI('kpi6', 'Costo por Tonelada');
-      unlockKPI('kpi7', 'Multa REP Evitada');
-    }
-    actualizarSimulador();
-  }
-
-  syncPair(sDiesel,      nDiesel);
-  syncPair(sCarton,      nCarton);
-  syncPair(sPET,         nPET);
-  syncPair(sRendimiento, nRendimiento);
-  syncPair(sDistancia,   nDistancia);
-  // Override volume slider with progressive logic
-  sKmVacio.addEventListener('input', onVolumeChange);
-  nVolumen.addEventListener('input', function() {
-    var v = parseFloat(nVolumen.value);
-    if (!isNaN(v)) { v = Math.min(Math.max(v, 0), 500); sKmVacio.value = v; nVolumen.value = v; }
-    onVolumeChange();
-  });
-  sCombustible.addEventListener('input', actualizarSimulador);
-  sMantencion.addEventListener('input',  actualizarSimulador);
-
-  // Override market sliders with unlock logic
-  [sDiesel, nDiesel, sCarton, nCarton, sPET, nPET].forEach(function(el) {
-    el.addEventListener('input', onMarketChange);
-  });
-  // Override fleet sliders with unlock logic
-  [sRendimiento, nRendimiento, sDistancia, nDistancia].forEach(function(el) {
-    el.addEventListener('input', onFleetChange);
-  });
-
-  function clp(n) { return '$' + Math.round(n).toLocaleString('es-CL'); }
-
-  function actualizarSimulador() {
-
-    // ── Leer variables ──
-    var precioDiesel  = parseFloat(sDiesel.value);
-    var precioCarton  = parseFloat(sCarton.value);
-    var precioPET     = parseFloat(sPET.value);
-    var rendimiento   = parseFloat(sRendimiento.value);
-    var distancia     = parseFloat(sDistancia.value);
-    var toneladas     = parseFloat(sKmVacio.value);
-    var pctCarton     = parseFloat(sCombustible.value);
-    var factorPct     = parseFloat(sMantencion.value);   // 50–100 → factor 0.50–1.00
-
-    // Factor de compactación real (0.50 a 1.00)
-    var factorCompact = factorPct / 100;
-    var capEfectivo   = CAP_CAMION * factorCompact;      // ton reales por viaje
-
-    // Etiquetas sliders sin number-input
-    document.getElementById('valFrio').innerText    = pctCarton + '% Cart\u00f3n';
-    document.getElementById('valRetorno').innerText = factorCompact.toFixed(2) + '\u00d7';
-
-    // ── Distribución de material ──
-    var tonCarton = toneladas * (pctCarton / 100);
-    var tonPET    = toneladas * ((100 - pctCarton) / 100);
-
-    // ════════════════════════════════════════════════════
-    // CADENA CAUSAL CENTRAL
-    // ════════════════════════════════════════════════════
-    var viajesNec     = toneladas > 0 ? Math.ceil(toneladas / capEfectivo) : 0;
-    var litrosTotales = (distancia * 2 / rendimiento) * viajesNec;
-    var opexCombust   = litrosTotales * precioDiesel;
-    var opexPlanta    = toneladas * OPEX_POR_TON;
-    var opexTotal     = opexCombust + opexPlanta;
-    var ingresos      = (tonCarton * precioCarton * 1000) + (tonPET * precioPET * 1000);
-    var rentNeta      = ingresos - opexTotal;
-    var saturacion    = (viajesNec > 0) ? Math.min((toneladas / (viajesNec * capEfectivo)) * 100, 100) : 0;
-
-    // CO₂
-    var co2Evit  = (tonCarton * CO2_CARTON) + (tonPET * CO2_PET);
-    var co2Emit  = litrosTotales * FACTOR_DIESEL;
-    var co2Neto  = co2Evit - co2Emit;
-    var co2Anual = (co2Neto * 12) / 1000;  // tCO₂e/año
-
-    // ════════════════════════════════════════════════════
-    // KPI 1 — Rentabilidad Operativa Neta
-    // ════════════════════════════════════════════════════
-    var cardR  = document.getElementById('cardRentabilidad');
-    var badgeR = document.getElementById('badgeRentabilidad');
-    var kpiR   = document.getElementById('kpiRentabilidad');
-
-    kpiR.textContent = clp(rentNeta);
-    document.getElementById('desgIngresos').textContent    = clp(ingresos);
-    document.getElementById('desgCombustible').textContent = clp(opexCombust);
-    document.getElementById('desgPlanta').textContent      = clp(opexPlanta);
-    document.getElementById('desgViajes').textContent      = viajesNec + ' viaje' + (viajesNec !== 1 ? 's' : '') + ' (' + capEfectivo.toFixed(1) + ' ton/viaje)';
-    document.getElementById('desgCapacidad').textContent   = 'OPEX total: ' + clp(opexTotal);
-
-    if (rentNeta > 0) {
-      cardR.className = 'bg-white p-5 rounded-2xl shadow-sm border border-emerald-300 bg-emerald-50/20 flex flex-col justify-between relative overflow-hidden transition-all duration-200';
-      badgeR.className = 'absolute top-0 right-0 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider bg-emerald-100 text-emerald-700';
-      kpiR.className = 'text-2xl font-black mt-2 tracking-tight text-emerald-600';
-    } else if (rentNeta < 0) {
-      cardR.className = 'bg-white p-5 rounded-2xl shadow-sm border border-rose-300 bg-rose-50/20 flex flex-col justify-between relative overflow-hidden transition-all duration-200';
-      badgeR.className = 'absolute top-0 right-0 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider bg-rose-100 text-rose-700';
-      kpiR.className = 'text-2xl font-black mt-2 tracking-tight text-rose-600';
-    } else {
-      cardR.className = 'bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200';
-      badgeR.className = 'absolute top-0 right-0 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider bg-slate-100 text-slate-500';
-      kpiR.className = 'text-2xl font-black mt-2 tracking-tight text-slate-400';
-    }
-
-    // ════════════════════════════════════════════════════
-    // KPI 2 — Eficiencia Volumétrica (saturación real)
-    // ════════════════════════════════════════════════════
-    var barE   = document.getElementById('barEficiencia');
-    var alertE = document.getElementById('alertaEficiencia');
-    var kpiE   = document.getElementById('kpiEficiencia');
-    var cardE  = document.getElementById('cardEficiencia');
-    var badgeE = document.getElementById('badgeEficiencia');
-
-    kpiE.textContent = saturacion.toFixed(1) + '%';
-    barE.style.width = Math.min(saturacion, 100) + '%';
-
-    if (saturacion < 40) {
-      barE.className = 'h-full rounded-full transition-all duration-500 bg-rose-400';
-      alertE.className = 'text-xs font-bold mt-1 text-rose-600';
-      alertE.textContent = '\u26a0\ufe0f Camiones transportando aire \u2014 P\u00e9rdida de OPEX';
-      cardE.className = 'bg-white p-5 rounded-2xl shadow-sm border border-rose-200 bg-rose-50/10 flex flex-col justify-between relative overflow-hidden transition-all duration-200';
-      badgeE.className = 'absolute top-0 right-0 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider bg-rose-100 text-rose-700';
-      kpiE.className = 'text-2xl font-black mt-2 tracking-tight text-rose-600';
-    } else if (saturacion < 75) {
-      barE.className = 'h-full rounded-full transition-all duration-500 bg-amber-400';
-      alertE.className = 'text-xs font-bold mt-1 text-amber-600';
-      alertE.textContent = '\u25b6 Saturaci\u00f3n parcial \u2014 Aumenta compactaci\u00f3n para reducir viajes';
-      cardE.className = 'bg-white p-5 rounded-2xl shadow-sm border border-amber-200 bg-amber-50/10 flex flex-col justify-between relative overflow-hidden transition-all duration-200';
-      badgeE.className = 'absolute top-0 right-0 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider bg-amber-100 text-amber-700';
-      kpiE.className = 'text-2xl font-black mt-2 tracking-tight text-amber-600';
-    } else {
-      barE.className = 'h-full rounded-full transition-all duration-500 bg-emerald-500';
-      alertE.className = 'text-xs font-bold mt-1 text-emerald-600';
-      alertE.textContent = '\u2713 \u00d3ptimo \u2014 Fardos densos, m\u00ednimo n\u00famero de viajes';
-      cardE.className = 'bg-white p-5 rounded-2xl shadow-sm border border-emerald-200 bg-emerald-50/10 flex flex-col justify-between relative overflow-hidden transition-all duration-200';
-      badgeE.className = 'absolute top-0 right-0 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider bg-emerald-100 text-emerald-700';
-      kpiE.className = 'text-2xl font-black mt-2 tracking-tight text-emerald-600';
-    }
-
-    // ════════════════════════════════════════════════════
-    // KPI 3 — ROI & Payback (usa rentNeta que incluye opexPlanta)
-    // ════════════════════════════════════════════════════
-    var kpiPay  = document.getElementById('kpiPayback');
-    var roiMes  = document.getElementById('roiRentMes');
-    var roiMsg  = document.getElementById('roiMensaje');
-    var cardROI = document.getElementById('cardROI');
-    var roiOpex = document.getElementById('roiOpexTotal');
-
-    roiMes.textContent = clp(rentNeta);
-    roiOpex.textContent = clp(opexTotal);
-
-    if (rentNeta > 0) {
-      var payback = CAPEX_MAQUIN / rentNeta;
-      kpiPay.textContent = payback.toFixed(1) + ' meses';
-      kpiPay.className   = 'text-2xl font-black text-emerald-600 mt-2 tracking-tight';
-      roiMsg.className   = 'text-[11px] font-bold mt-1 pt-1 border-t border-slate-100 text-emerald-600';
-      roiMsg.textContent = payback <= 6 ? '\u2605 Payback \u00f3ptimo (\u22646 meses)' : payback <= 12 ? 'Payback aceptable (\u22641 a\u00f1o)' : '\u26a0 Payback prolongado (' + payback.toFixed(0) + ' meses)';
-      cardROI.className  = 'bg-white p-5 rounded-2xl shadow-sm border border-emerald-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200';
-      roiMes.className   = 'font-bold text-emerald-600';
-    } else if (rentNeta < 0) {
-      kpiPay.textContent = 'No recuperable';
-      kpiPay.className   = 'text-2xl font-black text-rose-500 mt-2 tracking-tight';
-      roiMsg.className   = 'text-[11px] font-bold mt-1 pt-1 border-t border-slate-100 text-rose-500';
-      roiMsg.textContent = 'Operaci\u00f3n en d\u00e9ficit \u2014 ajuste variables';
-      cardROI.className  = 'bg-white p-5 rounded-2xl shadow-sm border border-rose-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200';
-      roiMes.className   = 'font-bold text-rose-500';
-    } else {
-      kpiPay.textContent = '— meses';
-      kpiPay.className   = 'text-2xl font-black text-slate-400 mt-2 tracking-tight';
-      roiMsg.className   = 'text-[11px] font-bold mt-1 pt-1 border-t border-slate-100 text-slate-400';
-      roiMsg.textContent = 'Genere rentabilidad positiva para calcular';
-      cardROI.className  = 'bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200';
-      roiMes.className   = 'font-bold text-slate-600';
-    }
-
-    // ════════════════════════════════════════════════════
-    // KPI 4 — Balance de Carbono Neto + acumulado anual
-    // ════════════════════════════════════════════════════
-    var kpiCO2  = document.getElementById('kpiCarbono');
-    var subCO2  = document.getElementById('subCarbono');
-    var cardCO2 = document.getElementById('cardCarbono');
-
-    document.getElementById('co2Evitado').textContent = Math.round(co2Evit).toLocaleString('es-CL') + ' kg';
-    document.getElementById('co2Emitido').textContent = Math.round(co2Emit).toLocaleString('es-CL') + ' kg';
-    document.getElementById('co2Anual').textContent   = co2Anual.toFixed(2) + ' tCO\u2082e/a\u00f1o';
-
-    kpiCO2.textContent = (co2Neto >= 0 ? '+' : '') + Math.round(co2Neto).toLocaleString('es-CL') + ' kg CO\u2082e';
-
-    if (co2Neto > 0) {
-      kpiCO2.className = 'text-2xl font-black text-emerald-600 mt-2 tracking-tight';
-      subCO2.className = 'text-[10px] font-semibold mt-0.5 text-emerald-500';
-      subCO2.textContent = '\u2193 Balance positivo \u2014 reciclaje supera emisiones de ruta';
-      cardCO2.className = 'bg-white p-5 rounded-2xl shadow-sm border border-emerald-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200';
-    } else if (co2Neto < 0) {
-      kpiCO2.className = 'text-2xl font-black text-rose-500 mt-2 tracking-tight';
-      subCO2.className = 'text-[10px] font-semibold mt-0.5 text-rose-400';
-      subCO2.textContent = '\u2191 Balance negativo \u2014 di\u00e9sel supera beneficio del reciclaje';
-      cardCO2.className = 'bg-white p-5 rounded-2xl shadow-sm border border-rose-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200';
-    } else {
-      kpiCO2.className = 'text-2xl font-black text-slate-400 mt-2 tracking-tight';
-      subCO2.className = 'text-[10px] font-semibold mt-0.5 text-slate-400';
-      subCO2.textContent = 'Neto = Evitado \u2212 Emitido';
-      cardCO2.className = 'bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200';
-    }
-
-    // ════════════════════════════════════════════════════
-    // KPI 5 — Cumplimiento Ley REP + HuellaChile + acum. anual
-    // ════════════════════════════════════════════════════
-    // Referencia HuellaChile: reducción 30% al 2030 base 2018.
-    // Proxy: meta individual 200 ton/mes = 2.400 ton/año para este operador.
-    // % avance = (co2Anual / (2.400 × 101*0.3)) × 100  — estimación pedagógica.
-    var huellaRef   = 2400 * CO2_CARTON * 0.30 / 1000;  // tCO₂e referencia anual operador
-    var huellaAvance = huellaRef > 0 ? Math.min((co2Anual / huellaRef) * 100, 999) : 0;
-
-    document.getElementById('co2HuellaChile').textContent =
-      huellaAvance.toFixed(1) + '% meta HuellaChile \u201930';
-    document.getElementById('acumCO2Anual').textContent =
-      'Acumulado 12 meses: ' + co2Anual.toFixed(2) + ' tCO\u2082e/a\u00f1o evitadas';
-
-    evaluarMetaAmbiental(toneladas);
-
-    // ── Guardar estado en localStorage para Dashboard ──
-    try {
-      localStorage.setItem('damu_simulador', JSON.stringify({
-        toneladas: toneladas,
-        rentNeta: rentNeta,
-        ingresos: ingresos,
-        opexTotal: opexTotal,
-        saturacion: saturacion,
-        co2Neto: co2Neto,
-        co2Anual: co2Anual,
-        viajesNec: viajesNec,
-        costoPorTon: toneladas > 0 ? opexTotal / toneladas : 0,
-        tFaltantes: Math.max(0, META_REP_TON - toneladas),
-        multaAnual: Math.max(0, META_REP_TON - toneladas) > 0 ? Math.max(0, META_REP_TON - toneladas) * MULTA_POR_TON * 12 : 0,
-        pctMeta: Math.min((toneladas / META_REP_TON) * 100, 100).toFixed(1),
-        ts: Date.now()
-      }));
-    } catch(e) {}
-
-    // ════════════════════════════════════════════════════
-    // KPI 6 — Costo por Tonelada Recuperada
-    // ════════════════════════════════════════════════════
-    var cardCPT  = document.getElementById('cardCostoPorTon');
-    var badgeCPT = document.getElementById('badgeCostoPorTon');
-    var kpiCPT   = document.getElementById('kpiCostoPorTon');
-    var subCPT   = document.getElementById('subCostoPorTon');
-    var msgCPT   = document.getElementById('cptMensaje');
-
-    if (toneladas > 0) {
-      var costoPorTon = opexTotal / toneladas;
-      kpiCPT.textContent = clp(Math.round(costoPorTon)) + '/ton';
-      subCPT.textContent = 'OPEX total / ' + toneladas + ' ton recuperadas';
-
-      if (costoPorTon < 12000) {
-        kpiCPT.className = 'text-2xl font-black text-emerald-600 mt-2 tracking-tight';
-        cardCPT.className = 'bg-white p-5 rounded-2xl shadow-sm border border-emerald-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200';
-        badgeCPT.className = 'absolute top-0 right-0 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider bg-emerald-100 text-emerald-700';
-        msgCPT.className = 'font-bold text-emerald-600';
-        msgCPT.textContent = '\u2705 Eficiente \u2014 por debajo del umbral ANIR $12.000/ton';
-      } else if (costoPorTon <= 20000) {
-        kpiCPT.className = 'text-2xl font-black text-amber-600 mt-2 tracking-tight';
-        cardCPT.className = 'bg-white p-5 rounded-2xl shadow-sm border border-amber-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200';
-        badgeCPT.className = 'absolute top-0 right-0 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider bg-amber-100 text-amber-700';
-        msgCPT.className = 'font-bold text-amber-600';
-        msgCPT.textContent = '\u26a0 En alerta \u2014 compite con recicladores externos';
-      } else {
-        kpiCPT.className = 'text-2xl font-black text-rose-600 mt-2 tracking-tight';
-        cardCPT.className = 'bg-white p-5 rounded-2xl shadow-sm border border-rose-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200';
-        badgeCPT.className = 'absolute top-0 right-0 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider bg-rose-100 text-rose-700';
-        msgCPT.className = 'font-bold text-rose-600';
-        msgCPT.textContent = '\u2715 Ineficiente \u2014 externalizar puede ser m\u00e1s barato';
-      }
-    } else {
-      kpiCPT.textContent = '— CLP/ton';
-      kpiCPT.className = 'text-2xl font-black text-slate-400 mt-2 tracking-tight';
-      subCPT.textContent = 'OPEX total / toneladas recuperadas';
-      cardCPT.className = 'bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200';
-      badgeCPT.className = 'absolute top-0 right-0 bg-slate-100 text-slate-500 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider';
-      msgCPT.className = 'font-bold text-slate-400';
-      msgCPT.textContent = 'Ingrese toneladas para calcular';
-    }
-
-    // ════════════════════════════════════════════════════
-    // KPI 7 — Multa REP Evitada Proyectada (Art. 48)
-    // ════════════════════════════════════════════════════
-    var cardMulta  = document.getElementById('cardMulta');
-    var badgeMulta = document.getElementById('badgeMulta');
-    var kpiMulta   = document.getElementById('kpiMulta');
-    var subMulta   = document.getElementById('subMulta');
-    var tonFalt    = document.getElementById('multaTonFaltantes');
-    var msgMulta   = document.getElementById('multaMensaje');
-
-    var tFaltantes = Math.max(0, META_REP_TON - toneladas);
-    var multaAnual = tFaltantes > 0 ? tFaltantes * MULTA_POR_TON * 12 : 0;
-
-    tonFalt.textContent = tFaltantes > 0 ? tFaltantes.toFixed(1) + ' ton' : '0 ton (cumple)';
-
-    if (tFaltantes === 0) {
-      kpiMulta.textContent = '$0 CLP (cumple)';
-      kpiMulta.className = 'text-2xl font-black text-emerald-600 mt-2 tracking-tight';
-      subMulta.className = 'text-[10px] font-semibold mt-0.5 text-emerald-500';
-      subMulta.textContent = 'Sin exposici\u00f3n regulatoria';
-      cardMulta.className = 'bg-white p-5 rounded-2xl shadow-sm border border-emerald-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200';
-      badgeMulta.className = 'absolute top-0 right-0 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider bg-emerald-100 text-emerald-700';
-      msgMulta.className = 'text-[11px] font-bold mt-1 pt-1 border-t border-slate-100 text-emerald-600';
-      msgMulta.textContent = '\u2705 Cumple Art. 48 \u2014 meta Decreto 12 alcanzada';
-      tonFalt.className = 'font-bold text-emerald-600';
-    } else if (tFaltantes < 50) {
-      kpiMulta.textContent = clp(multaAnual) + '/a\u00f1o';
-      kpiMulta.className = 'text-2xl font-black text-amber-600 mt-2 tracking-tight';
-      subMulta.className = 'text-[10px] font-semibold mt-0.5 text-amber-500';
-      subMulta.textContent = 'Riesgo bajo \u2014 faltan menos de 50 ton';
-      cardMulta.className = 'bg-white p-5 rounded-2xl shadow-sm border border-amber-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200';
-      badgeMulta.className = 'absolute top-0 right-0 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider bg-amber-100 text-amber-700';
-      msgMulta.className = 'text-[11px] font-bold mt-1 pt-1 border-t border-slate-100 text-amber-600';
-      msgMulta.textContent = '\u26a0 Riesgo moderado \u2014 acercar volumen a 200 ton';
-      tonFalt.className = 'font-bold text-amber-600';
-    } else {
-      kpiMulta.textContent = clp(multaAnual) + '/a\u00f1o';
-      kpiMulta.className = 'text-2xl font-black text-rose-600 mt-2 tracking-tight';
-      subMulta.className = 'text-[10px] font-semibold mt-0.5 text-rose-400';
-      subMulta.textContent = 'Exposici\u00f3n regulatoria alta \u2014 \u2265 50 ton faltantes';
-      cardMulta.className = 'bg-white p-5 rounded-2xl shadow-sm border border-rose-200 flex flex-col justify-between relative overflow-hidden transition-all duration-200';
-      badgeMulta.className = 'absolute top-0 right-0 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider bg-rose-100 text-rose-700';
-      msgMulta.className = 'text-[11px] font-bold mt-1 pt-1 border-t border-slate-100 text-rose-600';
-      msgMulta.textContent = '\u2715 Alerta Art. 48 \u2014 incumplimiento Decreto 12';
-      tonFalt.className = 'font-bold text-rose-600';
-    }
-  }
-
-  /* =====================================================================
-     KPI 5 — EVALUACIÓN META AMBIENTAL / LEY REP (Decreto 12)
-     -----------------------------------------------------------------------
-     Recibe las toneladas recuperadas y actualiza la tarjeta completa:
-     color, icono, barra de progreso, texto de estado y descripción.
-     Umbrales:
-       0     → sin acción (rojo)
-       1–99  → bajo rendimiento (rojo)
-       100–199 → cumplimiento parcial (ámbar)
-       ≥200    → meta REP alcanzada (verde)
-     ===================================================================== */
-  function evaluarMetaAmbiental(toneladas) {
-    var card    = document.getElementById('cardMeta');
-    var badge   = document.getElementById('badgeMeta');
-    var iconDiv = document.getElementById('iconMeta');
-    var svgEl   = document.getElementById('svgMeta');
-    var label   = document.getElementById('labelMeta');
-    var texto   = document.getElementById('textoMeta');
-    var pct     = document.getElementById('pctMeta');
-    var metaRef = document.getElementById('metaRef');
-    var barBg   = document.getElementById('barBg');
-    var barFill = document.getElementById('barFill');
-    var desc    = document.getElementById('descMeta');
-
-    if (!card) return;  // guarda si el DOM aún no está listo
-
-    var anchoBarra = Math.min((toneladas / 500) * 100, 100).toFixed(1);
-    pct.textContent = toneladas + ' ton';
-
-    var baseCard = 'sm:col-span-2 p-5 rounded-2xl border-2 flex flex-col gap-3 relative overflow-hidden transition-all duration-300';
-
-    if (toneladas < 100) {
-      /* ──── ROJO: bajo rendimiento ──── */
-      card.className    = baseCard + ' border-rose-300 bg-rose-50';
-      badge.className   = 'absolute top-0 right-0 bg-rose-200 text-rose-800 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider';
-      iconDiv.className = 'shrink-0 w-10 h-10 rounded-xl flex items-center justify-center bg-rose-100 text-rose-600';
-      svgEl.innerHTML   = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path>';
-      label.className   = 'text-xs font-bold text-rose-500 uppercase tracking-wider mb-1';
-      texto.className   = 'text-lg font-black tracking-tight leading-tight text-rose-700';
-      texto.textContent = toneladas === 0
-        ? 'Sin volumen recuperado — ingrese toneladas'
-        : 'Alerta: Bajo rendimiento ambiental';
-      pct.className     = 'text-3xl font-black tracking-tight text-rose-700';
-      metaRef.className = 'text-[10px] font-bold uppercase tracking-wider opacity-70 text-rose-500';
-      barBg.className   = 'h-2.5 rounded-full w-full overflow-hidden bg-rose-100';
-      barFill.className = 'h-full rounded-full transition-all duration-500 bg-rose-500';
-      barFill.style.width = anchoBarra + '%';
-      desc.className    = 'text-xs font-medium leading-relaxed text-rose-700';
-      desc.textContent  = toneladas === 0
-        ? 'Active el slider de Volumen para proyectar el cumplimiento regulatorio Decreto 12.'
-        : 'Volumen actual (' + toneladas + ' ton) por debajo del umbral m\u00ednimo. Se requieren al menos 100 ton para entrar al tramo de cumplimiento parcial.';
-
-    } else if (toneladas < 200) {
-      /* ──── ÁMBAR: cumplimiento parcial ──── */
-      card.className    = baseCard + ' border-amber-300 bg-amber-50';
-      badge.className   = 'absolute top-0 right-0 bg-amber-200 text-amber-800 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider';
-      iconDiv.className = 'shrink-0 w-10 h-10 rounded-xl flex items-center justify-center bg-amber-100 text-amber-600';
-      svgEl.innerHTML   = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>';
-      label.className   = 'text-xs font-bold text-amber-600 uppercase tracking-wider mb-1';
-      texto.className   = 'text-lg font-black tracking-tight leading-tight text-amber-700';
-      texto.textContent = 'Cumplimiento parcial \u2014 faltan ' + (200 - toneladas) + ' ton';
-      pct.className     = 'text-3xl font-black tracking-tight text-amber-700';
-      metaRef.className = 'text-[10px] font-bold uppercase tracking-wider opacity-70 text-amber-600';
-      barBg.className   = 'h-2.5 rounded-full w-full overflow-hidden bg-amber-100';
-      barFill.className = 'h-full rounded-full transition-all duration-500 bg-amber-500';
-      barFill.style.width = anchoBarra + '%';
-      desc.className    = 'text-xs font-medium leading-relaxed text-amber-700';
-      desc.textContent  = 'En tramo de cumplimiento parcial. Aumentar volumen ' + (200 - toneladas) + ' ton adicionales para alcanzar la meta legal del Decreto 12 y evitar exposici\u00f3n Art. 48.';
-
-    } else {
-      /* ──── VERDE: meta REP alcanzada ──── */
-      card.className    = baseCard + ' border-emerald-300 bg-emerald-50';
-      badge.className   = 'absolute top-0 right-0 bg-emerald-200 text-emerald-800 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wider';
-      iconDiv.className = 'shrink-0 w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-100 text-emerald-600';
-      svgEl.innerHTML   = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path>';
-      label.className   = 'text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1';
-      texto.className   = 'text-lg font-black tracking-tight leading-tight text-emerald-700';
-      texto.textContent = '\u2705 Meta Ley REP Alcanzada \u2014 Decreto 12 cumplido';
-      pct.className     = 'text-3xl font-black tracking-tight text-emerald-700';
-      metaRef.className = 'text-[10px] font-bold uppercase tracking-wider opacity-70 text-emerald-600';
-      barBg.className   = 'h-2.5 rounded-full w-full overflow-hidden bg-emerald-100';
-      barFill.className = 'h-full rounded-full transition-all duration-500 bg-emerald-500';
-      barFill.style.width = anchoBarra + '%';
-      desc.className    = 'text-xs font-medium leading-relaxed text-emerald-700';
-      desc.textContent  = '\u2605 ' + toneladas + ' ton recuperadas \u2014 supera la meta de 200 ton del Decreto 12. Sin exposici\u00f3n regulatoria Art. 48. Operaci\u00f3n en liderazgo de log\u00edstica inversa circular.';
-    }
-  }
-
-  actualizarSimulador();
 </script>
-
-</body></html>
+</body>
+</html>
