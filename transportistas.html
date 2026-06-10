@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Portal Transportistas — Damu SGC</title>
+  <style>
+    :root {
+      --verde:    #2d7a4f;
+      --verde-cl: #3fa66e;
+      --verde-bg: #e8f5ee;
+      --gris-os:  #1a1a2e;
+      --gris-me:  #2c3e50;
+      --blanco:   #ffffff;
+      --texto:    #333;
+      --borde:    #d0e8da;
+      --acento:   #f0a500;
+      --azul:     #2980b9;
+      --azul-cl:  #3498db;
+      --azul-bg:  #eaf4fb;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Segoe UI',sans-serif; color:var(--texto); background:#f7faf8; }
+
+    /* ── NAV ── */
+    nav {
+      background:var(--gris-os); display:flex; align-items:center;
+      justify-content:space-between; padding:0 2rem; height:64px;
+      position:sticky; top:0; z-index:100;
+    }
+    .nav-logo { display:flex; align-items:center; gap:.75rem; text-decoration:none; }
+    .nav-logo .badge {
+      width:38px; height:38px; border-radius:50%; background:var(--azul);
+      color:#fff; display:flex; align-items:center; justify-content:center;
+      font-weight:800; font-size:1.1rem;
+    }
+    .nav-logo span { color:#fff; font-weight:700; font-size:1.1rem; }
+    .nav-logo small { color:#8abeaa; font-size:.7rem; display:block; margin-top:-2px; }
+    nav ul { list-style:none; display:flex; gap:1.5rem; }
+    nav ul a {
+      color:#ccc; text-decoration:none; font-size:.9rem;
+      padding:.4rem .8rem; border-radius:6px; transition:.2s;
+    }
+    nav ul a:hover, nav ul a.active { background:var(--azul); color:#fff; }
+    .nav-back {
+      background:transparent; color:#8abeaa; border:1px solid #3a5a4a;
+      padding:.4rem 1rem; border-radius:20px; cursor:pointer;
+      font-size:.82rem; text-decoration:none; transition:.2s;
+    }
+    .nav-back:hover { background:var(--azul); color:#fff; }
+
+    /* ── HERO PORTAL ── */
+    .hero-portal {
+      background:linear-gradient(135deg, #0a2a45 0%, var(--azul) 100%);
+      color:#fff; padding:3rem 2rem 2.5rem;
+      display:flex; align-items:center; justify-content:space-between;
+      flex-wrap:wrap; gap:1.5rem;
+    }
+    .hero-portal .left { max-width:560px; }
+    .portal-badge {
+      display:inline-flex; align-items:center; gap:.4rem;
+      background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3);
+      padding:.3rem .9rem; border-radius:20px; font-size:.78rem;
+      color:#c8e8f8; margin-bottom:.9rem;
+    }
+    .hero-portal h1 { font-size:clamp(1.5rem,3vw,2.2rem); font-weight:800; line-height:1.25; margin-bottom:.6rem; }
+    .hero-portal p { color:#a0c8e0; font-size:.95rem; line-height:1.7; }
+    .hero-portal .right {
+      background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2);
+      border-radius:14px; padding:1.2rem 1.6rem; min-width:220px; text-align:center;
+    }
+    .hero-portal .right .lbl { font-size:.75rem; color:#a0c8e0; margin-bottom:.3rem; }
+    .hero-portal .right .val { font-size:1.1rem; font-weight:700; color:#fff; }
+    .hero-portal .right hr { border:none; border-top:1px solid rgba(255,255,255,.15); margin:.8rem 0; }
+
+    /* ── TABS NAV ── */
+    .tab-nav {
+      background:#fff; border-bottom:2px solid #d0e4f0;
+      display:flex; padding:0 2rem; overflow-x:auto; gap:0;
+    }
+    .tab-nav a {
+      padding:1rem 1.4rem; text-decoration:none; font-size:.88rem;
+      font-weight:600; color:#888; border-bottom:3px solid transparent;
+      white-space:nowrap; transition:.2s; margin-bottom:-2px; cursor:pointer;
+    }
+    .tab-nav a:hover { color:var(--azul); }
+    .tab-nav a.active { color:var(--azul); border-bottom-color:var(--azul); }
+
+    /* ── CONTENIDO ── */
+    .content { max-width:1080px; margin:0 auto; padding:2.5rem 1.5rem; }
+    .section-header { margin-bottom:1.5rem; }
+    .section-header h2 { font-size:1.3rem; color:var(--gris-me); display:flex; align-items:center; gap:.5rem; }
+    .section-header p { font-size:.88rem; color:#666; margin-top:.3rem; }
+
+    /* ── MAPA SIMULADO ── */
+    .mapa-wrap {
+      background:#fff; border:1px solid #d0e4f0; border-radius:16px;
+      padding:1.5rem; margin-bottom:2rem;
+    }
+    .mapa-header {
+      display:flex; justify-content:space-between; align-items:center;
+      margin-bottom:1rem; flex-wrap:wrap; gap:.5rem;
+    }
+    .mapa-header h3 { font-size:.95rem; font-weight:700; color:var(--gris-me); }
+    .filter-btns { display:flex; gap:.4rem; flex-wrap:wrap; }
+    .filter-btn {
+      padding:.3rem .8rem; border-radius:20px; border:1px solid #ccc;
+      font-size:.75rem; cursor:pointer; transition:.2s; background:#f5f5f5;
+    }
+    .filter-btn.active { background:var(--azul); color:#fff; border-color:var(--azul); }
+    .mapa-canvas {
+      position:relative; background:#eaf2f8; border-radius:12px;
+      height:300px; overflow:hidden; border:1px solid #c8dff0; margin-bottom:1rem;
+    }
+    /* SVG calles simuladas */
+    .mapa-svg { width:100%; height:100%; position:absolute; top:0; left:0; }
+    .punto {
+      position:absolute; width:18px; height:18px; border-radius:50%;
+      border:2.5px solid #fff; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.25);
+      transition:.2s; transform:translate(-50%,-50%);
+    }
+    .punto:hover { transform:translate(-50%,-50%) scale(1.4); }
+    .punto.lleno   { background:#e74c3c; }
+    .punto.medio   { background:#f39c12; }
+    .punto.libre   { background:#2ecc71; }
+    .punto-label {
+      position:absolute; background:#fff; border:1px solid #d0d8e0;
+      border-radius:6px; padding:.2rem .6rem; font-size:.68rem; font-weight:600;
+      white-space:nowrap; pointer-events:none; box-shadow:0 2px 4px rgba(0,0,0,.1);
+      transform:translate(-50%, 14px);
+    }
+    .mapa-leyenda { display:flex; gap:1.2rem; flex-wrap:wrap; font-size:.78rem; margin-top:.4rem; }
+    .mapa-leyenda span { display:flex; align-items:center; gap:.4rem; }
+    .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+    .dot.lleno { background:#e74c3c; }
+    .dot.medio { background:#f39c12; }
+    .dot.libre { background:#2ecc71; }
+
+    /* ── TABLA RUTAS ── */
+    .rutas-table { width:100%; border-collapse:collapse; font-size:.83rem; }
+    .rutas-table th {
+      background:#f0f6fb; padding:.7rem 1rem; text-align:left;
+      font-size:.75rem; color:#666; text-transform:uppercase; letter-spacing:.03em;
+    }
+    .rutas-table td { padding:.7rem 1rem; border-bottom:1px solid #e8f0f6; vertical-align:middle; }
+    .rutas-table tr:last-child td { border:none; }
+    .ruta-btn {
+      background:var(--azul-bg); color:var(--azul); border:1px solid #b0d4ec;
+      padding:.3rem .8rem; border-radius:8px; font-size:.75rem;
+      font-weight:600; cursor:pointer; transition:.2s;
+    }
+    .ruta-btn:hover { background:var(--azul); color:#fff; }
+    .badge-ruta {
+      font-size:.72rem; font-weight:700; padding:.2rem .6rem; border-radius:10px;
+    }
+    .badge-ruta.lleno { background:#fde8e8; color:#c0392b; }
+    .badge-ruta.medio { background:#fef3cd; color:#856404; }
+    .badge-ruta.libre { background:#d4edda; color:#155724; }
+
+    /* ── KPIs ── */
+    .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem; margin-bottom:2rem; }
+    .kpi-card {
+      background:#fff; border:1px solid #d0e4f0; border-radius:12px;
+      padding:1.3rem 1.2rem; text-align:center; position:relative; overflow:hidden;
+    }
+    .kpi-card .kpi-icon { font-size:1.5rem; margin-bottom:.5rem; }
+    .kpi-card .kpi-val { font-size:1.6rem; font-weight:800; color:var(--azul); margin-bottom:.25rem; }
+    .kpi-card .kpi-lbl { font-size:.78rem; color:#666; }
+    .kpi-card::after {
+      content:''; position:absolute; bottom:0; left:0; right:0; height:3px;
+      background:var(--azul-cl);
+    }
+    .kpi-card .kpi-sub { font-size:.72rem; color:#aaa; margin-top:.3rem; }
+
+    /* ── QR ── */
+    .qr-wrap {
+      background:#fff; border:1px solid #d0e4f0; border-radius:16px;
+      padding:1.8rem; max-width:520px; margin:0 auto 2rem;
+    }
+    .qr-area {
+      border:2px dashed #b0c4d4; border-radius:12px;
+      height:200px; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:.6rem;
+      background:#f5f9fc; cursor:pointer; transition:.2s;
+    }
+    .qr-area:hover { border-color:var(--azul); background:var(--azul-bg); }
+    .qr-area .qr-icon { font-size:2.8rem; }
+    .qr-area p { font-size:.85rem; color:#666; }
+    .btn-scan {
+      width:100%; background:var(--azul); color:#fff; border:none;
+      padding:.8rem; border-radius:10px; font-size:.95rem;
+      font-weight:700; cursor:pointer; transition:.2s; margin-top:1rem;
+    }
+    .btn-scan:hover { background:var(--azul-cl); }
+    .scan-result {
+      background:var(--azul-bg); border:1px solid #b0d4ec;
+      border-radius:10px; padding:1.1rem; margin-top:1rem; font-size:.83rem;
+    }
+    .scan-row { display:flex; justify-content:space-between; padding:.3rem 0; border-bottom:1px solid #c8dff0; }
+    .scan-row:last-child { border:none; font-weight:700; color:var(--azul); }
+
+    /* ── TMS ── */
+    .tms-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:1rem; margin-bottom:2rem; }
+    .tms-card {
+      background:#fff; border:1px solid #d0e4f0; border-radius:12px;
+      padding:1.2rem; display:flex; gap:.8rem; align-items:flex-start;
+    }
+    .tms-card .tms-icon { font-size:1.5rem; flex-shrink:0; }
+    .tms-card h4 { font-size:.88rem; font-weight:700; color:var(--gris-me); margin-bottom:.3rem; }
+    .tms-card p { font-size:.78rem; color:#666; line-height:1.5; }
+    .tms-form {
+      background:#fff; border:1px solid #d0e4f0; border-radius:16px;
+      padding:1.8rem; max-width:560px;
+    }
+    .tms-form h3 { font-size:1rem; font-weight:700; color:var(--gris-me); margin-bottom:1.2rem; }
+    .form-group { margin-bottom:1rem; }
+    .form-group label { display:block; font-size:.8rem; color:#555; margin-bottom:.35rem; font-weight:600; }
+    .form-group input, .form-group select {
+      width:100%; padding:.65rem .9rem; border:1px solid #b0d4ec;
+      border-radius:8px; font-size:.9rem; outline:none; transition:.2s; background:#fafffe;
+    }
+    .form-group input:focus, .form-group select:focus {
+      border-color:var(--azul-cl); box-shadow:0 0 0 3px rgba(41,128,185,.15);
+    }
+    .btn-tms {
+      background:var(--azul); color:#fff; border:none;
+      padding:.75rem 2rem; border-radius:10px; font-size:.95rem;
+      font-weight:700; cursor:pointer; transition:.2s;
+    }
+    .btn-tms:hover { background:var(--azul-cl); }
+
+    /* ── INFO BOXES ── */
+    .info-box {
+      background:#eaf4fb; border:1px solid #b0d4ec; border-radius:10px;
+      padding:1rem 1.2rem; font-size:.83rem; color:#1a3a5e;
+      display:flex; gap:.6rem; align-items:flex-start; margin-bottom:1.5rem;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      background:var(--gris-os); color:#8abeaa;
+      padding:2rem; text-align:center; font-size:.82rem;
+    }
+    footer strong { color:#fff; }
+    footer .links { display:flex; gap:1.5rem; justify-content:center; margin-top:.8rem; flex-wrap:wrap; }
+    footer .links a { color:#8abeaa; text-decoration:none; }
+    footer .links a:hover { color:#fff; }
+
+    @media(max-width:600px){ nav ul { display:none; } }
+  </style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav>
+  <a class="nav-logo" href="index.html">
+    <div class="badge">D</div>
+    <div>
+      <span>Damu SGC</span>
+      <small>Trazabilidad Ley REP</small>
+    </div>
+  </a>
+  <ul>
+    <li><a href="index.html">Inicio</a></li>
+    <li><a href="productores.html">Productores</a></li>
+    <li><a href="transportistas.html" class="active">Transportistas</a></li>
+    <li><a href="simulador.html">Simulador</a></li>
+    <li><a href="dashboard.html">Dashboard</a></li>
+  </ul>
+  <a href="index.html" class="nav-back">← Volver</a>
+</nav>
+
+<!-- ── HERO ── -->
+<div class="hero-portal">
+  <div class="left">
+    <div class="portal-badge">🚚 Portal Socios Transportistas</div>
+    <h1>Gestiona tu flota en la red<br/>de recolección inteligente</h1>
+    <p>Visualiza puntos de acopio disponibles, escanea cargas QR, consulta tus KPIs por viaje y accede al TMS para planificación de rutas con IA.</p>
+  </div>
+  <div class="right">
+    <div class="lbl">Sistema integrado</div>
+    <div class="val">TMS Integrado</div>
+    <hr/>
+    <div class="lbl">Rutas</div>
+    <div class="val">Dinámica · Tiempo real</div>
+    <hr/>
+    <div class="lbl">Trazabilidad</div>
+    <div class="val">QR / Código de barras</div>
+  </div>
+</div>
+
+<!-- ── TABS ── -->
+<div class="tab-nav">
+  <a href="javascript:void(0)" class="active" onclick="showTab('mapa',this)">📍 Mapa de Acopio</a>
+  <a href="javascript:void(0)" onclick="showTab('kpis',this)">📊 Mis KPIs</a>
+  <a href="javascript:void(0)" onclick="showTab('qr',this)">📷 Escaneo QR</a>
+  <a href="javascript:void(0)" onclick="showTab('tms',this)">🧠 TMS / IA</a>
+</div>
+
+<!-- ── CONTENIDO ── -->
+<div class="content">
+
+  <!-- TAB: MAPA -->
+  <div id="tab-mapa">
+    <div class="section-header">
+      <h2>📍 Mapa de Acopio</h2>
+      <p>Puntos de recolección activos en tu zona con estado de capacidad en tiempo real.</p>
+    </div>
+
+    <div class="mapa-wrap">
+      <div class="mapa-header">
+        <h3>Región Metropolitana — Puntos activos</h3>
+        <div class="filter-btns">
+          <button class="filter-btn active" onclick="filtrarPuntos('todos',this)">Todos</button>
+          <button class="filter-btn" onclick="filtrarPuntos('lleno',this)">🔴 Capacidad llena</button>
+          <button class="filter-btn" onclick="filtrarPuntos('medio',this)">🟡 Capacidad media</button>
+          <button class="filter-btn" onclick="filtrarPuntos('libre',this)">🟢 Disponible</button>
+        </div>
+      </div>
+
+      <div class="mapa-canvas" id="mapa-canvas">
+        <!-- Calles simuladas -->
+        <svg class="mapa-svg" viewBox="0 0 800 300" preserveAspectRatio="none">
+          <rect width="800" height="300" fill="#e8f0f8"/>
+          <!-- calles horizontales -->
+          <line x1="0" y1="60"  x2="800" y2="60"  stroke="#c8d8e8" stroke-width="6"/>
+          <line x1="0" y1="150" x2="800" y2="150" stroke="#c8d8e8" stroke-width="8"/>
+          <line x1="0" y1="240" x2="800" y2="240" stroke="#c8d8e8" stroke-width="5"/>
+          <!-- calles verticales -->
+          <line x1="150" y1="0" x2="150" y2="300" stroke="#c8d8e8" stroke-width="5"/>
+          <line x1="350" y1="0" x2="350" y2="300" stroke="#c8d8e8" stroke-width="8"/>
+          <line x1="600" y1="0" x2="600" y2="300" stroke="#c8d8e8" stroke-width="5"/>
+        </svg>
+
+        <!-- Puntos de acopio -->
+        <div class="punto lleno" style="left:19%;top:55%"
+             data-estado="lleno" data-nombre="Punto Maipú Centro"
+             onclick="selPunto(this)" title="Maipú Centro"></div>
+        <div class="punto-label" style="left:19%;top:55%">Maipú Centro · Lleno · Envases</div>
+
+        <div class="punto medio" style="left:44%;top:25%"
+             data-estado="medio" data-nombre="Punto Pudahuel Norte"
+             onclick="selPunto(this)" title="Pudahuel Norte"></div>
+        <div class="punto-label" style="left:44%;top:25%">Pudahuel Norte · Medio · RAEE</div>
+
+        <div class="punto libre" style="left:75%;top:50%"
+             data-estado="libre" data-nombre="Punto Ñuñoa Industrial"
+             onclick="selPunto(this)" title="Ñuñoa Industrial"></div>
+        <div class="punto-label" style="left:75%;top:50%">Ñuñoa Industrial · Libre · Aceites</div>
+
+        <div class="punto lleno" style="left:55%;top:78%"
+             data-estado="lleno" data-nombre="Punto La Florida Sur"
+             onclick="selPunto(this)" title="La Florida Sur"></div>
+        <div class="punto-label" style="left:55%;top:78%">La Florida Sur · Lleno · Neumáticos</div>
+
+        <div class="punto libre" style="left:30%;top:80%"
+             data-estado="libre" data-nombre="Punto San Bernardo"
+             onclick="selPunto(this)" title="San Bernardo"></div>
+        <div class="punto-label" style="left:30%;top:80%">San Bernardo · Libre · Envases</div>
+
+        <div class="punto medio" style="left:85%;top:22%"
+             data-estado="medio" data-nombre="Punto Peñalolén"
+             onclick="selPunto(this)" title="Peñalolén"></div>
+        <div class="punto-label" style="left:85%;top:22%">Peñalolén · Medio · Pilas</div>
+      </div>
+
+      <div class="mapa-leyenda">
+        <span><span class="dot lleno"></span> Capacidad llena</span>
+        <span><span class="dot medio"></span> Capacidad media</span>
+        <span><span class="dot libre"></span> Disponible</span>
+      </div>
+    </div>
+
+    <div class="section-header" style="margin-top:1.5rem">
+      <h2>🛣️ Rutas sugeridas para hoy</h2>
+    </div>
+    <div style="background:#fff;border:1px solid #d0e4f0;border-radius:12px;overflow:hidden;margin-bottom:2rem">
+      <table class="rutas-table">
+        <thead>
+          <tr>
+            <th>Punto de acopio</th>
+            <th>Categoría</th>
+            <th>Estado</th>
+            <th>Peso est.</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Maipú Centro</td>
+            <td>Envases</td>
+            <td><span class="badge-ruta lleno">Lleno</span></td>
+            <td>3.2 t</td>
+            <td><button class="ruta-btn" onclick="iniciarRuta('Maipú Centro')">Iniciar ruta</button></td>
+          </tr>
+          <tr>
+            <td>La Florida Sur</td>
+            <td>Neumáticos</td>
+            <td><span class="badge-ruta lleno">Lleno</span></td>
+            <td>2.8 t</td>
+            <td><button class="ruta-btn" onclick="iniciarRuta('La Florida Sur')">Iniciar ruta</button></td>
+          </tr>
+          <tr>
+            <td>Ñuñoa Industrial</td>
+            <td>Aceites</td>
+            <td><span class="badge-ruta libre">Libre</span></td>
+            <td>1.1 t</td>
+            <td><button class="ruta-btn" onclick="iniciarRuta('Ñuñoa Industrial')">Ver detalles</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB: KPIs -->
+  <div id="tab-kpis" style="display:none">
+    <div class="section-header">
+      <h2>📊 Mis KPIs operativos</h2>
+      <p>Indicadores de rendimiento de tu flota en la red Damu SGC. Se actualizan tras cada viaje completado.</p>
+    </div>
+
+    <div class="info-box">
+      ℹ️ Conecta tu cuenta de operador para visualizar tus métricas reales. Los valores mostrados son ejemplos de referencia.
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-icon">🛣️</div>
+        <div class="kpi-val">—</div>
+        <div class="kpi-lbl">Rutas completadas</div>
+        <div class="kpi-sub">Este mes</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">⚖️</div>
+        <div class="kpi-val">—</div>
+        <div class="kpi-lbl">Toneladas recolectadas</div>
+        <div class="kpi-sub">Acumulado mensual</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">🎯</div>
+        <div class="kpi-val">—</div>
+        <div class="kpi-lbl">Precisión de escaneo</div>
+        <div class="kpi-sub">% QR exitosos</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">🚫</div>
+        <div class="kpi-val">—</div>
+        <div class="kpi-lbl">Km en vacío evitados</div>
+        <div class="kpi-sub">Histórico optimizado</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">⏱️</div>
+        <div class="kpi-val">—</div>
+        <div class="kpi-lbl">Tiempo promedio por ruta</div>
+        <div class="kpi-sub">Minutos</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">💰</div>
+        <div class="kpi-val">—</div>
+        <div class="kpi-lbl">Rentabilidad por viaje</div>
+        <div class="kpi-sub">CLP estimado</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: QR -->
+  <div id="tab-qr" style="display:none">
+    <div class="section-header">
+      <h2>📷 Escaneo QR de carga</h2>
+      <p>Registra cada retiro escaneando el código QR del punto de acopio para generar el Eco-Ticket de trazabilidad.</p>
+    </div>
+
+    <div class="qr-wrap">
+      <div class="qr-area" onclick="simularScan()">
+        <div class="qr-icon">📷</div>
+        <p>Toca para activar el escáner</p>
+        <p style="font-size:.75rem;color:#aaa">o simula un escaneo de prueba</p>
+      </div>
+      <button class="btn-scan" onclick="simularScan()">Simular escaneo QR</button>
+      <div class="scan-result" id="scan-result" style="display:none">
+        <div class="scan-row"><span>Punto de acopio</span><span id="sr-punto">—</span></div>
+        <div class="scan-row"><span>Categoría REP</span><span id="sr-cat">—</span></div>
+        <div class="scan-row"><span>Peso registrado</span><span id="sr-peso">—</span></div>
+        <div class="scan-row"><span>Vehículo asignado</span><span id="sr-vehiculo">—</span></div>
+        <div class="scan-row"><span>Hora de retiro</span><span id="sr-hora">—</span></div>
+        <div class="scan-row"><span>Estado Eco-Ticket</span><span id="sr-estado">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: TMS -->
+  <div id="tab-tms" style="display:none">
+    <div class="section-header">
+      <h2>🧠 TMS / IA — Sistema de Gestión de Transporte</h2>
+      <p>Accede al módulo de planificación inteligente de rutas y gestión de flota integrada con Damu SGC.</p>
+    </div>
+
+    <div class="tms-grid">
+      <div class="tms-card">
+        <div class="tms-icon">🗺️</div>
+        <div>
+          <h4>Planificación de rutas por IA</h4>
+          <p>Algoritmo de optimización multiparada que minimiza km recorridos según estado de puntos en tiempo real.</p>
+        </div>
+      </div>
+      <div class="tms-card">
+        <div class="tms-icon">💡</div>
+        <div>
+          <h4>Asignación dinámica en tiempo real</h4>
+          <p>El sistema asigna automáticamente la carga más urgente según tu ubicación GPS actual.</p>
+        </div>
+      </div>
+      <div class="tms-card">
+        <div class="tms-icon">📦</div>
+        <div>
+          <h4>Control de carga por viaje</h4>
+          <p>Registro de peso, categoría y destino de cada retiro vinculado a tu perfil de conductor.</p>
+        </div>
+      </div>
+      <div class="tms-card">
+        <div class="tms-icon">📋</div>
+        <div>
+          <h4>Historial y reportes de flota</h4>
+          <p>Accede a todos tus viajes, toneladas recolectadas y métricas acumuladas en un solo lugar.</p>
+        </div>
+      </div>
+      <div class="tms-card">
+        <div class="tms-icon">🔔</div>
+        <div>
+          <h4>Alertas de retiro urgente</h4>
+          <p>Notificaciones en tiempo real cuando un punto llega a capacidad máxima en tu zona asignada.</p>
+        </div>
+      </div>
+      <div class="tms-card">
+        <div class="tms-icon">🤝</div>
+        <div>
+          <h4>Conexión directa con productores</h4>
+          <p>Canal de comunicación con las empresas productoras para coordinar retiros especiales o urgentes.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="tms-form">
+      <h3>Registrar mi vehículo en la red Damu</h3>
+      <div class="form-group">
+        <label>Nombre del conductor</label>
+        <input type="text" placeholder="Ej: Juan Pérez González"/>
+      </div>
+      <div class="form-group">
+        <label>Patente del vehículo</label>
+        <input type="text" placeholder="Ej: ABCD-12"/>
+      </div>
+      <div class="form-group">
+        <label>Tipo de vehículo</label>
+        <select>
+          <option>Camión (5–10 t)</option>
+          <option>Furgón (hasta 2 t)</option>
+          <option>Camión mayor (10+ t)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Zona de operación</label>
+        <select>
+          <option>Región Metropolitana Norte</option>
+          <option>Región Metropolitana Sur</option>
+          <option>Región Metropolitana Centro</option>
+          <option>Valparaíso</option>
+          <option>Biobío</option>
+        </select>
+      </div>
+      <button class="btn-tms" onclick="enviarSolicitud()">Enviar solicitud</button>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<!-- ── FOOTER ── -->
+<footer>
+  <strong>Damu SGC</strong> — Trazabilidad Ley REP · Chile
+  <div class="links">
+    <a href="index.html">Inicio</a>
+    <a href="productores.html">Productores</a>
+    <a href="transportistas.html">Transportistas</a>
+    <a href="simulador.html">Simulador</a>
+    <a href="dashboard.html">Dashboard</a>
+  </div>
+  <p style="margin-top:.8rem;font-size:.75rem;color:#4a7a5e;">© 2025 Damu SGC · Todos los derechos reservados</p>
+</footer>
+
+<script>
+  function showTab(id, el) {
+    ['mapa','kpis','qr','tms'].forEach(t => {
+      document.getElementById('tab-'+t).style.display = t===id ? 'block' : 'none';
+    });
+    document.querySelectorAll('.tab-nav a').forEach(a => a.classList.remove('active'));
+    if (el) el.classList.add('active');
+  }
+
+  function filtrarPuntos(estado, el) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    document.querySelectorAll('.punto').forEach(p => {
+      p.style.display = (estado === 'todos' || p.dataset.estado === estado) ? 'block' : 'none';
+    });
+  }
+
+  function selPunto(el) {
+    const nombre = el.dataset.nombre || 'Punto seleccionado';
+    const estado = el.dataset.estado;
+    const msgs = {
+      lleno: 'Capacidad llena — retiro urgente disponible.',
+      medio: 'Capacidad media — retiro disponible.',
+      libre: 'Punto disponible — sin retiro urgente.',
+    };
+    alert(nombre + '\n' + (msgs[estado] || ''));
+  }
+
+  function iniciarRuta(punto) {
+    alert('Ruta iniciada. Escanea el QR al retirar la carga.\nDestino: ' + punto);
+  }
+
+  const puntos  = ['Maipú Centro','Pudahuel Norte','Ñuñoa Industrial','La Florida Sur','San Bernardo','Peñalolén'];
+  const cats    = ['Envases','Neumáticos','Pilas','RAEE','Aceites'];
+  const vehs    = ['Camión D-42','Camión D-17','Furgón D-08'];
+
+  function simularScan() {
+    const p = puntos[Math.floor(Math.random()*puntos.length)];
+    const c = cats[Math.floor(Math.random()*cats.length)];
+    const kg = (Math.random()*4+0.5).toFixed(2);
+    const v  = vehs[Math.floor(Math.random()*vehs.length)];
+    const h  = new Date().toLocaleTimeString('es-CL', {hour:'2-digit', minute:'2-digit'});
+
+    document.getElementById('sr-punto').textContent    = p;
+    document.getElementById('sr-cat').textContent      = c;
+    document.getElementById('sr-peso').textContent     = kg + ' t';
+    document.getElementById('sr-vehiculo').textContent = v;
+    document.getElementById('sr-hora').textContent     = h;
+    document.getElementById('sr-estado').textContent   = '✓ Eco-Ticket generado';
+    document.getElementById('scan-result').style.display = 'block';
+  }
+
+  function enviarSolicitud() {
+    alert('Solicitud enviada. El equipo Damu te contactará en 24 horas.');
+  }
+</script>
+</body>
+</html>

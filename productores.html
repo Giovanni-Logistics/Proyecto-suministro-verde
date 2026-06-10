@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Portal Productores — Damu SGC</title>
+  <style>
+    :root {
+      --verde:    #2d7a4f;
+      --verde-cl: #3fa66e;
+      --verde-bg: #e8f5ee;
+      --gris-os:  #1a1a2e;
+      --gris-me:  #2c3e50;
+      --blanco:   #ffffff;
+      --texto:    #333;
+      --borde:    #d0e8da;
+      --acento:   #f0a500;
+      --alerta:   #e74c3c;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Segoe UI',sans-serif; color:var(--texto); background:#f7faf8; }
+
+    /* ── NAV ── */
+    nav {
+      background:var(--gris-os); display:flex; align-items:center;
+      justify-content:space-between; padding:0 2rem; height:64px;
+      position:sticky; top:0; z-index:100;
+    }
+    .nav-logo { display:flex; align-items:center; gap:.75rem; text-decoration:none; }
+    .nav-logo .badge {
+      width:38px; height:38px; border-radius:50%; background:var(--verde);
+      color:#fff; display:flex; align-items:center; justify-content:center;
+      font-weight:800; font-size:1.1rem;
+    }
+    .nav-logo span { color:#fff; font-weight:700; font-size:1.1rem; }
+    .nav-logo small { color:#8abeaa; font-size:.7rem; display:block; margin-top:-2px; }
+    nav ul { list-style:none; display:flex; gap:1.5rem; }
+    nav ul a {
+      color:#ccc; text-decoration:none; font-size:.9rem;
+      padding:.4rem .8rem; border-radius:6px; transition:.2s;
+    }
+    nav ul a:hover, nav ul a.active { background:var(--verde); color:#fff; }
+    .nav-back {
+      background:transparent; color:#8abeaa; border:1px solid #3a5a4a;
+      padding:.4rem 1rem; border-radius:20px; cursor:pointer;
+      font-size:.82rem; text-decoration:none; transition:.2s;
+    }
+    .nav-back:hover { background:var(--verde); color:#fff; }
+
+    /* ── HERO PORTAL ── */
+    .hero-portal {
+      background:linear-gradient(135deg, #0f3d2a 0%, var(--verde) 100%);
+      color:#fff; padding:3rem 2rem 2.5rem;
+      display:flex; align-items:center; justify-content:space-between;
+      flex-wrap:wrap; gap:1.5rem;
+    }
+    .hero-portal .left { max-width:560px; }
+    .portal-badge {
+      display:inline-flex; align-items:center; gap:.4rem;
+      background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3);
+      padding:.3rem .9rem; border-radius:20px; font-size:.78rem;
+      color:#c8f0d8; margin-bottom:.9rem;
+    }
+    .hero-portal h1 { font-size:clamp(1.5rem,3vw,2.2rem); font-weight:800; line-height:1.25; margin-bottom:.6rem; }
+    .hero-portal p { color:#b0d8c0; font-size:.95rem; line-height:1.7; }
+    .hero-portal .right {
+      background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2);
+      border-radius:14px; padding:1.2rem 1.6rem; min-width:220px; text-align:center;
+    }
+    .hero-portal .right .lbl { font-size:.75rem; color:#a8d8b8; margin-bottom:.3rem; }
+    .hero-portal .right .val { font-size:1.1rem; font-weight:700; color:#fff; }
+    .hero-portal .right hr { border:none; border-top:1px solid rgba(255,255,255,.15); margin:.8rem 0; }
+
+    /* ── TABS NAV ── */
+    .tab-nav {
+      background:#fff; border-bottom:2px solid var(--borde);
+      display:flex; padding:0 2rem; overflow-x:auto; gap:0;
+    }
+    .tab-nav a {
+      padding:1rem 1.4rem; text-decoration:none; font-size:.88rem;
+      font-weight:600; color:#888; border-bottom:3px solid transparent;
+      white-space:nowrap; transition:.2s; margin-bottom:-2px; cursor:pointer;
+    }
+    .tab-nav a:hover { color:var(--verde); }
+    .tab-nav a.active { color:var(--verde); border-bottom-color:var(--verde); }
+
+    /* ── CONTENIDO ── */
+    .content { max-width:1080px; margin:0 auto; padding:2.5rem 1.5rem; }
+    .section-header { margin-bottom:1.5rem; }
+    .section-header h2 { font-size:1.3rem; color:var(--gris-me); display:flex; align-items:center; gap:.5rem; }
+    .section-header p { font-size:.88rem; color:#666; margin-top:.3rem; }
+
+    /* ── METAS GRID ── */
+    .metas-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1rem; margin-bottom:2rem; }
+    .meta-card {
+      background:#fff; border:1px solid var(--borde); border-radius:12px;
+      padding:1.3rem; position:relative; overflow:hidden;
+    }
+    .meta-card .icon { font-size:1.6rem; margin-bottom:.6rem; }
+    .meta-card h4 { font-size:.88rem; font-weight:700; color:var(--gris-me); margin-bottom:.3rem; }
+    .meta-card p { font-size:.8rem; color:#666; line-height:1.5; }
+    .meta-card .categoria {
+      display:inline-block; margin-top:.6rem;
+      background:var(--verde-bg); color:var(--verde);
+      font-size:.72rem; font-weight:700; padding:.2rem .6rem; border-radius:10px;
+    }
+    .meta-card::after {
+      content:''; position:absolute; bottom:0; left:0; right:0; height:3px;
+      background:var(--verde-cl);
+    }
+
+    /* ── ECO-TICKET ── */
+    .eco-ticket {
+      background:#fff; border:1px solid var(--borde); border-radius:16px;
+      padding:1.8rem; margin-bottom:2rem;
+    }
+    .ticket-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+    @media(max-width:600px){ .ticket-grid { grid-template-columns:1fr; } }
+    .form-group { margin-bottom:1rem; }
+    .form-group label { display:block; font-size:.8rem; color:#555; margin-bottom:.35rem; font-weight:600; }
+    .form-group input, .form-group select {
+      width:100%; padding:.65rem .9rem; border:1px solid #cde0d4;
+      border-radius:8px; font-size:.9rem; outline:none; transition:.2s; background:#fafffe;
+    }
+    .form-group input:focus, .form-group select:focus {
+      border-color:var(--verde-cl); box-shadow:0 0 0 3px rgba(63,166,110,.15);
+    }
+    .form-group .hint { font-size:.73rem; color:#888; margin-top:.25rem; }
+    .result-box {
+      background:var(--verde-bg); border:1px solid var(--borde);
+      border-radius:10px; padding:1.2rem; margin-top:1.2rem;
+    }
+    .result-box h4 { font-size:.85rem; color:var(--verde); font-weight:700; margin-bottom:.8rem; }
+    .result-row { display:flex; justify-content:space-between; font-size:.85rem; padding:.3rem 0; border-bottom:1px solid #c8e8d4; }
+    .result-row:last-child { border:none; font-weight:700; color:var(--verde); }
+    .result-row span:last-child { font-weight:600; }
+    .btn-calc {
+      background:var(--verde); color:#fff; border:none;
+      padding:.75rem 2rem; border-radius:10px; font-size:.95rem;
+      font-weight:700; cursor:pointer; transition:.2s; margin-top:1rem;
+    }
+    .btn-calc:hover { background:var(--verde-cl); }
+
+    /* ── CERTIFICADOS ── */
+    .cert-list { display:flex; flex-direction:column; gap:.8rem; margin-bottom:2rem; }
+    .cert-item {
+      background:#fff; border:1px solid var(--borde); border-radius:10px;
+      padding:1rem 1.3rem; display:flex; align-items:center; gap:1rem; transition:.2s;
+    }
+    .cert-item:hover { border-color:var(--verde-cl); background:#fafffe; }
+    .cert-icon { font-size:1.5rem; flex-shrink:0; }
+    .cert-info { flex:1; }
+    .cert-info strong { font-size:.9rem; color:var(--gris-me); }
+    .cert-info p { font-size:.78rem; color:#666; margin-top:.15rem; }
+    .cert-status {
+      font-size:.75rem; font-weight:700; padding:.25rem .7rem;
+      border-radius:10px; flex-shrink:0;
+    }
+    .cert-status.ok   { background:#d4edda; color:#155724; }
+    .cert-status.pend { background:#fff3cd; color:#856404; }
+    .cert-dl {
+      background:var(--verde-bg); color:var(--verde); border:1px solid var(--borde);
+      padding:.35rem .8rem; border-radius:8px; font-size:.78rem;
+      font-weight:600; cursor:pointer; transition:.2s; white-space:nowrap;
+    }
+    .cert-dl:hover { background:var(--verde); color:#fff; }
+
+    /* ── INFO BOXES ── */
+    .info-box {
+      background:#fff3cd; border:1px solid #ffc107; border-radius:10px;
+      padding:1rem 1.2rem; font-size:.83rem; color:#664d03;
+      display:flex; gap:.6rem; align-items:flex-start; margin-bottom:1.5rem;
+    }
+    .info-box.verde { background:var(--verde-bg); border-color:var(--borde); color:#1a4a2e; }
+
+    /* ── FOOTER ── */
+    footer {
+      background:var(--gris-os); color:#8abeaa;
+      padding:2rem; text-align:center; font-size:.82rem;
+    }
+    footer strong { color:#fff; }
+    footer .links { display:flex; gap:1.5rem; justify-content:center; margin-top:.8rem; flex-wrap:wrap; }
+    footer .links a { color:#8abeaa; text-decoration:none; }
+    footer .links a:hover { color:#fff; }
+
+    @media(max-width:600px){ nav ul { display:none; } }
+  </style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav>
+  <a class="nav-logo" href="index.html">
+    <div class="badge">D</div>
+    <div>
+      <span>Damu SGC</span>
+      <small>Trazabilidad Ley REP</small>
+    </div>
+  </a>
+  <ul>
+    <li><a href="index.html">Inicio</a></li>
+    <li><a href="productores.html" class="active">Productores</a></li>
+    <li><a href="transportistas.html">Transportistas</a></li>
+    <li><a href="simulador.html">Simulador</a></li>
+    <li><a href="dashboard.html">Dashboard</a></li>
+  </ul>
+  <a href="index.html" class="nav-back">← Volver</a>
+</nav>
+
+<!-- ── HERO ── -->
+<div class="hero-portal">
+  <div class="left">
+    <div class="portal-badge">🏭 Portal Empresas Productoras</div>
+    <h1>Gestiona tu cumplimiento<br/>bajo la Ley REP</h1>
+    <p>Desde este portal puedes generar tu Eco-Ticket, reportar tus metas de valorización anuales, obtener certificados de trazabilidad y proyectar tus costos operativos.</p>
+  </div>
+  <div class="right">
+    <div class="lbl">Decreto aplicable</div>
+    <div class="val">Decreto N° 12</div>
+    <hr/>
+    <div class="lbl">Categorías gestionadas</div>
+    <div class="val">6 categorías REP</div>
+    <hr/>
+    <div class="lbl">Certificados</div>
+    <div class="val">Automáticos · PDF</div>
+  </div>
+</div>
+
+<!-- ── TABS ── -->
+<div class="tab-nav">
+  <a href="javascript:void(0)" class="active" onclick="showTab('metas',this)">📋 Metas REP</a>
+  <a href="javascript:void(0)" onclick="showTab('ecoticket',this)">🧾 Eco-Ticket</a>
+  <a href="javascript:void(0)" onclick="showTab('certificados',this)">📄 Certificados</a>
+</div>
+
+<!-- ── CONTENIDO ── -->
+<div class="content">
+
+  <!-- TAB: METAS REP -->
+  <div id="tab-metas">
+    <div class="section-header">
+      <h2>📋 Metas de Valorización Ley REP</h2>
+      <p>Visualiza qué categorías de productos estás obligado a gestionar según el Decreto 12 y en qué consiste cada meta.</p>
+    </div>
+
+    <div class="info-box verde">
+      ℹ️ La Ley REP (Ley 20.920) establece metas escalonadas de recolección y valorización para cada categoría. Damu SGC registra y reporta tu avance operativo ante el SMA.
+    </div>
+
+    <div class="metas-grid">
+      <div class="meta-card">
+        <div class="icon">📦</div>
+        <h4>Envases y Embalajes</h4>
+        <p>Incluye envases de vidrio, plástico, papel, cartón y metálicos puestos en el mercado.</p>
+        <span class="categoria">Obligatorio desde 2023</span>
+      </div>
+      <div class="meta-card">
+        <div class="icon">🛞</div>
+        <h4>Neumáticos</h4>
+        <p>Neumáticos de vehículos livianos y pesados comercializados en Chile.</p>
+        <span class="categoria">Obligatorio desde 2023</span>
+      </div>
+      <div class="meta-card">
+        <div class="icon">🔋</div>
+        <h4>Pilas y Baterías</h4>
+        <p>Pilas domésticas y baterías de uso general puestas en el mercado nacional.</p>
+        <span class="categoria">Obligatorio desde 2024</span>
+      </div>
+      <div class="meta-card">
+        <div class="icon">🖥️</div>
+        <h4>Aparatos Eléctricos y Electrónicos</h4>
+        <p>RAEE: equipos de cómputo, electrodomésticos, iluminación y similares.</p>
+        <span class="categoria">Obligatorio desde 2024</span>
+      </div>
+      <div class="meta-card">
+        <div class="icon">🛢️</div>
+        <h4>Aceites Lubricantes</h4>
+        <p>Aceites de motor y lubricantes industriales distribuidos en territorio nacional.</p>
+        <span class="categoria">Obligatorio desde 2023</span>
+      </div>
+      <div class="meta-card">
+        <div class="icon">💊</div>
+        <h4>Medicamentos</h4>
+        <p>Fármacos vencidos o sin uso que requieren gestión como residuo especial.</p>
+        <span class="categoria">En implementación</span>
+      </div>
+    </div>
+
+    <div class="info-box">
+      ⚠️ El incumplimiento de las metas REP puede derivar en multas del SMA. Damu SGC genera la documentación de trazabilidad para tu defensa normativa.
+    </div>
+  </div>
+
+  <!-- TAB: ECO-TICKET -->
+  <div id="tab-ecoticket" style="display:none">
+    <div class="section-header">
+      <h2>🧾 Eco-Ticket — Simulador de Presupuesto</h2>
+      <p>Ingresa los datos de tu operación para obtener una estimación de costos de gestión y valorización según tu categoría REP.</p>
+    </div>
+
+    <div class="eco-ticket">
+      <div class="ticket-grid">
+        <div>
+          <div class="form-group">
+            <label>Categoría REP</label>
+            <select id="et-categoria" onchange="calcTicket()">
+              <option value="envases">Envases y embalajes</option>
+              <option value="neumaticos">Neumáticos</option>
+              <option value="pilas">Pilas y baterías</option>
+              <option value="raee">Aparatos eléctricos (RAEE)</option>
+              <option value="aceites">Aceites lubricantes</option>
+            </select>
+            <div class="hint">Selecciona la categoría principal de tus productos</div>
+          </div>
+          <div class="form-group">
+            <label>Toneladas puestas en mercado / año</label>
+            <input type="number" id="et-toneladas" placeholder="Ej: 120" min="1" oninput="calcTicket()" />
+            <div class="hint">Dato declarado en tu registro SMA</div>
+          </div>
+          <div class="form-group">
+            <label>Región de operación</label>
+            <select id="et-region" onchange="calcTicket()">
+              <option value="rm">Región Metropolitana</option>
+              <option value="v">Valparaíso</option>
+              <option value="viii">Biobío</option>
+              <option value="otro">Otra región</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <div class="form-group">
+            <label>Meta de valorización estimada (%)</label>
+            <input type="number" id="et-meta" placeholder="Ej: 25" min="1" max="100" oninput="calcTicket()" />
+            <div class="hint">Porcentaje mínimo exigido por la norma según año</div>
+          </div>
+          <div class="form-group">
+            <label>Frecuencia de retiro</label>
+            <select id="et-freq" onchange="calcTicket()">
+              <option value="mensual">Mensual</option>
+              <option value="trimestral">Trimestral</option>
+              <option value="semestral">Semestral</option>
+            </select>
+          </div>
+          <button class="btn-calc" onclick="calcTicket()">Calcular Eco-Ticket</button>
+        </div>
+      </div>
+
+      <div class="result-box" id="ticket-result" style="display:none">
+        <h4>📊 Estimación de costos operativos</h4>
+        <div class="result-row"><span>Toneladas a valorizar (según meta)</span><span id="r-tons">—</span></div>
+        <div class="result-row"><span>Costo estimado recolección</span><span id="r-reco">—</span></div>
+        <div class="result-row"><span>Costo estimado transporte</span><span id="r-trans">—</span></div>
+        <div class="result-row"><span>Costo estimado valorización</span><span id="r-val">—</span></div>
+        <div class="result-row"><span>Total estimado anual</span><span id="r-total">—</span></div>
+      </div>
+      <p style="font-size:.75rem;color:#888;margin-top:.8rem;">
+        * Estimación referencial basada en rangos operativos. El valor final depende de condiciones específicas de cada operación.
+      </p>
+    </div>
+  </div>
+
+  <!-- TAB: CERTIFICADOS -->
+  <div id="tab-certificados" style="display:none">
+    <div class="section-header">
+      <h2>📄 Certificados de Trazabilidad</h2>
+      <p>Damu SGC genera automáticamente los documentos que acreditan el cumplimiento de tu cadena de valorización ante el SMA.</p>
+    </div>
+
+    <div class="info-box verde">
+      ℹ️ Cada retiro de residuos genera un certificado con código QR verificable, fechas, peso neto y destino de valorización.
+    </div>
+
+    <div class="cert-list">
+      <div class="cert-item">
+        <div class="cert-icon">📄</div>
+        <div class="cert-info">
+          <strong>Certificado de Trazabilidad</strong>
+          <p>Acredita el recorrido completo del residuo desde el punto de origen hasta el gestor autorizado.</p>
+        </div>
+        <span class="cert-status ok">Disponible</span>
+        <button class="cert-dl" onclick="alert('Función disponible al conectar tu cuenta.')">Generar PDF</button>
+      </div>
+      <div class="cert-item">
+        <div class="cert-icon">✅</div>
+        <div class="cert-info">
+          <strong>Reporte de Meta Anual REP</strong>
+          <p>Resumen oficial del porcentaje de meta cumplida por período y categoría.</p>
+        </div>
+        <span class="cert-status ok">Disponible</span>
+        <button class="cert-dl" onclick="alert('Función disponible al conectar tu cuenta.')">Generar PDF</button>
+      </div>
+      <div class="cert-item">
+        <div class="cert-icon">🌿</div>
+        <div class="cert-info">
+          <strong>Certificado de CO₂e Mitigado</strong>
+          <p>Calcula y certifica las toneladas de CO₂ equivalente evitadas por tu gestión de residuos.</p>
+        </div>
+        <span class="cert-status ok">Disponible</span>
+        <button class="cert-dl" onclick="alert('Función disponible al conectar tu cuenta.')">Generar PDF</button>
+      </div>
+      <div class="cert-item">
+        <div class="cert-icon">📋</div>
+        <div class="cert-info">
+          <strong>Declaración para el SMA</strong>
+          <p>Documento estructurado listo para presentar ante la Superintendencia del Medio Ambiente.</p>
+        </div>
+        <span class="cert-status pend">En desarrollo</span>
+        <button class="cert-dl" style="opacity:.5;cursor:default;">Próximamente</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<!-- ── FOOTER ── -->
+<footer>
+  <strong>Damu SGC</strong> — Trazabilidad Ley REP · Chile
+  <div class="links">
+    <a href="index.html">Inicio</a>
+    <a href="productores.html">Productores</a>
+    <a href="transportistas.html">Transportistas</a>
+    <a href="simulador.html">Simulador</a>
+    <a href="dashboard.html">Dashboard</a>
+  </div>
+  <p style="margin-top:.8rem;font-size:.75rem;color:#4a7a5e;">© 2025 Damu SGC · Todos los derechos reservados</p>
+</footer>
+
+<script>
+  function showTab(id, el) {
+    ['metas','ecoticket','certificados'].forEach(t => {
+      document.getElementById('tab-'+t).style.display = t===id ? 'block' : 'none';
+    });
+    document.querySelectorAll('.tab-nav a').forEach(a => a.classList.remove('active'));
+    if (el) el.classList.add('active');
+  }
+
+  const tarifas = {
+    envases:    { reco:18000, trans:12000, val:22000 },
+    neumaticos: { reco:25000, trans:18000, val:30000 },
+    pilas:      { reco:35000, trans:20000, val:45000 },
+    raee:       { reco:40000, trans:25000, val:50000 },
+    aceites:    { reco:22000, trans:15000, val:28000 },
+  };
+  const freqMult   = { mensual:1, trimestral:0.9, semestral:0.85 };
+  const regionMult = { rm:1, v:1.08, viii:1.12, otro:1.2 };
+
+  function fmt(n) { return '$' + Math.round(n).toLocaleString('es-CL') + ' CLP'; }
+
+  function calcTicket() {
+    const cat  = document.getElementById('et-categoria').value;
+    const tons = parseFloat(document.getElementById('et-toneladas').value) || 0;
+    const meta = parseFloat(document.getElementById('et-meta').value) || 0;
+    const freq = document.getElementById('et-freq').value;
+    const reg  = document.getElementById('et-region').value;
+    if (!tons || !meta) return;
+
+    const tonsVal = tons * (meta / 100);
+    const t  = tarifas[cat];
+    const fm = freqMult[freq];
+    const rm = regionMult[reg];
+
+    const reco  = tonsVal * t.reco  * fm * rm;
+    const trans = tonsVal * t.trans * fm * rm;
+    const val   = tonsVal * t.val   * fm * rm;
+    const total = reco + trans + val;
+
+    document.getElementById('r-tons').textContent  = tonsVal.toFixed(1) + ' t';
+    document.getElementById('r-reco').textContent  = fmt(reco);
+    document.getElementById('r-trans').textContent = fmt(trans);
+    document.getElementById('r-val').textContent   = fmt(val);
+    document.getElementById('r-total').textContent = fmt(total);
+    document.getElementById('ticket-result').style.display = 'block';
+  }
+</script>
+</body>
+</html>
