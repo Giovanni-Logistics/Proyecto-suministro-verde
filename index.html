@@ -1,211 +1,415 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Damu SGC — Trazabilidad Ley REP</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        .text-gradient { background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Damu SGC — Trazabilidad Ley REP</title>
+  <style>
+    :root {
+      --verde:    #2d7a4f;
+      --verde-cl: #3fa66e;
+      --verde-bg: #e8f5ee;
+      --gris-os:  #1a1a2e;
+      --gris-me:  #2c3e50;
+      --blanco:   #ffffff;
+      --texto:    #333;
+      --borde:    #d0e8da;
+      --acento:   #f0a500;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Segoe UI',sans-serif; color:var(--texto); background:#f7faf8; }
+
+    /* ── NAV ── */
+    nav {
+      background:var(--gris-os);
+      display:flex; align-items:center; justify-content:space-between;
+      padding:0 2rem; height:64px; position:sticky; top:0; z-index:100;
+    }
+    .nav-logo { display:flex; align-items:center; gap:.75rem; text-decoration:none; }
+    .nav-logo .badge {
+      width:38px; height:38px; border-radius:50%;
+      background:var(--verde); color:#fff;
+      display:flex; align-items:center; justify-content:center;
+      font-weight:800; font-size:1.1rem;
+    }
+    .nav-logo span { color:#fff; font-weight:700; font-size:1.1rem; letter-spacing:.5px; }
+    .nav-logo small { color:#8abeaa; font-size:.7rem; display:block; margin-top:-2px; }
+    nav ul { list-style:none; display:flex; gap:1.5rem; }
+    nav ul a {
+      color:#ccc; text-decoration:none; font-size:.9rem;
+      padding:.4rem .8rem; border-radius:6px; transition:.2s;
+    }
+    nav ul a:hover, nav ul a.active { background:var(--verde); color:#fff; }
+    .nav-cta {
+      background:var(--verde-cl); color:#fff; border:none;
+      padding:.5rem 1.2rem; border-radius:20px; cursor:pointer;
+      font-size:.85rem; font-weight:600; transition:.2s;
+    }
+    .nav-cta:hover { background:var(--verde); }
+
+    /* ── HERO ── */
+    .hero {
+      background: linear-gradient(135deg, var(--gris-os) 0%, #0f3d2a 60%, var(--verde) 100%);
+      color:#fff; padding:5rem 2rem 4rem; text-align:center; position:relative; overflow:hidden;
+    }
+    .hero::before {
+      content:''; position:absolute; inset:0;
+      background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%232d7a4f' fill-opacity='0.12'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+      pointer-events:none;
+    }
+    .hero-badge {
+      display:inline-block; background:rgba(63,166,110,.25);
+      border:1px solid var(--verde-cl); color:#a8f0c8;
+      padding:.3rem 1rem; border-radius:20px; font-size:.8rem;
+      margin-bottom:1.2rem; letter-spacing:.5px;
+    }
+    .hero h1 { font-size:clamp(1.8rem,4vw,3rem); font-weight:800; line-height:1.2; max-width:700px; margin:0 auto .8rem; }
+    .hero h1 span { color:var(--acento); }
+    .hero p { font-size:1.05rem; color:#b8d8c8; max-width:560px; margin:0 auto 2rem; line-height:1.7; }
+    .hero-btns { display:flex; gap:1rem; justify-content:center; flex-wrap:wrap; }
+    .btn-primary {
+      background:var(--verde-cl); color:#fff; border:none;
+      padding:.75rem 1.8rem; border-radius:25px; font-size:.95rem;
+      font-weight:700; cursor:pointer; transition:.2s;
+      text-decoration:none; display:inline-block;
+    }
+    .btn-primary:hover { background:var(--verde); transform:translateY(-2px); }
+    .btn-outline {
+      background:transparent; color:#fff;
+      border:2px solid rgba(255,255,255,.4);
+      padding:.75rem 1.8rem; border-radius:25px; font-size:.95rem;
+      cursor:pointer; transition:.2s; text-decoration:none; display:inline-block;
+    }
+    .btn-outline:hover { border-color:#fff; background:rgba(255,255,255,.1); }
+
+    /* ── KPI STRIP ── */
+    .kpi-strip {
+      background:var(--blanco); border-bottom:1px solid var(--borde);
+      display:flex; justify-content:center; flex-wrap:wrap; gap:0;
+    }
+    .kpi-item {
+      flex:1; min-width:160px; max-width:220px;
+      padding:1.4rem 1rem; text-align:center;
+      border-right:1px solid var(--borde);
+    }
+    .kpi-item:last-child { border-right:none; }
+    .kpi-num { font-size:1.7rem; }
+    .kpi-lbl { font-size:.75rem; color:#666; margin-top:.2rem; }
+
+    /* ── SECCIÓN QUIÉNES ── */
+    .section { padding:4rem 2rem; }
+    .section-title { text-align:center; margin-bottom:2.5rem; }
+    .section-title h2 { font-size:1.8rem; color:var(--gris-me); }
+    .section-title p { color:#666; margin-top:.4rem; font-size:.95rem; }
+
+    .cards { display:flex; gap:1.5rem; flex-wrap:wrap; max-width:1000px; margin:0 auto; }
+    .card {
+      flex:1; min-width:280px;
+      background:#fff; border:1px solid var(--borde);
+      border-radius:16px; padding:2rem 1.6rem;
+      transition:.25s; position:relative; overflow:hidden;
+    }
+    .card::before {
+      content:''; position:absolute; top:0; left:0; right:0; height:4px;
+      background:var(--verde-cl);
+    }
+    .card:hover { transform:translateY(-4px); box-shadow:0 12px 30px rgba(45,122,79,.15); }
+    .card-icon { font-size:2.2rem; margin-bottom:1rem; }
+    .card h3 { font-size:1.15rem; color:var(--gris-me); margin-bottom:.8rem; }
+    .card p { font-size:.88rem; color:#555; line-height:1.6; margin-bottom:1.2rem; }
+    .card ul { list-style:none; display:flex; flex-direction:column; gap:.5rem; }
+    .card ul li { font-size:.85rem; color:#444; display:flex; align-items:flex-start; gap:.5rem; }
+    .card ul li::before { content:'✓'; color:var(--verde); font-weight:700; flex-shrink:0; }
+    .card-link {
+      display:inline-block; margin-top:1.2rem;
+      color:var(--verde); font-weight:600; font-size:.88rem;
+      text-decoration:none; border-bottom:2px solid transparent; transition:.2s;
+    }
+    .card-link:hover { border-color:var(--verde); }
+
+    /* ── AUTH ── */
+    .auth-section {
+      background: linear-gradient(135deg, var(--verde-bg), #f0faf4);
+      padding:4rem 2rem;
+    }
+    .auth-grid { display:flex; gap:2rem; max-width:900px; margin:0 auto; flex-wrap:wrap; }
+    .auth-box {
+      flex:1; min-width:280px;
+      background:#fff; border-radius:16px; padding:2rem;
+      border:1px solid var(--borde);
+      box-shadow:0 4px 20px rgba(0,0,0,.06);
+    }
+    .auth-box h3 {
+      font-size:1.1rem; color:var(--gris-me); margin-bottom:1.4rem;
+      display:flex; align-items:center; gap:.5rem;
+    }
+    .auth-box h3 span { font-size:1.3rem; }
+    .form-group { margin-bottom:1rem; }
+    .form-group label { display:block; font-size:.8rem; color:#555; margin-bottom:.35rem; font-weight:600; }
+    .form-group input, .form-group select {
+      width:100%; padding:.65rem .9rem;
+      border:1px solid #cde0d4; border-radius:8px;
+      font-size:.9rem; outline:none; transition:.2s; background:#fafffe;
+    }
+    .form-group input:focus, .form-group select:focus {
+      border-color:var(--verde-cl); box-shadow:0 0 0 3px rgba(63,166,110,.15);
+    }
+    .btn-full {
+      width:100%; padding:.75rem; border:none; border-radius:10px;
+      background:var(--verde); color:#fff; font-size:.95rem;
+      font-weight:700; cursor:pointer; transition:.2s; margin-top:.5rem;
+    }
+    .btn-full:hover { background:var(--verde-cl); }
+    .btn-full.outline {
+      background:transparent; color:var(--verde); border:2px solid var(--verde);
+    }
+    .btn-full.outline:hover { background:var(--verde-bg); }
+    .auth-note { font-size:.75rem; color:#888; margin-top:1rem; line-height:1.5; }
+
+    /* ── TABS REGISTRO ── */
+    .tab-bar { display:flex; gap:.5rem; margin-bottom:1.5rem; }
+    .tab {
+      flex:1; padding:.55rem; border:1px solid var(--borde);
+      border-radius:8px; background:#f5faf7; cursor:pointer;
+      font-size:.82rem; font-weight:600; color:#666; transition:.2s; text-align:center;
+    }
+    .tab.active { background:var(--verde); color:#fff; border-color:var(--verde); }
+
+    /* ── FOOTER ── */
+    footer {
+      background:var(--gris-os); color:#8abeaa;
+      padding:2rem; text-align:center; font-size:.82rem;
+    }
+    footer strong { color:#fff; }
+    footer .links { display:flex; gap:1.5rem; justify-content:center; margin-top:.8rem; flex-wrap:wrap; }
+    footer .links a { color:#8abeaa; text-decoration:none; }
+    footer .links a:hover { color:#fff; }
+
+    @media(max-width:600px){
+      .kpi-item { min-width:140px; }
+      nav ul { display:none; }
+    }
+  </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+<body>
 
-    <!-- ═══ NAV ═══ -->
-    <nav class="bg-gradient-to-r from-emerald-700 to-cyan-600 text-white shadow-lg w-full p-4 flex justify-between items-center">
-        <div class="flex items-center space-x-2 cursor-pointer" onclick="switchTab('home')">
-            <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center">
-                <span class="text-emerald-700 font-bold text-xl">D</span>
-            </div>
-            <h1 class="text-2xl font-bold tracking-wide">Damu SGC</h1>
+<!-- ── NAV ── -->
+<nav>
+  <a class="nav-logo" href="index.html">
+    <div class="badge">D</div>
+    <div>
+      <span>Damu SGC</span>
+      <small>Trazabilidad Ley REP</small>
+    </div>
+  </a>
+  <ul>
+    <li><a href="index.html" class="active">Inicio</a></li>
+    <li><a href="productores.html">Productores</a></li>
+    <li><a href="transportistas.html">Transportistas</a></li>
+    <li><a href="simulador.html">Simulador</a></li>
+    <li><a href="dashboard.html">Dashboard</a></li>
+  </ul>
+  <button class="nav-cta" onclick="document.getElementById('auth').scrollIntoView({behavior:'smooth'})">
+    Mi Portal
+  </button>
+</nav>
+
+<!-- ── HERO ── -->
+<section class="hero">
+  <div class="hero-badge">⚡ Compatible con Decreto 12 · Ley REP Chile</div>
+  <h1>El Ecosistema Digital para la <span>Economía Circular</span></h1>
+  <p>Conectamos la responsabilidad extendida con la eficiencia logística. Trazabilidad en tiempo real, cumplimiento normativo y optimización de recursos.</p>
+  <div class="hero-btns">
+    <button class="btn-primary" onclick="document.getElementById('auth').scrollIntoView({behavior:'smooth'})">
+      Integrarse al Sistema
+    </button>
+    <a href="simulador.html" class="btn-outline">Ver Simulador →</a>
+  </div>
+</section>
+
+<!-- ── KPI STRIP ── -->
+<div class="kpi-strip">
+  <div class="kpi-item">
+    <div class="kpi-num">📋</div>
+    <div class="kpi-lbl">Reporta tus metas REP en un solo lugar</div>
+  </div>
+  <div class="kpi-item">
+    <div class="kpi-num">📍</div>
+    <div class="kpi-lbl">Visualiza puntos de acopio en tiempo real</div>
+  </div>
+  <div class="kpi-item">
+    <div class="kpi-num">🧾</div>
+    <div class="kpi-lbl">Genera certificados de trazabilidad automáticos</div>
+  </div>
+  <div class="kpi-item">
+    <div class="kpi-num">🚚</div>
+    <div class="kpi-lbl">Elimina kilómetros en vacío con rutas inteligentes</div>
+  </div>
+  <div class="kpi-item">
+    <div class="kpi-num">♻️</div>
+    <div class="kpi-lbl">Calcula CO₂e mitigado por período</div>
+  </div>
+</div>
+
+<!-- ── PROPUESTA DE VALOR ── -->
+<section class="section">
+  <div class="section-title">
+    <h2>¿A quién está dirigido?</h2>
+    <p>Dos perfiles, una misma plataforma de economía circular</p>
+  </div>
+  <div class="cards">
+
+    <div class="card">
+      <div class="card-icon">🏭</div>
+      <h3>Empresas Productoras</h3>
+      <p>Asegura el cumplimiento de tus metas normativas delegando la gestión operativa a la red Damu.</p>
+      <ul>
+        <li>Simula presupuestos reales con el Eco-Ticket</li>
+        <li>Reporta metas de valorización anual (Ley REP)</li>
+        <li>Obtén certificados de trazabilidad en tiempo real</li>
+        <li>Proyecta ingresos, CO₂e mitigado y costos operativos</li>
+      </ul>
+      <a href="productores.html" class="card-link">Acceder al portal Productor →</a>
+    </div>
+
+    <div class="card">
+      <div class="card-icon">🚚</div>
+      <h3>Socios Transportistas</h3>
+      <p>Únete a la red de recolección inteligente y elimina los kilómetros en vacío de tus operaciones.</p>
+      <ul>
+        <li>Asignación dinámica de rutas desde el Mapa de Acopio</li>
+        <li>Escaneo de cargas mediante códigos QR/Barras</li>
+        <li>KPIs operativos en tiempo real por viaje</li>
+        <li>TMS integrado con planificación por IA</li>
+      </ul>
+      <a href="transportistas.html" class="card-link">Acceder al portal Transportista →</a>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── AUTH ── -->
+<section class="auth-section" id="auth">
+  <div class="section-title">
+    <h2>Acceso al Sistema</h2>
+    <p>Ingresa a tu portal o crea tu cuenta en la red Damu</p>
+  </div>
+  <div class="auth-grid">
+
+    <!-- LOGIN -->
+    <div class="auth-box">
+      <h3><span>🔐</span> Acceso Corporativo</h3>
+      <div class="form-group">
+        <label>RUT Empresa</label>
+        <input type="text" placeholder="76.123.456-7" id="rut" value="76.234.567-K" />
+      </div>
+      <div class="form-group">
+        <label>Contraseña</label>
+        <input type="password" placeholder="••••••••" id="pwd" value="123456" />
+      </div>
+      <button class="btn-full" onclick="handleLogin()">Ingresar al Portal</button>
+      <div id="login-msg" style="font-size:.8rem;margin-top:.6rem;color:var(--verde);display:none;">
+        ✓ Verificando credenciales…
+      </div>
+      <p class="auth-note">¿Olvidaste tu contraseña? <a href="#" style="color:var(--verde);">Recupérala aquí</a></p>
+    </div>
+
+    <!-- REGISTRO -->
+    <div class="auth-box">
+      <h3><span>🌱</span> Únete a la Red Damu</h3>
+      <div class="tab-bar">
+        <div class="tab active" id="tab-prod" onclick="switchTab('prod')">🏭 Productor</div>
+        <div class="tab" id="tab-trans" onclick="switchTab('trans')">🚚 Transportista</div>
+      </div>
+
+      <div id="form-prod">
+        <div class="form-group">
+          <label>RUT Empresa</label>
+          <input type="text" placeholder="76.123.456-7" />
         </div>
-        <ul class="flex space-x-6 font-medium items-center">
-            <li class="cursor-pointer hover:text-cyan-200 transition" onclick="switchTab('home')">Inicio</li>
-            <li class="cursor-pointer bg-white/20 px-4 py-1 rounded-full hover:bg-white/30 transition" onclick="switchTab('auth')">Mi Portal</li>
-        </ul>
-    </nav>
+        <div class="form-group">
+          <label>Razón Social</label>
+          <input type="text" placeholder="Empresa S.A." />
+        </div>
+        <div class="form-group">
+          <label>Categoría REP</label>
+          <select>
+            <option>Envases y embalajes</option>
+            <option>Neumáticos</option>
+            <option>Aceites lubricantes</option>
+            <option>Aparatos eléctricos</option>
+            <option>Pilas y baterías</option>
+          </select>
+        </div>
+        <button class="btn-full outline" onclick="handleRegister()">Solicitar Integración</button>
+      </div>
 
-    <main class="flex-grow p-8 max-w-6xl mx-auto w-full">
+      <div id="form-trans" style="display:none">
+        <div class="form-group">
+          <label>RUT Empresa</label>
+          <input type="text" placeholder="76.123.456-7" />
+        </div>
+        <div class="form-group">
+          <label>N° Patente principal</label>
+          <input type="text" placeholder="ABCD-12" />
+        </div>
+        <div class="form-group">
+          <label>Tipo de flota</label>
+          <select>
+            <option>Camión 3/4</option>
+            <option>Camión 3/4 con grúa</option>
+            <option>Furgón</option>
+            <option>Camión rígido</option>
+          </select>
+        </div>
+        <button class="btn-full outline" onclick="handleRegister()">Solicitar Integración TMS</button>
+        <p class="auth-note">Al completar el registro recibirás credenciales de acceso a nuestro TMS con planificación de rutas por IA.</p>
+      </div>
+    </div>
 
-        <!-- ══════════════════════════════════════
-             PESTAÑA 1: LANDING PAGE
-        ══════════════════════════════════════ -->
-        <section id="home" class="tab-content active">
+  </div>
+</section>
 
-            <!-- Hero -->
-            <div class="text-center py-16 px-6 bg-white rounded-2xl shadow-sm mb-10 border border-emerald-100 relative overflow-hidden">
-                <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 to-cyan-400"></div>
-                <h2 class="text-4xl md:text-5xl font-extrabold mb-6">
-                    <span class="bg-gradient-to-r from-emerald-600 to-cyan-500 text-gradient">El Ecosistema Digital</span> para la Economía Circular
-                </h2>
-                <p class="text-lg text-slate-600 max-w-3xl mx-auto mb-10">
-                    Conectamos la responsabilidad extendida con la eficiencia logística. Damu SGC asegura trazabilidad, cumplimiento de la Ley REP y optimización de recursos, inspirado en el renacer constante de la naturaleza.
-                </p>
-                <button onclick="switchTab('auth'); toggleAuth('register');"
-                    class="bg-gradient-to-r from-emerald-600 to-cyan-500 text-white font-bold py-3 px-8 rounded-full shadow-lg hover:shadow-cyan-500/50 hover:scale-105 transition transform duration-200 text-lg">
-                    Integrarse al Sistema Hoy
-                </button>
-            </div>
+<!-- ── FOOTER ── -->
+<footer>
+  <strong>Damu SGC</strong> — Trazabilidad Ley REP · Chile
+  <div class="links">
+    <a href="index.html">Inicio</a>
+    <a href="productores.html">Productores</a>
+    <a href="transportistas.html">Transportistas</a>
+    <a href="simulador.html">Simulador</a>
+    <a href="dashboard.html">Dashboard</a>
+  </div>
+  <p style="margin-top:.8rem; font-size:.75rem; color:#4a7a5e;">© 2025 Damu SGC · Todos los derechos reservados</p>
+</footer>
 
-            <!-- Propuesta de valor dual -->
-            <div class="grid md:grid-cols-2 gap-8 mb-12">
+<script>
+  function switchTab(t) {
+    document.getElementById('tab-prod').classList.toggle('active', t === 'prod');
+    document.getElementById('tab-trans').classList.toggle('active', t === 'trans');
+    document.getElementById('form-prod').style.display = t === 'prod' ? 'block' : 'none';
+    document.getElementById('form-trans').style.display = t === 'trans' ? 'block' : 'none';
+  }
 
-                <!-- Card Productores -->
-                <div class="bg-emerald-50 rounded-xl p-8 border border-emerald-100 shadow-sm hover:shadow-md transition">
-                    <div class="w-12 h-12 bg-emerald-600 text-white rounded-lg flex items-center justify-center text-2xl font-bold mb-4">🏭</div>
-                    <h3 class="text-2xl font-bold text-emerald-800 mb-3">Empresas Productoras</h3>
-                    <p class="text-slate-600 mb-4">Asegura el cumplimiento de tus metas normativas delegando la gestión operativa. Damu SGC te permite:</p>
-                    <ul class="space-y-2 text-sm text-slate-700 font-medium">
-                        <li class="flex items-center">✓ Simular presupuestos reales con el Eco-Ticket.</li>
-                        <li class="flex items-center">✓ Reportar metas de valorización anual (Ley REP).</li>
-                        <li class="flex items-center">✓ Obtener certificados de trazabilidad en tiempo real.</li>
-                        <li class="flex items-center text-emerald-700 font-bold">✓ Proyectar ingresos por valorización, CO₂e mitigado y costos operativos con el Simulador de Rentabilidad Pro.</li>
-                    </ul>
-                </div>
+  function handleLogin() {
+    const msg = document.getElementById('login-msg');
+    msg.style.display = 'block';
+    msg.textContent = '✓ Verificando credenciales…';
+    localStorage.setItem('damu_session', JSON.stringify({
+      empresa: 'Manufacturas Circulares S.A.',
+      rut: document.getElementById('rut').value || '76.234.567-K',
+      tipo: 'productor',
+      ts: Date.now()
+    }));
+    setTimeout(() => {
+      msg.textContent = '✓ Acceso verificado. Redirigiendo…';
+      setTimeout(() => { window.location.href = 'portal.html'; }, 700);
+    }, 1000);
+  }
 
-                <!-- Card Transportistas -->
-                <div class="bg-cyan-50 rounded-xl p-8 border border-cyan-100 shadow-sm hover:shadow-md transition">
-                    <div class="w-12 h-12 bg-cyan-500 text-white rounded-lg flex items-center justify-center text-2xl font-bold mb-4">🚚</div>
-                    <h3 class="text-2xl font-bold text-cyan-800 mb-3">Socios Transportistas</h3>
-                    <p class="text-slate-600 mb-4">Únete a la red uberizada de recolección inteligente y elimina los kilómetros en vacío de tus operaciones:</p>
-                    <ul class="space-y-2 text-sm text-slate-700 font-medium">
-                        <li class="flex items-center">✓ Asignación dinámica de rutas desde el Mapa de Acopio.</li>
-                        <li class="flex items-center">✓ Escaneo de cargas mediante códigos QR/Barras.</li>
-                        <li class="flex items-center">✓ Visualiza KPIs operativos en tiempo real: rutas optimizadas, precisión de escaneo y rentabilidad por viaje.</li>
-                        <li class="flex items-center text-cyan-700 font-bold">✓ Acceso directo a nuestro sistema propio TMS para gestión integral de flota.</li>
-                    </ul>
-                </div>
-
-            </div>
-        </section>
-
-        <!-- ══════════════════════════════════════
-             PESTAÑA 3: AUTENTICACIÓN (Login / Registro)
-             Al hacer login → redirige a portal.html
-        ══════════════════════════════════════ -->
-        <section id="auth" class="tab-content">
-            <div class="max-w-md mx-auto bg-white rounded-2xl shadow-lg border border-emerald-100 overflow-hidden">
-
-                <!-- Selector Login / Registro -->
-                <div class="flex border-b border-slate-100">
-                    <button id="btn-tab-login"
-                        class="flex-1 py-4 font-bold text-emerald-700 border-b-2 border-emerald-600 bg-emerald-50/50"
-                        onclick="toggleAuth('login')">Iniciar Sesión</button>
-                    <button id="btn-tab-register"
-                        class="flex-1 py-4 font-bold text-slate-500 hover:bg-slate-50 transition"
-                        onclick="toggleAuth('register')">Crear Cuenta</button>
-                </div>
-
-                <div class="p-8">
-
-                    <!-- Formulario Login -->
-                    <div id="login-form" class="block">
-                        <h3 class="text-xl font-bold text-slate-800 mb-6 text-center">Acceso Corporativo Damu</h3>
-                        <div class="mb-4">
-                            <label class="block text-sm font-semibold text-slate-600 mb-1">RUT Empresa</label>
-                            <input type="text" id="login-rut" value="76.234.567-K"
-                                class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-emerald-500 focus:border-emerald-500 bg-slate-50">
-                        </div>
-                        <div class="mb-6">
-                            <label class="block text-sm font-semibold text-slate-600 mb-1">Contraseña</label>
-                            <input type="password" id="login-pass" value="123456"
-                                class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-emerald-500 focus:border-emerald-500 bg-slate-50">
-                        </div>
-                        <button type="button" onclick="loginCompany()"
-                            class="w-full bg-gradient-to-r from-emerald-600 to-cyan-500 text-white font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition">
-                            Ingresar al Portal
-                        </button>
-                    </div>
-
-                    <!-- Formulario Registro -->
-                    <div id="register-form" class="hidden">
-                        <h3 class="text-xl font-bold text-slate-800 mb-4 text-center">Únete a la Red Damu</h3>
-                        <div class="flex justify-center space-x-6 mb-6">
-                            <label class="flex items-center space-x-2 cursor-pointer">
-                                <input type="radio" name="userType" value="productor" checked onchange="toggleRegForm()"
-                                    class="accent-emerald-600 w-4 h-4">
-                                <span class="text-sm font-semibold text-slate-700">Productor</span>
-                            </label>
-                            <label class="flex items-center space-x-2 cursor-pointer">
-                                <input type="radio" name="userType" value="transportista" onchange="toggleRegForm()"
-                                    class="accent-cyan-500 w-4 h-4">
-                                <span class="text-sm font-semibold text-slate-700">Transportista</span>
-                            </label>
-                        </div>
-                        <form>
-                            <div class="mb-4">
-                                <input type="text" class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-emerald-500 focus:border-emerald-500" placeholder="Razón Social">
-                            </div>
-                            <div class="mb-4">
-                                <input type="text" class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-emerald-500 focus:border-emerald-500" placeholder="RUT Empresa">
-                            </div>
-                            <!-- Banner TMS — visible al seleccionar Transportista -->
-                            <div id="tms-banner" class="hidden bg-cyan-50 border border-cyan-200 p-4 rounded-lg mb-6 shadow-inner">
-                                <div class="flex items-start space-x-3">
-                                    <span class="text-cyan-600 text-xl">🚚</span>
-                                    <p class="text-xs text-cyan-800 font-medium">Al completar el registro de tu flota, recibirás credenciales de acceso a nuestro sistema <strong>TMS (Transport Management System)</strong> integral para planificar tus rutas futuras con Inteligencia Artificial.</p>
-                                </div>
-                            </div>
-                            <button type="button"
-                                onclick="alert('Registro exitoso. Procede a Iniciar Sesión.'); toggleAuth('login');"
-                                class="w-full bg-slate-800 text-white font-bold py-3 rounded-lg shadow hover:bg-slate-700 transition">
-                                Solicitar Integración
-                            </button>
-                        </form>
-                    </div>
-
-                </div>
-            </div>
-        </section>
-
-    </main>
-
-    <script>
-        // ----- NAVEGACIÓN POR PESTAÑAS -----
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-        }
-
-        // ----- AUTENTICACIÓN -----
-        function toggleAuth(type) {
-            const loginForm    = document.getElementById('login-form');
-            const registerForm = document.getElementById('register-form');
-            const btnLogin     = document.getElementById('btn-tab-login');
-            const btnRegister  = document.getElementById('btn-tab-register');
-            const activeClass  = 'flex-1 py-4 font-bold text-emerald-700 border-b-2 border-emerald-600 bg-emerald-50/50';
-            const inactiveClass = 'flex-1 py-4 font-bold text-slate-500 hover:bg-slate-50 transition';
-
-            if (type === 'login') {
-                loginForm.classList.remove('hidden');
-                registerForm.classList.add('hidden');
-                btnLogin.className    = activeClass;
-                btnRegister.className = inactiveClass;
-            } else {
-                loginForm.classList.add('hidden');
-                registerForm.classList.remove('hidden');
-                btnRegister.className = activeClass;
-                btnLogin.className    = inactiveClass;
-            }
-        }
-
-        function toggleRegForm() {
-            const isTransportista = document.querySelector('input[name="userType"][value="transportista"]').checked;
-            document.getElementById('tms-banner').classList.toggle('hidden', !isTransportista);
-        }
-
-        // Login: guarda sesión y redirige a portal.html
-        function loginCompany() {
-            localStorage.setItem('damu_session', JSON.stringify({
-                empresa: 'Manufacturas Circulares S.A.',
-                rut: document.getElementById('login-rut').value,
-                tipo: 'productor',
-                ts: Date.now()
-            }));
-            window.location.href = 'portal.html';
-        }
-    </script>
+  function handleRegister() {
+    alert('¡Solicitud enviada! El equipo Damu se contactará en 24 horas.');
+  }
+</script>
 </body>
 </html>
