@@ -1,412 +1,370 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Damu SGC — Trazabilidad Ley REP</title>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Hub de Simulación Logística — Damu SGC</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    :root {
-      --verde:    #2d7a4f;
-      --verde-cl: #3fa66e;
-      --verde-bg: #e8f5ee;
-      --gris-os:  #1a1a2e;
-      --gris-me:  #2c3e50;
-      --blanco:   #ffffff;
-      --texto:    #333;
-      --borde:    #d0e8da;
-      --acento:   #f0a500;
-    }
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Segoe UI',sans-serif; color:var(--texto); background:#f7faf8; }
-
-    /* ── NAV ── */
-    nav {
-      background:var(--gris-os);
-      display:flex; align-items:center; justify-content:space-between;
-      padding:0 2rem; height:64px; position:sticky; top:0; z-index:100;
-    }
-    .nav-logo { display:flex; align-items:center; gap:.75rem; text-decoration:none; }
-    .nav-logo .badge {
-      width:38px; height:38px; border-radius:50%;
-      background:var(--verde); color:#fff;
-      display:flex; align-items:center; justify-content:center;
-      font-weight:800; font-size:1.1rem;
-    }
-    .nav-logo span { color:#fff; font-weight:700; font-size:1.1rem; letter-spacing:.5px; }
-    .nav-logo small { color:#8abeaa; font-size:.7rem; display:block; margin-top:-2px; }
-    nav ul { list-style:none; display:flex; gap:1.5rem; }
-    nav ul a {
-      color:#ccc; text-decoration:none; font-size:.9rem;
-      padding:.4rem .8rem; border-radius:6px; transition:.2s;
-    }
-    nav ul a:hover, nav ul a.active { background:var(--verde); color:#fff; }
-    .nav-cta {
-      background:var(--verde-cl); color:#fff; border:none;
-      padding:.5rem 1.2rem; border-radius:20px; cursor:pointer;
-      font-size:.85rem; font-weight:600; transition:.2s;
-    }
-    .nav-cta:hover { background:var(--verde); }
-
-    /* ── HERO ── */
-    .hero {
-      background: linear-gradient(135deg, var(--gris-os) 0%, #0f3d2a 60%, var(--verde) 100%);
-      color:#fff; padding:5rem 2rem 4rem; text-align:center; position:relative; overflow:hidden;
-    }
-    .hero::before {
-      content:''; position:absolute; inset:0;
-      background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%232d7a4f' fill-opacity='0.12'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-      pointer-events:none;
-    }
-    .hero-badge {
-      display:inline-block; background:rgba(63,166,110,.25);
-      border:1px solid var(--verde-cl); color:#a8f0c8;
-      padding:.3rem 1rem; border-radius:20px; font-size:.8rem;
-      margin-bottom:1.2rem; letter-spacing:.5px;
-    }
-    .hero h1 { font-size:clamp(1.8rem,4vw,3rem); font-weight:800; line-height:1.2; max-width:700px; margin:0 auto .8rem; }
-    .hero h1 span { color:var(--acento); }
-    .hero p { font-size:1.05rem; color:#b8d8c8; max-width:560px; margin:0 auto 2rem; line-height:1.7; }
-    .hero-btns { display:flex; gap:1rem; justify-content:center; flex-wrap:wrap; }
-    .btn-primary {
-      background:var(--verde-cl); color:#fff; border:none;
-      padding:.75rem 1.8rem; border-radius:25px; font-size:.95rem;
-      font-weight:700; cursor:pointer; transition:.2s;
-      text-decoration:none; display:inline-block;
-    }
-    .btn-primary:hover { background:var(--verde); transform:translateY(-2px); }
-    .btn-outline {
-      background:transparent; color:#fff;
-      border:2px solid rgba(255,255,255,.4);
-      padding:.75rem 1.8rem; border-radius:25px; font-size:.95rem;
-      cursor:pointer; transition:.2s; text-decoration:none; display:inline-block;
-    }
-    .btn-outline:hover { border-color:#fff; background:rgba(255,255,255,.1); }
-
-    /* ── KPI STRIP ── */
-    .kpi-strip {
-      background:var(--blanco); border-bottom:1px solid var(--borde);
-      display:flex; justify-content:center; flex-wrap:wrap; gap:0;
-    }
-    .kpi-item {
-      flex:1; min-width:160px; max-width:220px;
-      padding:1.4rem 1rem; text-align:center;
-      border-right:1px solid var(--borde);
-    }
-    .kpi-item:last-child { border-right:none; }
-    .kpi-num { font-size:1.7rem; }
-    .kpi-lbl { font-size:.75rem; color:#666; margin-top:.2rem; }
-
-    /* ── SECCIÓN QUIÉNES ── */
-    .section { padding:4rem 2rem; }
-    .section-title { text-align:center; margin-bottom:2.5rem; }
-    .section-title h2 { font-size:1.8rem; color:var(--gris-me); }
-    .section-title p { color:#666; margin-top:.4rem; font-size:.95rem; }
-
-    .cards { display:flex; gap:1.5rem; flex-wrap:wrap; max-width:1000px; margin:0 auto; }
-    .card {
-      flex:1; min-width:280px;
-      background:#fff; border:1px solid var(--borde);
-      border-radius:16px; padding:2rem 1.6rem;
-      transition:.25s; position:relative; overflow:hidden;
-    }
-    .card::before {
-      content:''; position:absolute; top:0; left:0; right:0; height:4px;
-      background:var(--verde-cl);
-    }
-    .card:hover { transform:translateY(-4px); box-shadow:0 12px 30px rgba(45,122,79,.15); }
-    .card-icon { font-size:2.2rem; margin-bottom:1rem; }
-    .card h3 { font-size:1.15rem; color:var(--gris-me); margin-bottom:.8rem; }
-    .card p { font-size:.88rem; color:#555; line-height:1.6; margin-bottom:1.2rem; }
-    .card ul { list-style:none; display:flex; flex-direction:column; gap:.5rem; }
-    .card ul li { font-size:.85rem; color:#444; display:flex; align-items:flex-start; gap:.5rem; }
-    .card ul li::before { content:'✓'; color:var(--verde); font-weight:700; flex-shrink:0; }
-    .card-link {
-      display:inline-block; margin-top:1.2rem;
-      color:var(--verde); font-weight:600; font-size:.88rem;
-      text-decoration:none; border-bottom:2px solid transparent; transition:.2s;
-    }
-    .card-link:hover { border-color:var(--verde); }
-
-    /* ── AUTH ── */
-    .auth-section {
-      background: linear-gradient(135deg, var(--verde-bg), #f0faf4);
-      padding:4rem 2rem;
-    }
-    .auth-grid { display:flex; gap:2rem; max-width:900px; margin:0 auto; flex-wrap:wrap; }
-    .auth-box {
-      flex:1; min-width:280px;
-      background:#fff; border-radius:16px; padding:2rem;
-      border:1px solid var(--borde);
-      box-shadow:0 4px 20px rgba(0,0,0,.06);
-    }
-    .auth-box h3 {
-      font-size:1.1rem; color:var(--gris-me); margin-bottom:1.4rem;
-      display:flex; align-items:center; gap:.5rem;
-    }
-    .auth-box h3 span { font-size:1.3rem; }
-    .form-group { margin-bottom:1rem; }
-    .form-group label { display:block; font-size:.8rem; color:#555; margin-bottom:.35rem; font-weight:600; }
-    .form-group input, .form-group select {
-      width:100%; padding:.65rem .9rem;
-      border:1px solid #cde0d4; border-radius:8px;
-      font-size:.9rem; outline:none; transition:.2s; background:#fafffe;
-    }
-    .form-group input:focus, .form-group select:focus {
-      border-color:var(--verde-cl); box-shadow:0 0 0 3px rgba(63,166,110,.15);
-    }
-    .btn-full {
-      width:100%; padding:.75rem; border:none; border-radius:10px;
-      background:var(--verde); color:#fff; font-size:.95rem;
-      font-weight:700; cursor:pointer; transition:.2s; margin-top:.5rem;
-    }
-    .btn-full:hover { background:var(--verde-cl); }
-    .btn-full.outline {
-      background:transparent; color:var(--verde); border:2px solid var(--verde);
-    }
-    .btn-full.outline:hover { background:var(--verde-bg); }
-    .auth-note { font-size:.75rem; color:#888; margin-top:1rem; line-height:1.5; }
-
-    /* ── TABS REGISTRO ── */
-    .tab-bar { display:flex; gap:.5rem; margin-bottom:1.5rem; }
-    .tab {
-      flex:1; padding:.55rem; border:1px solid var(--borde);
-      border-radius:8px; background:#f5faf7; cursor:pointer;
-      font-size:.82rem; font-weight:600; color:#666; transition:.2s; text-align:center;
-    }
-    .tab.active { background:var(--verde); color:#fff; border-color:var(--verde); }
-
-    /* ── FOOTER ── */
-    footer {
-      background:var(--gris-os); color:#8abeaa;
-      padding:2rem; text-align:center; font-size:.82rem;
-    }
-    footer strong { color:#fff; }
-    footer .links { display:flex; gap:1.5rem; justify-content:center; margin-top:.8rem; flex-wrap:wrap; }
-    footer .links a { color:#8abeaa; text-decoration:none; }
-    footer .links a:hover { color:#fff; }
-
-    @media(max-width:600px){
-      .kpi-item { min-width:140px; }
-      nav ul { display:none; }
-    }
+    input[type=range] { accent-color: #059669; }
+    .fade-in { animation: fadeIn .35s ease; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
   </style>
 </head>
-<body>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
 
-<!-- ── NAV ── -->
-<nav>
-  <a class="nav-logo" href="index.html">
-    <div class="badge">D</div>
+<!-- ══════════════════════════════
+     NAV
+══════════════════════════════ -->
+<nav class="bg-slate-900 sticky top-0 z-50 flex items-center justify-between px-8 h-16 shadow-xl">
+
+  <!-- Logo -->
+  <a href="index.html" class="flex items-center gap-3 no-underline">
+    <div class="w-9 h-9 rounded-full bg-emerald-600 flex items-center justify-center font-black text-white text-lg">D</div>
     <div>
-      <span>Damu SGC</span>
-      <small>Trazabilidad Ley REP</small>
+      <span class="text-white font-bold text-base leading-none">Damu SGC</span>
+      <span class="block text-emerald-400 text-xs leading-none mt-0.5">Trazabilidad Ley REP</span>
     </div>
   </a>
-  <ul>
-    <li><a href="index.html" class="active">Inicio</a></li>
-    <li><a href="productores.html">Productores</a></li>
-    <li><a href="transportistas.html">Transportistas</a></li>
-    <li><a href="simulador.html">Simulador</a></li>
-    <li><a href="dashboard.html">Dashboard</a></li>
+
+  <!-- Links -->
+  <ul class="hidden md:flex items-center gap-1 list-none">
+    <li><a href="index.html"          class="text-white bg-emerald-700 px-3 py-1.5 rounded-md text-sm font-semibold">Inicio</a></li>
+    <li><a href="portal.html"         class="text-slate-300 hover:text-white hover:bg-slate-700 px-3 py-1.5 rounded-md text-sm transition-colors">Portal</a></li>
+    <li><a href="productores.html"    class="text-slate-300 hover:text-white hover:bg-slate-700 px-3 py-1.5 rounded-md text-sm transition-colors">Productores</a></li>
+    <li><a href="transportistas.html" class="text-slate-300 hover:text-white hover:bg-slate-700 px-3 py-1.5 rounded-md text-sm transition-colors">Transportistas</a></li>
+    <li><a href="simulador.html"      class="text-slate-300 hover:text-white hover:bg-slate-700 px-3 py-1.5 rounded-md text-sm transition-colors">Simulador</a></li>
+    <li><a href="dashboard.html"      class="text-slate-300 hover:text-white hover:bg-slate-700 px-3 py-1.5 rounded-md text-sm transition-colors">Dashboard</a></li>
   </ul>
-  <a href="portal.html" class="nav-cta" style="text-decoration:none;">Mi Portal</a>
+
+  <!-- Badge -->
+  <span class="bg-emerald-900 text-emerald-300 border border-emerald-700 text-xs font-semibold px-3 py-1 rounded-full">
+    ⚡ Decreto 12 · Ley REP
+  </span>
 </nav>
 
-<!-- ── HERO ── -->
-<section class="hero">
-  <div class="hero-badge">⚡ Compatible con Decreto 12 · Ley REP Chile</div>
-  <h1>El Ecosistema Digital para la <span>Economía Circular</span></h1>
-  <p>Conectamos la responsabilidad extendida con la eficiencia logística. Trazabilidad en tiempo real, cumplimiento normativo y optimización de recursos.</p>
-  <div class="hero-btns">
-    <button class="btn-primary" onclick="document.getElementById('auth').scrollIntoView({behavior:'smooth'})">
-      Integrarse al Sistema
-    </button>
-    <a href="simulador.html" class="btn-outline">Ver Simulador →</a>
+<!-- ══════════════════════════════
+     HERO
+══════════════════════════════ -->
+<header class="bg-gradient-to-br from-slate-900 via-emerald-950 to-emerald-800 text-white py-10 px-8">
+  <div class="max-w-6xl mx-auto">
+    <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-2">Damu SGC · Plataforma de Ingeniería Logística</p>
+    <h1 class="text-3xl md:text-4xl font-black leading-tight mb-3">
+      Hub de Simulación Logística<br/>
+      <span class="text-emerald-400">y Ley REP</span>
+    </h1>
+    <p class="text-slate-300 text-sm max-w-xl leading-relaxed mb-5">
+      Herramientas técnicas para el cálculo de metas REP, estimación de costos operativos
+      y trazabilidad logística según el Decreto 12 del Ministerio del Medio Ambiente.
+    </p>
+    <!-- Chips técnicos -->
+    <div class="flex flex-wrap gap-2">
+      <span class="bg-white/10 border border-white/20 text-white/80 text-xs px-3 py-1 rounded-full">6 categorías REP</span>
+      <span class="bg-white/10 border border-white/20 text-white/80 text-xs px-3 py-1 rounded-full">Cálculo OPEX / Ton</span>
+      <span class="bg-white/10 border border-white/20 text-white/80 text-xs px-3 py-1 rounded-full">Balance CO₂e</span>
+      <span class="bg-white/10 border border-white/20 text-white/80 text-xs px-3 py-1 rounded-full">Trazabilidad QR</span>
+      <span class="bg-white/10 border border-white/20 text-white/80 text-xs px-3 py-1 rounded-full">Rutas TMS / IA</span>
+    </div>
   </div>
-</section>
+</header>
 
-<!-- ── KPI STRIP ── -->
-<div class="kpi-strip">
-  <div class="kpi-item">
-    <div class="kpi-num">📋</div>
-    <div class="kpi-lbl">Reporta tus metas REP en un solo lugar</div>
-  </div>
-  <div class="kpi-item">
-    <div class="kpi-num">📍</div>
-    <div class="kpi-lbl">Visualiza puntos de acopio en tiempo real</div>
-  </div>
-  <div class="kpi-item">
-    <div class="kpi-num">🧾</div>
-    <div class="kpi-lbl">Genera certificados de trazabilidad automáticos</div>
-  </div>
-  <div class="kpi-item">
-    <div class="kpi-num">🚚</div>
-    <div class="kpi-lbl">Elimina kilómetros en vacío con rutas inteligentes</div>
-  </div>
-  <div class="kpi-item">
-    <div class="kpi-num">♻️</div>
-    <div class="kpi-lbl">Calcula CO₂e mitigado por período</div>
-  </div>
-</div>
+<!-- ══════════════════════════════
+     MAIN GRID
+══════════════════════════════ -->
+<main class="flex-grow max-w-6xl mx-auto w-full px-4 md:px-6 py-8 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
-<!-- ── PROPUESTA DE VALOR ── -->
-<section class="section">
-  <div class="section-title">
-    <h2>¿A quién está dirigido?</h2>
-    <p>Dos perfiles, una misma plataforma de economía circular</p>
-  </div>
-  <div class="cards">
+  <!-- ────────────────────────────
+       COLUMNA IZQUIERDA — ECO-TICKET
+  ──────────────────────────────── -->
+  <div class="bg-white rounded-2xl border border-emerald-100 shadow-sm overflow-hidden">
 
-    <div class="card">
-      <div class="card-icon">🏭</div>
-      <h3>Empresas Productoras</h3>
-      <p>Asegura el cumplimiento de tus metas normativas delegando la gestión operativa a la red Damu.</p>
-      <ul>
-        <li>Simula presupuestos reales con el Eco-Ticket</li>
-        <li>Reporta metas de valorización anual (Ley REP)</li>
-        <li>Obtén certificados de trazabilidad en tiempo real</li>
-        <li>Proyecta ingresos, CO₂e mitigado y costos operativos</li>
-      </ul>
-      <a href="productores.html" class="card-link">Acceder al portal Productor →</a>
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-emerald-700 to-emerald-600 px-5 py-4">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="text-2xl">🧾</span>
+        <h2 class="text-white font-bold text-base">Calculadora Eco-Ticket</h2>
+      </div>
+      <p class="text-emerald-200 text-xs">Cálculo de volumen y costo de gestión por categoría REP · Decreto 12</p>
     </div>
 
-    <div class="card">
-      <div class="card-icon">🚚</div>
-      <h3>Socios Transportistas</h3>
-      <p>Únete a la red de recolección inteligente y elimina los kilómetros en vacío de tus operaciones.</p>
-      <ul>
-        <li>Asignación dinámica de rutas desde el Mapa de Acopio</li>
-        <li>Escaneo de cargas mediante códigos QR/Barras</li>
-        <li>KPIs operativos en tiempo real por viaje</li>
-        <li>TMS integrado con planificación por IA</li>
-      </ul>
-      <a href="transportistas.html" class="card-link">Acceder al portal Transportista →</a>
-    </div>
+    <!-- Form -->
+    <div class="p-5 space-y-4">
 
-  </div>
-</section>
-
-<!-- ── AUTH ── -->
-<section class="auth-section" id="auth">
-  <div class="section-title">
-    <h2>Acceso al Sistema</h2>
-    <p>Ingresa a tu portal o crea tu cuenta en la red Damu</p>
-  </div>
-  <div class="auth-grid">
-
-    <!-- LOGIN -->
-    <div class="auth-box">
-      <h3><span>🔐</span> Acceso Corporativo</h3>
-      <div class="form-group">
-        <label>RUT Empresa</label>
-        <input type="text" placeholder="76.123.456-7" id="rut" value="76.234.567-K" />
-      </div>
-      <div class="form-group">
-        <label>Contraseña</label>
-        <input type="password" placeholder="••••••••" id="pwd" value="123456" />
-      </div>
-      <button class="btn-full" onclick="handleLogin()">Ingresar al Portal</button>
-      <div id="login-msg" style="font-size:.8rem;margin-top:.6rem;color:var(--verde);display:none;">
-        ✓ Verificando credenciales…
-      </div>
-      <p class="auth-note">¿Olvidaste tu contraseña? <a href="#" style="color:var(--verde);">Recupérala aquí</a></p>
-    </div>
-
-    <!-- REGISTRO -->
-    <div class="auth-box">
-      <h3><span>🌱</span> Únete a la Red Damu</h3>
-      <div class="tab-bar">
-        <div class="tab active" id="tab-prod" onclick="switchTab('prod')">🏭 Productor</div>
-        <div class="tab" id="tab-trans" onclick="switchTab('trans')">🚚 Transportista</div>
+      <!-- Categoría -->
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1">Categoría REP</label>
+        <select id="et-cat" onchange="calcEco()"
+          class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-slate-50">
+          <option value="envases">Envases y embalajes</option>
+          <option value="neumaticos">Neumáticos</option>
+          <option value="pilas">Pilas y baterías</option>
+          <option value="raee">Aparatos eléctricos (RAEE)</option>
+          <option value="aceites">Aceites lubricantes</option>
+        </select>
       </div>
 
-      <div id="form-prod">
-        <div class="form-group">
-          <label>RUT Empresa</label>
-          <input type="text" placeholder="76.123.456-7" />
-        </div>
-        <div class="form-group">
-          <label>Razón Social</label>
-          <input type="text" placeholder="Empresa S.A." />
-        </div>
-        <div class="form-group">
-          <label>Categoría REP</label>
-          <select>
-            <option>Envases y embalajes</option>
-            <option>Neumáticos</option>
-            <option>Aceites lubricantes</option>
-            <option>Aparatos eléctricos</option>
-            <option>Pilas y baterías</option>
+      <!-- Toneladas -->
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1">
+          Toneladas puestas en mercado / año
+        </label>
+        <input id="et-tons" type="number" min="1" placeholder="Ej: 150" oninput="calcEco()"
+          class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-slate-50"/>
+        <p class="text-xs text-slate-400 mt-1">Dato declarado ante el SMA</p>
+      </div>
+
+      <!-- Meta slider -->
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-2">
+          Meta de valorización aplicable —
+          <span id="sv-meta" class="text-emerald-600 font-bold">25%</span>
+        </label>
+        <input id="et-meta" type="range" min="5" max="80" value="25"
+          oninput="document.getElementById('sv-meta').textContent=this.value+'%'; calcEco()"
+          class="w-full h-2 rounded-full"/>
+        <div class="flex justify-between text-xs text-slate-400 mt-1"><span>5%</span><span>80%</span></div>
+      </div>
+
+      <!-- Grid: Región + Frecuencia -->
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1">Región</label>
+          <select id="et-reg" onchange="calcEco()"
+            class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-slate-50">
+            <option value="1">R. Metropolitana</option>
+            <option value="1.08">Valparaíso</option>
+            <option value="1.12">Biobío</option>
+            <option value="1.2">Otra región</option>
           </select>
         </div>
-        <button class="btn-full outline" onclick="handleRegister()">Solicitar Integración</button>
-      </div>
-
-      <div id="form-trans" style="display:none">
-        <div class="form-group">
-          <label>RUT Empresa</label>
-          <input type="text" placeholder="76.123.456-7" />
-        </div>
-        <div class="form-group">
-          <label>N° Patente principal</label>
-          <input type="text" placeholder="ABCD-12" />
-        </div>
-        <div class="form-group">
-          <label>Tipo de flota</label>
-          <select>
-            <option>Camión 3/4</option>
-            <option>Camión 3/4 con grúa</option>
-            <option>Furgón</option>
-            <option>Camión rígido</option>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1">Frecuencia de retiro</label>
+          <select id="et-freq" onchange="calcEco()"
+            class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-slate-50">
+            <option value="1">Mensual</option>
+            <option value="0.9">Trimestral</option>
+            <option value="0.85">Semestral</option>
           </select>
         </div>
-        <button class="btn-full outline" onclick="handleRegister()">Solicitar Integración TMS</button>
-        <p class="auth-note">Al completar el registro recibirás credenciales de acceso a nuestro TMS con planificación de rutas por IA.</p>
       </div>
+
+      <!-- Precio valorización (opcional) -->
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1">
+          Precio de valorización (CLP/ton) <span class="text-slate-400 font-normal">— opcional</span>
+        </label>
+        <input id="et-precio" type="number" min="0" placeholder="Ej: 85000" oninput="calcEco()"
+          class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-slate-50"/>
+      </div>
+
+      <!-- Botón -->
+      <button onclick="calcEco()"
+        class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-sm transition-colors">
+        Calcular Eco-Ticket
+      </button>
+
+      <!-- Resultados -->
+      <div id="et-result" class="hidden fade-in">
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-2">
+          <p class="text-xs font-bold text-emerald-700 uppercase tracking-wide mb-2">📊 Estimación anual</p>
+          <div class="space-y-1.5 text-sm">
+            <div class="flex justify-between py-1 border-b border-emerald-100">
+              <span class="text-slate-600">Toneladas a valorizar</span>
+              <span id="r-tval" class="font-semibold text-slate-800">—</span>
+            </div>
+            <div class="flex justify-between py-1 border-b border-emerald-100">
+              <span class="text-slate-600">Recolección en origen</span>
+              <span id="r-reco" class="font-semibold text-red-600">—</span>
+            </div>
+            <div class="flex justify-between py-1 border-b border-emerald-100">
+              <span class="text-slate-600">Transporte al gestor</span>
+              <span id="r-trans" class="font-semibold text-red-600">—</span>
+            </div>
+            <div class="flex justify-between py-1 border-b border-emerald-100">
+              <span class="text-slate-600">Valorización</span>
+              <span id="r-val" class="font-semibold text-red-600">—</span>
+            </div>
+            <div id="r-ingreso-row" class="hidden flex justify-between py-1 border-b border-emerald-100">
+              <span class="text-slate-600">Ingreso estimado</span>
+              <span id="r-ingreso" class="font-semibold text-emerald-700">—</span>
+            </div>
+            <div class="flex justify-between py-1 font-bold text-base">
+              <span class="text-slate-700">Total costos</span>
+              <span id="r-total" class="text-red-600">—</span>
+            </div>
+            <div id="r-balance-row" class="hidden flex justify-between py-1 font-bold">
+              <span class="text-slate-700">Balance neto</span>
+              <span id="r-balance">—</span>
+            </div>
+          </div>
+        </div>
+        <p class="text-xs text-slate-400 mt-2 leading-relaxed">
+          * Estimación referencial. Valores reales dependen de condiciones específicas del gestor autorizado.
+        </p>
+      </div>
+
+    </div><!-- /form -->
+  </div>
+
+  <!-- ────────────────────────────
+       COLUMNA DERECHA — HERRAMIENTAS
+  ──────────────────────────────── -->
+  <div class="flex flex-col gap-5">
+
+    <!-- SIMULADOR PRO — card principal -->
+    <div class="bg-gradient-to-br from-slate-900 via-emerald-950 to-emerald-800 rounded-2xl p-6 text-white shadow-xl">
+      <div class="flex items-start gap-3 mb-4">
+        <div class="bg-white/15 rounded-xl p-2.5 text-2xl flex-shrink-0">🧮</div>
+        <div>
+          <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase">Herramienta avanzada</p>
+          <h2 class="text-white font-black text-lg leading-tight">Simulador de Rentabilidad<br/>Operativa Pro</h2>
+        </div>
+      </div>
+
+      <!-- Feature badges -->
+      <div class="flex flex-wrap gap-2 mb-4">
+        <span class="bg-white/10 border border-white/20 text-white/80 text-xs px-2.5 py-1 rounded-full">📉 Cálculo OPEX</span>
+        <span class="bg-white/10 border border-white/20 text-white/80 text-xs px-2.5 py-1 rounded-full">⚙️ ROI maquinaria</span>
+        <span class="bg-white/10 border border-white/20 text-white/80 text-xs px-2.5 py-1 rounded-full">🌿 Balance CO₂e</span>
+        <span class="bg-white/10 border border-white/20 text-white/80 text-xs px-2.5 py-1 rounded-full">📊 Desglose por categoría</span>
+      </div>
+
+      <!-- Descripción técnica -->
+      <p class="text-slate-300 text-sm leading-relaxed mb-5">
+        Proyecta costos de recolección, transporte y valorización con variables logísticas completas:
+        distancia al gestor, calidad del material, frecuencia de retiro y región de operación.
+        Genera tabla de desglose y gráfico de barras comparativo.
+      </p>
+
+      <!-- CTA -->
+      <a href="simulador.html"
+        class="flex items-center justify-center gap-2 w-full bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-black py-3 rounded-xl text-sm transition-colors shadow-lg">
+        Abrir Simulador Pro →
+      </a>
     </div>
 
-  </div>
-</section>
+    <!-- Grid de herramientas secundarias -->
+    <div class="grid grid-cols-2 gap-4">
 
-<!-- ── FOOTER ── -->
-<footer>
-  <strong>Damu SGC</strong> — Trazabilidad Ley REP · Chile
-  <div class="links">
-    <a href="index.html">Inicio</a>
-    <a href="productores.html">Productores</a>
-    <a href="transportistas.html">Transportistas</a>
-    <a href="simulador.html">Simulador</a>
-    <a href="dashboard.html">Dashboard</a>
+      <!-- Mapa -->
+      <a href="mapa.html" class="group bg-white rounded-xl border border-slate-200 hover:border-emerald-400 p-4 flex flex-col gap-2 transition-all hover:shadow-md no-underline">
+        <span class="text-2xl">🗺️</span>
+        <p class="text-slate-800 font-bold text-sm">Mapa de Acopio</p>
+        <p class="text-slate-500 text-xs leading-relaxed">Red satelital de puntos y rutas activas en tiempo real.</p>
+        <span class="text-emerald-600 text-xs font-semibold group-hover:underline mt-auto">Abrir →</span>
+      </a>
+
+      <!-- Dashboard -->
+      <a href="dashboard.html" class="group bg-white rounded-xl border border-slate-200 hover:border-emerald-400 p-4 flex flex-col gap-2 transition-all hover:shadow-md no-underline">
+        <span class="text-2xl">📋</span>
+        <p class="text-slate-800 font-bold text-sm">Dashboard Ejecutivo</p>
+        <p class="text-slate-500 text-xs leading-relaxed">KPIs de retiros, toneladas, CO₂e y cumplimiento REP.</p>
+        <span class="text-emerald-600 text-xs font-semibold group-hover:underline mt-auto">Abrir →</span>
+      </a>
+
+      <!-- Productores -->
+      <a href="productores.html" class="group bg-white rounded-xl border border-slate-200 hover:border-emerald-400 p-4 flex flex-col gap-2 transition-all hover:shadow-md no-underline">
+        <span class="text-2xl">🏭</span>
+        <p class="text-slate-800 font-bold text-sm">Portal Productores</p>
+        <p class="text-slate-500 text-xs leading-relaxed">Metas REP, certificados de trazabilidad y simulación.</p>
+        <span class="text-emerald-600 text-xs font-semibold group-hover:underline mt-auto">Abrir →</span>
+      </a>
+
+      <!-- Transportistas -->
+      <a href="transportistas.html" class="group bg-white rounded-xl border border-slate-200 hover:border-emerald-400 p-4 flex flex-col gap-2 transition-all hover:shadow-md no-underline">
+        <span class="text-2xl">🚚</span>
+        <p class="text-slate-800 font-bold text-sm">Portal Transportistas</p>
+        <p class="text-slate-500 text-xs leading-relaxed">TMS, KPIs de flota, escaneo QR y rutas asignadas.</p>
+        <span class="text-emerald-600 text-xs font-semibold group-hover:underline mt-auto">Abrir →</span>
+      </a>
+
+    </div>
+
+    <!-- Portal acceso -->
+    <a href="portal.html"
+      class="bg-slate-800 hover:bg-slate-700 text-white rounded-xl px-5 py-3 flex items-center justify-between text-sm font-semibold transition-colors no-underline">
+      <span>🔐 Acceso al sistema</span>
+      <span class="text-slate-400 font-normal text-xs">Login · Registro de empresa →</span>
+    </a>
+
   </div>
-  <p style="margin-top:.8rem; font-size:.75rem; color:#4a7a5e;">© 2025 Damu SGC · Todos los derechos reservados</p>
+</main>
+
+<!-- ══════════════════════════════
+     FOOTER
+══════════════════════════════ -->
+<footer class="bg-slate-900 text-slate-400 text-xs py-5 border-t border-slate-800 mt-4">
+  <div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-3">
+    <p><strong class="text-white">Damu SGC</strong> — Trazabilidad Ley REP · Chile</p>
+    <div class="flex gap-4 flex-wrap justify-center">
+      <a href="portal.html"         class="hover:text-white transition-colors">Portal</a>
+      <a href="productores.html"    class="hover:text-white transition-colors">Productores</a>
+      <a href="transportistas.html" class="hover:text-white transition-colors">Transportistas</a>
+      <a href="simulador.html"      class="hover:text-white transition-colors">Simulador</a>
+      <a href="mapa.html"           class="hover:text-white transition-colors">Mapa</a>
+      <a href="dashboard.html"      class="hover:text-white transition-colors">Dashboard</a>
+    </div>
+    <p class="text-slate-600">© 2025 Damu SGC</p>
+  </div>
 </footer>
 
+<!-- ══════════════════════════════
+     ECO-TICKET JS
+══════════════════════════════ -->
 <script>
-  function switchTab(t) {
-    document.getElementById('tab-prod').classList.toggle('active', t === 'prod');
-    document.getElementById('tab-trans').classList.toggle('active', t === 'trans');
-    document.getElementById('form-prod').style.display = t === 'prod' ? 'block' : 'none';
-    document.getElementById('form-trans').style.display = t === 'trans' ? 'block' : 'none';
-  }
+  const tarifas = {
+    envases:    { reco:18000, trans:12000, val:22000 },
+    neumaticos: { reco:25000, trans:18000, val:30000 },
+    pilas:      { reco:35000, trans:20000, val:45000 },
+    raee:       { reco:40000, trans:25000, val:50000 },
+    aceites:    { reco:22000, trans:15000, val:28000 },
+  };
 
-  function handleLogin() {
-    const msg = document.getElementById('login-msg');
-    msg.style.display = 'block';
-    msg.textContent = '✓ Verificando credenciales…';
-    localStorage.setItem('damu_session', JSON.stringify({
-      empresa: 'Manufacturas Circulares S.A.',
-      rut: document.getElementById('rut').value || '76.234.567-K',
-      tipo: 'productor',
-      ts: Date.now()
-    }));
-    setTimeout(() => {
-      msg.textContent = '✓ Acceso verificado. Redirigiendo…';
-      setTimeout(() => { window.location.href = 'productores.html'; }, 700);
-    }, 1000);
-  }
+  function clp(n) { return '$' + Math.round(n).toLocaleString('es-CL') + ' CLP'; }
 
-  function handleRegister() {
-    alert('¡Solicitud enviada! El equipo Damu se contactará en 24 horas.');
+  function calcEco() {
+    const cat    = document.getElementById('et-cat').value;
+    const tons   = parseFloat(document.getElementById('et-tons').value) || 0;
+    const meta   = parseFloat(document.getElementById('et-meta').value) / 100;
+    const reg    = parseFloat(document.getElementById('et-reg').value);
+    const freq   = parseFloat(document.getElementById('et-freq').value);
+    const precio = parseFloat(document.getElementById('et-precio').value) || 0;
+
+    if (!tons) return;
+
+    const t       = tarifas[cat];
+    const tval    = tons * meta;
+    const reco    = tval * t.reco  * reg * freq;
+    const trans   = tval * t.trans * reg * freq;
+    const val     = tval * t.val   * reg * freq;
+    const total   = reco + trans + val;
+    const ingreso = tval * precio;
+    const balance = ingreso - total;
+
+    document.getElementById('r-tval').textContent  = tval.toFixed(1) + ' t';
+    document.getElementById('r-reco').textContent  = clp(reco);
+    document.getElementById('r-trans').textContent = clp(trans);
+    document.getElementById('r-val').textContent   = clp(val);
+    document.getElementById('r-total').textContent = clp(total);
+
+    const ingresoRow = document.getElementById('r-ingreso-row');
+    const balanceRow = document.getElementById('r-balance-row');
+    const balanceEl  = document.getElementById('r-balance');
+
+    if (precio) {
+      document.getElementById('r-ingreso').textContent = clp(ingreso);
+      balanceEl.textContent = clp(balance);
+      balanceEl.className   = balance >= 0 ? 'text-emerald-600' : 'text-red-600';
+      ingresoRow.classList.remove('hidden');
+      balanceRow.classList.remove('hidden');
+    } else {
+      ingresoRow.classList.add('hidden');
+      balanceRow.classList.add('hidden');
+    }
+
+    const result = document.getElementById('et-result');
+    result.classList.remove('hidden');
+    result.classList.add('fade-in');
   }
 </script>
 </body>
