@@ -209,9 +209,7 @@
     <li><a href="simulador.html">Simulador</a></li>
     <li><a href="dashboard.html">Dashboard</a></li>
   </ul>
-  <button class="nav-cta" onclick="document.getElementById('auth').scrollIntoView({behavior:'smooth'})">
-    Mi Portal
-  </button>
+  <a href="portal.html" class="nav-cta" style="text-decoration:none;">Mi Portal</a>
 </nav>
 
 <!-- ── HERO ── -->
@@ -403,7 +401,7 @@
     }));
     setTimeout(() => {
       msg.textContent = '✓ Acceso verificado. Redirigiendo…';
-      setTimeout(() => { window.location.href = 'portal.html'; }, 700);
+      setTimeout(() => { window.location.href = 'productores.html'; }, 700);
     }, 1000);
   }
 
