@@ -61,7 +61,6 @@
     <li><a href="productores.html"    class="text-slate-300 hover:text-white hover:bg-slate-700 px-3 py-1.5 rounded-md text-sm transition-colors">Productores</a></li>
     <li><a href="transportistas.html" class="text-slate-300 hover:text-white hover:bg-slate-700 px-3 py-1.5 rounded-md text-sm transition-colors">Transportistas</a></li>
     <li><a href="simulador.html"      class="text-slate-300 hover:text-white hover:bg-slate-700 px-3 py-1.5 rounded-md text-sm transition-colors">Simulador</a></li>
-    <li><a href="dashboard.html"      class="text-slate-300 hover:text-white hover:bg-slate-700 px-3 py-1.5 rounded-md text-sm transition-colors">Dashboard</a></li>
   </ul>
   <span class="bg-emerald-900 text-emerald-300 border border-emerald-700 text-xs font-semibold px-3 py-1 rounded-full">
     ⚡ Decreto 12 · Ley REP
@@ -187,21 +186,6 @@
             </label>
             <div class="flex items-center gap-1 flex-shrink-0">
               <input type="number" id="ton-aceites" disabled min="0" step="0.5" placeholder="0"
-                oninput="verificarDatos()"
-                class="w-20 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed"/>
-              <span class="text-xs text-slate-400">t</span>
-            </div>
-          </div>
-
-          <!-- Medicamentos -->
-          <div class="product-row flex items-center gap-3 px-3 py-2.5 bg-white">
-            <input type="checkbox" id="cb-medicamentos" onchange="toggleProducto('medicamentos')"
-              class="w-4 h-4 accent-emerald-600 cursor-pointer flex-shrink-0"/>
-            <label for="cb-medicamentos" class="flex items-center gap-1.5 flex-1 cursor-pointer text-sm text-slate-700 font-medium select-none">
-              <span>💊</span><span>Medicamentos</span>
-            </label>
-            <div class="flex items-center gap-1 flex-shrink-0">
-              <input type="number" id="ton-medicamentos" disabled min="0" step="0.5" placeholder="0"
                 oninput="verificarDatos()"
                 class="w-20 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed"/>
               <span class="text-xs text-slate-400">t</span>
@@ -481,7 +465,6 @@ var tarifas = {
   pilas:        { reco:35000, trans:20000, val:45000, co2:0.4,  precioMercado:180000 },
   raee:         { reco:40000, trans:25000, val:50000, co2:1.1,  precioMercado:120000 },
   aceites:      { reco:22000, trans:15000, val:28000, co2:0.9,  precioMercado:40000  },
-  medicamentos: { reco:38000, trans:22000, val:48000, co2:0.3,  precioMercado:15000  },
 };
 
 var PRODUCTOS = [
@@ -490,7 +473,6 @@ var PRODUCTOS = [
   { id:'pilas',        label:'Pilas y baterías',           icon:'🔋' },
   { id:'raee',         label:'Aparatos eléctricos (RAEE)', icon:'🖥️'  },
   { id:'aceites',      label:'Aceites lubricantes',        icon:'🛢️'  },
-  { id:'medicamentos', label:'Medicamentos',               icon:'💊' },
 ];
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
