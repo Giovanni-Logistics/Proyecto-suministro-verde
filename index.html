@@ -11,22 +11,43 @@
     #dashboard-section { scroll-margin-top: 72px; }
 
     /* ── Controles de ruta ── */
-    #route-controls { display:flex; flex-wrap:wrap; gap:.75rem; align-items:flex-end; }
-    #route-controls .route-field { flex:1; min-width:200px; }
-    #route-controls label { display:block; font-size:.72rem; font-weight:700; color:#64748b; margin-bottom:.25rem; }
-    #route-controls input[type=text] {
+    #route-controls { display:flex; flex-direction:column; gap:.75rem; }
+    .route-field label,
+    .destino-row label { display:block; font-size:.72rem; font-weight:700; color:#64748b; margin-bottom:.25rem; }
+    .route-field input[type=text],
+    .destino-input-wrap input[type=text] {
       width:100%; border:1px solid #e2e8f0; border-radius:.5rem;
       padding:.55rem .75rem; font-size:.875rem; outline:none; background:#f8fafc;
       transition:border-color .2s, box-shadow .2s;
     }
-    #route-controls input[type=text]:focus {
+    .route-field input[type=text]:focus,
+    .destino-input-wrap input[type=text]:focus {
       border-color:#059669; box-shadow:0 0 0 3px rgba(5,150,105,.15);
     }
+    #route-addresses { display:flex; flex-direction:column; gap:.55rem; }
+    .destino-input-wrap { display:flex; gap:.4rem; align-items:center; }
+    .destino-input-wrap input { flex:1; }
+    .btn-remove-dest {
+      background:#fde8e8; color:#c0392b; border:1px solid #fca5a5;
+      border-radius:.4rem; padding:.45rem .6rem; font-size:.8rem;
+      cursor:pointer; font-weight:700; flex-shrink:0; line-height:1;
+      transition:background .15s;
+    }
+    .btn-remove-dest:hover { background:#fee2e2; }
+    .route-ctrl-row { display:flex; flex-wrap:wrap; align-items:center; gap:.6rem; }
+    #btn-add-stop {
+      background:#f0fdf4; color:#059669; border:1.5px solid #a7f3d0;
+      border-radius:.5rem; padding:.45rem .85rem; font-size:.8rem;
+      font-weight:700; cursor:pointer; transition:background .15s;
+    }
+    #btn-add-stop:hover { background:#dcfce7; }
+    #btn-add-stop:disabled { opacity:.4; cursor:not-allowed; }
+    .roundtrip-chk { display:flex; align-items:center; gap:.4rem; font-size:.82rem; color:#475569; font-weight:600; cursor:pointer; }
+    .roundtrip-chk input[type=checkbox] { accent-color:#059669; width:15px; height:15px; cursor:pointer; }
     #btn-calcular-ruta {
       background:#059669; color:#fff; border:none; border-radius:.5rem;
       padding:.55rem 1.25rem; font-size:.875rem; font-weight:700;
       cursor:pointer; white-space:nowrap; transition:background .2s;
-      flex-shrink:0; height:38px;
     }
     #btn-calcular-ruta:hover { background:#047857; }
     #route-result {
@@ -298,9 +319,9 @@
             <label class="text-xs font-semibold text-slate-500">📍 Distancia al gestor</label>
             <span class="text-xs font-black text-slate-700"><span id="lbl-dist">40</span> km</span>
           </div>
-          <input type="range" id="v-dist" min="5" max="300" value="40" step="5" class="w-full"
+          <input type="range" id="v-dist" min="5" max="1000" value="40" step="5" class="w-full"
             oninput="document.getElementById('lbl-dist').textContent=parseInt(this.value); verificarDatos()"/>
-          <div class="flex justify-between text-xs text-slate-400 mt-0.5"><span>5 km</span><span>300 km</span></div>
+          <div class="flex justify-between text-xs text-slate-400 mt-0.5"><span>5 km</span><span>1.000 km</span></div>
         </div>
 
         <!-- Calidad del material -->
@@ -423,6 +444,8 @@
 
     <!-- Controles de ruta -->
     <div id="route-controls" class="mb-3">
+
+      <!-- Origen fijo -->
       <div class="route-field">
         <label>📍 Punto de origen</label>
         <input id="map-origin" type="text" list="sg-origen"
@@ -430,14 +453,19 @@
           oninput="debSuggest('map-origin','sg-origen')"/>
         <datalist id="sg-origen"></datalist>
       </div>
-      <div class="route-field">
-        <label>🏭 Destino (planta / gestor autorizado)</label>
-        <input id="map-dest" type="text" list="sg-dest"
-          placeholder="Ej: San Bernardo, Santiago"
-          oninput="debSuggest('map-dest','sg-dest')"/>
-        <datalist id="sg-dest"></datalist>
+
+      <!-- Destinos dinámicos (inyectados por JS al cargar) -->
+      <div id="route-addresses"></div>
+
+      <!-- Acciones: agregar parada · ida y vuelta · calcular -->
+      <div class="route-ctrl-row">
+        <button id="btn-add-stop" onclick="agregarParada()">＋ Agregar parada</button>
+        <label class="roundtrip-chk">
+          <input type="checkbox" id="chk-roundtrip"/> Ida y vuelta
+        </label>
+        <button id="btn-calcular-ruta" onclick="calcularRuta()">🧭 Calcular Ruta</button>
       </div>
-      <button id="btn-calcular-ruta" onclick="calcularRuta()">🧭 Calcular Ruta</button>
+
     </div>
 
     <!-- Resultado inyectado -->
@@ -485,18 +513,73 @@
 <script>
 // ─── Variables globales ───────────────────────────────────────────────────────
 var _lmap, _routeLayer, _markersLayer;
+var _destCounter = 0;
+var STOP_COLORS  = ['#059669','#2980b9','#f59e0b','#8e44ad','#e74c3c'];
+var STOP_LABELS  = ['A','B','C','D','E'];
 
 // ─── Inicializar mapa Leaflet ─────────────────────────────────────────────────
 function initMap() {
   _lmap = L.map('map', { scrollWheelZoom: false }).setView([-33.480, -70.660], 11);
-
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 18
   }).addTo(_lmap);
-
   _routeLayer   = L.layerGroup().addTo(_lmap);
   _markersLayer = L.layerGroup().addTo(_lmap);
+}
+
+// ─── Marcador circular con letra ─────────────────────────────────────────────
+function crearMarcador(letra, color) {
+  return L.divIcon({
+    className: '',
+    html: '<div style="width:26px;height:26px;border-radius:50%;background:' + color
+      + ';border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);'
+      + 'display:flex;align-items:center;justify-content:center;'
+      + 'color:#fff;font-size:11px;font-weight:900">' + letra + '</div>',
+    iconSize: [26,26], iconAnchor: [13,13]
+  });
+}
+
+// ─── Gestión dinámica de paradas ──────────────────────────────────────────────
+function agregarParada() {
+  var rows = document.querySelectorAll('#route-addresses .destino-row');
+  if (rows.length >= 4) return;
+  _destCounter++;
+  var uid    = 'dest-' + _destCounter;
+  var listId = 'sg-' + uid;
+
+  var div = document.createElement('div');
+  div.className = 'destino-row';
+  div.innerHTML =
+    '<label>🏭 Destino ' + (rows.length + 1) + ' (planta / gestor)</label>'
+    + '<div class="destino-input-wrap">'
+    +   '<input class="destino-input" type="text" id="' + uid + '" list="' + listId + '"'
+    +     ' placeholder="Ej: San Bernardo, Santiago"'
+    +     ' oninput="debSuggest(\'' + uid + '\',\'' + listId + '\')" />'
+    +   '<datalist id="' + listId + '"></datalist>'
+    +   '<button class="btn-remove-dest" onclick="eliminarParada(this)" title="Eliminar parada">✕</button>'
+    + '</div>';
+
+  document.getElementById('route-addresses').appendChild(div);
+  actualizarBtnAgregar();
+}
+
+function eliminarParada(btn) {
+  btn.closest('.destino-row').remove();
+  renumerarDestinos();
+  actualizarBtnAgregar();
+}
+
+function renumerarDestinos() {
+  document.querySelectorAll('#route-addresses .destino-row').forEach(function(row, i) {
+    var lbl = row.querySelector('label');
+    if (lbl) lbl.textContent = '🏭 Destino ' + (i + 1) + ' (planta / gestor)';
+  });
+}
+
+function actualizarBtnAgregar() {
+  var n = document.querySelectorAll('#route-addresses .destino-row').length;
+  document.getElementById('btn-add-stop').disabled = n >= 4;
 }
 
 // ─── Sugerencias con debounce (Nominatim → <datalist>) ───────────────────────
@@ -522,7 +605,7 @@ async function fetchSugerencias(inputId, listId) {
       opt.value = item.display_name;
       list.appendChild(opt);
     });
-  } catch(e) { /* silencioso si no hay conexión */ }
+  } catch(e) {}
 }
 
 // ─── Geocodificar dirección → coordenadas (Nominatim) ────────────────────────
@@ -536,81 +619,107 @@ async function geocodificar(query) {
   return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
 }
 
-// ─── Calcular ruta con OSRM (motor de rutas OpenStreetMap) ───────────────────
+// ─── Calcular ruta (OSRM) — soporta multi-parada e ida y vuelta ──────────────
 async function calcularRuta() {
-  var origen  = document.getElementById('map-origin').value.trim();
-  var destino = document.getElementById('map-dest').value.trim();
-  if (!origen || !destino) {
-    alert('Por favor ingresa el punto de origen y el destino.');
-    return;
-  }
+  var origen = document.getElementById('map-origin').value.trim();
+  if (!origen) { alert('Ingresa el punto de origen.'); return; }
 
+  var destinos = [];
+  document.querySelectorAll('#route-addresses .destino-input').forEach(function(inp) {
+    var v = inp.value.trim();
+    if (v) destinos.push(v);
+  });
+  if (!destinos.length) { alert('Agrega al menos un destino.'); return; }
+
+  var roundtrip = document.getElementById('chk-roundtrip').checked;
   var btn = document.getElementById('btn-calcular-ruta');
   btn.textContent = '⏳ Calculando…';
   btn.disabled    = true;
 
   try {
-    // 1. Geocodificar ambas direcciones
-    var ptOrigen  = await geocodificar(origen);
-    var ptDestino = await geocodificar(destino);
-
-    // 2. Solicitar ruta a OSRM (motor libre basado en OpenStreetMap)
-    var osrmUrl = 'https://router.project-osrm.org/route/v1/driving/'
-      + ptOrigen.lng  + ',' + ptOrigen.lat  + ';'
-      + ptDestino.lng + ',' + ptDestino.lat
-      + '?overview=full&geometries=geojson';
-
-    var osrmRes  = await fetch(osrmUrl);
-    var osrmData = await osrmRes.json();
-
-    if (osrmData.code !== 'Ok' || !osrmData.routes.length) {
-      throw new Error('No se encontró ruta entre los puntos indicados.');
+    // 1. Geocodificar todos los puntos en orden
+    var allNames = [origen].concat(destinos);
+    var ptsGeo   = [];
+    for (var i = 0; i < allNames.length; i++) {
+      ptsGeo.push(await geocodificar(allNames[i]));
     }
 
-    var ruta    = osrmData.routes[0];
+    // 2. Construir cadena de coordenadas para OSRM
+    var coordStr = ptsGeo.map(function(p) { return p.lng + ',' + p.lat; }).join(';');
+
+    var ruta, ordenPts, ordenNames;
+
+    if (ptsGeo.length === 2 && !roundtrip) {
+      // Ruta simple A→B: endpoint /route
+      var res  = await fetch('https://router.project-osrm.org/route/v1/driving/'
+        + coordStr + '?overview=full&geometries=geojson');
+      var data = await res.json();
+      if (data.code !== 'Ok' || !data.routes.length)
+        throw new Error('No se encontró ruta entre los puntos indicados.');
+      ruta       = data.routes[0];
+      ordenPts   = ptsGeo;
+      ordenNames = allNames;
+    } else {
+      // Multi-parada o ida y vuelta: endpoint /trip (TSP solver — ruta óptima)
+      var destParam = roundtrip ? 'first' : 'any';
+      var res  = await fetch('https://router.project-osrm.org/trip/v1/driving/'
+        + coordStr
+        + '?roundtrip=' + roundtrip
+        + '&source=first&destination=' + destParam
+        + '&overview=full&geometries=geojson');
+      var data = await res.json();
+      if (data.code !== 'Ok' || !data.trips.length)
+        throw new Error('No se encontró ruta óptima entre los puntos indicados.');
+      ruta       = data.trips[0];
+      // Reconstruir orden óptimo: waypoints[inputIdx].waypoint_index = posición en el viaje
+      ordenPts   = new Array(ptsGeo.length);
+      ordenNames = new Array(ptsGeo.length);
+      data.waypoints.forEach(function(wp, inputIdx) {
+        ordenPts[wp.waypoint_index]   = ptsGeo[inputIdx];
+        ordenNames[wp.waypoint_index] = allNames[inputIdx];
+      });
+    }
+
+    // 3. Limpiar capas previas
+    _routeLayer.clearLayers();
+    _markersLayer.clearLayers();
+
+    // 4. Dibujar traza de la ruta
+    L.geoJSON(ruta.geometry, {
+      style: { color: '#059669', weight: 5, opacity: 0.85 }
+    }).addTo(_routeLayer);
+
+    // 5. Marcadores con letra y color por orden de recorrido
+    ordenPts.forEach(function(pt, i) {
+      if (!pt) return;
+      var color = STOP_COLORS[Math.min(i, STOP_COLORS.length - 1)];
+      var letra = STOP_LABELS[Math.min(i, STOP_LABELS.length - 1)];
+      L.marker([pt.lat, pt.lng], { icon: crearMarcador(letra, color) })
+        .addTo(_markersLayer)
+        .bindPopup('<b>' + letra + ':</b> ' + (ordenNames[i] || ''));
+    });
+
+    // 6. Ajustar vista a todos los puntos
+    _lmap.fitBounds(
+      L.latLngBounds(ptsGeo.map(function(p) { return [p.lat, p.lng]; })),
+      { padding: [40, 40] }
+    );
+
+    // 7. Mostrar resultado
     var distKm  = Math.round(ruta.distance / 1000);
     var durMin  = Math.round(ruta.duration / 60);
     var durText = durMin >= 60
       ? Math.floor(durMin / 60) + 'h ' + (durMin % 60) + ' min'
       : durMin + ' min';
+    var extras  = [];
+    if (destinos.length > 1) extras.push('ruta óptima · ' + destinos.length + ' destinos');
+    if (roundtrip)           extras.push('ida y vuelta');
 
-    // 3. Limpiar capas previas y dibujar nueva ruta
-    _routeLayer.clearLayers();
-    _markersLayer.clearLayers();
-
-    L.geoJSON(ruta.geometry, {
-      style: { color: '#059669', weight: 5, opacity: 0.85 }
-    }).addTo(_routeLayer);
-
-    // Marcadores origen (verde) y destino (rojo)
-    var mkOrigen = L.divIcon({
-      className: '',
-      html: '<div style="width:14px;height:14px;border-radius:50%;background:#059669;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4)"></div>',
-      iconSize: [14,14], iconAnchor: [7,7]
-    });
-    var mkDestino = L.divIcon({
-      className: '',
-      html: '<div style="width:14px;height:14px;border-radius:50%;background:#e74c3c;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4)"></div>',
-      iconSize: [14,14], iconAnchor: [7,7]
-    });
-
-    L.marker([ptOrigen.lat,  ptOrigen.lng],  { icon: mkOrigen  }).addTo(_markersLayer)
-      .bindPopup('<b>Origen:</b> ' + origen);
-    L.marker([ptDestino.lat, ptDestino.lng], { icon: mkDestino }).addTo(_markersLayer)
-      .bindPopup('<b>Destino:</b> ' + destino);
-
-    // 4. Ajustar vista al trayecto completo
-    _lmap.fitBounds(
-      L.latLngBounds([ptOrigen.lat, ptOrigen.lng], [ptDestino.lat, ptDestino.lng]),
-      { padding: [40, 40] }
-    );
-
-    // 5. Mostrar resultado en pantalla
-    document.getElementById('dist-label').textContent     = distKm + ' km';
+    document.getElementById('dist-label').textContent =
+      distKm + ' km' + (extras.length ? ' (' + extras.join(' · ') + ')' : '');
     document.getElementById('route-duration').textContent = '⏱ ' + durText;
     document.getElementById('route-result').style.display = 'block';
 
-    // 6. Inyectar distancia en el Simulador Pro
     inyectarDistancia(distKm);
 
   } catch(err) {
@@ -627,21 +736,23 @@ function inyectarDistancia(km) {
   var label  = document.getElementById('lbl-dist');
   if (!slider || !label) return;
 
-  var val = Math.max(5, Math.min(300, km));  // clamp al rango del slider
+  var val = Math.max(5, Math.min(1000, km));
   slider.value      = val;
   label.textContent = val;
 
-  verificarDatos();  // actualiza estado del botón Generar
+  verificarDatos();
 
-  // Si el dashboard ya está visible → recalcular automáticamente
   var dash = document.getElementById('dashboard-section');
   if (dash && !dash.classList.contains('hidden')) {
     generarDashboard();
   }
 }
 
-// Inicializar mapa cuando el DOM esté listo
-window.addEventListener('DOMContentLoaded', initMap);
+// Inicializar mapa + primera parada al cargar
+window.addEventListener('DOMContentLoaded', function() {
+  initMap();
+  agregarParada();
+});
 </script>
 
 <!-- ══════════════════════════════
