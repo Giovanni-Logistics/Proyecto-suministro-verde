@@ -8,9 +8,32 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>
     input[type=range] { accent-color: #059669; }
-    /* Tailwind preflight resets max-width on img — esto rompe los íconos de Leaflet */
-    .leaflet-container img { max-width: none; display: inline-block; }
     #dashboard-section { scroll-margin-top: 72px; }
+
+    /* ── Controles de ruta ── */
+    #route-controls { display:flex; flex-wrap:wrap; gap:.75rem; align-items:flex-end; }
+    #route-controls .route-field { flex:1; min-width:200px; }
+    #route-controls label { display:block; font-size:.72rem; font-weight:700; color:#64748b; margin-bottom:.25rem; }
+    #route-controls input[type=text] {
+      width:100%; border:1px solid #e2e8f0; border-radius:.5rem;
+      padding:.55rem .75rem; font-size:.875rem; outline:none; background:#f8fafc;
+      transition:border-color .2s, box-shadow .2s;
+    }
+    #route-controls input[type=text]:focus {
+      border-color:#059669; box-shadow:0 0 0 3px rgba(5,150,105,.15);
+    }
+    #btn-calcular-ruta {
+      background:#059669; color:#fff; border:none; border-radius:.5rem;
+      padding:.55rem 1.25rem; font-size:.875rem; font-weight:700;
+      cursor:pointer; white-space:nowrap; transition:background .2s;
+      flex-shrink:0; height:38px;
+    }
+    #btn-calcular-ruta:hover { background:#047857; }
+    #route-result {
+      display:none; background:#ecfdf5; border:1px solid #a7f3d0;
+      border-radius:.75rem; padding:.55rem 1rem;
+      font-size:.82rem; color:#065f46; font-weight:600;
+    }
 
     /* Estado del botón generar */
     #btn-generar { transition: all 0.35s ease; }
@@ -381,21 +404,58 @@
 </section>
 
 <!-- ══════════════════════════════
-     MAPA LEAFLET
+     SIMULADOR DE RUTA LOGÍSTICA
 ══════════════════════════════ -->
 <div class="max-w-6xl mx-auto w-full px-4 md:px-6 pb-8">
   <div class="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100 mt-2">
-    <div class="flex items-center gap-3 mb-1">
-      <span class="text-2xl">📍</span>
-      <h3 class="text-xl font-bold text-emerald-800">Red Satelital de Operaciones SGC</h3>
+
+    <!-- Cabecera -->
+    <div class="flex items-start gap-3 mb-4">
+      <span class="text-2xl">🗺️</span>
+      <div>
+        <h3 class="text-xl font-bold text-emerald-800">Simulador de Ruta Logística</h3>
+        <p class="text-sm text-slate-500 mt-0.5">
+          Ingresa origen y destino — la distancia calculada se inyecta automáticamente
+          en el slider <strong>Distancia al gestor</strong> del simulador.
+        </p>
+      </div>
     </div>
-    <p class="text-sm text-slate-500 mb-4">Monitoreo geográfico de puntos de acopio primario y plantas de valorización autorizadas — Región Metropolitana.</p>
-    <div id="map" class="w-full rounded-xl border border-slate-200 shadow-inner relative z-10" style="height:450px"></div>
-    <div class="flex flex-wrap gap-4 mt-4 text-xs font-semibold text-slate-600">
-      <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-full bg-emerald-600"></span>Centro de Acopio</span>
-      <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-full bg-cyan-600"></span>Planta de Valorización</span>
-      <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-full bg-slate-600"></span>Hub Logístico</span>
+
+    <!-- Controles de ruta -->
+    <div id="route-controls" class="mb-3">
+      <div class="route-field">
+        <label>📍 Punto de origen</label>
+        <input id="map-origin" type="text" list="sg-origen"
+          placeholder="Ej: Maipú, Santiago"
+          oninput="debSuggest('map-origin','sg-origen')"/>
+        <datalist id="sg-origen"></datalist>
+      </div>
+      <div class="route-field">
+        <label>🏭 Destino (planta / gestor autorizado)</label>
+        <input id="map-dest" type="text" list="sg-dest"
+          placeholder="Ej: San Bernardo, Santiago"
+          oninput="debSuggest('map-dest','sg-dest')"/>
+        <datalist id="sg-dest"></datalist>
+      </div>
+      <button id="btn-calcular-ruta" onclick="calcularRuta()">🧭 Calcular Ruta</button>
     </div>
+
+    <!-- Resultado inyectado -->
+    <div id="route-result" class="mb-3">
+      ✅ Ruta calculada:
+      <span id="dist-label" class="font-black">— km</span>
+      &nbsp;·&nbsp;
+      <span id="route-duration" class="font-normal text-emerald-700"></span>
+      &nbsp;·&nbsp; Distancia inyectada automáticamente en el Simulador Pro.
+    </div>
+
+    <!-- Contenedor del mapa -->
+    <div id="map" class="w-full rounded-xl border border-slate-200 shadow-inner" style="height:460px"></div>
+
+    <p class="text-xs text-slate-400 mt-3">
+      Tecnología: Leaflet · OpenStreetMap · OSRM · Nominatim — 100% gratuito, sin registro ni API key.
+    </p>
+
   </div>
 </div>
 
@@ -418,38 +478,170 @@
 </footer>
 
 <!-- ══════════════════════════════
-     LEAFLET JS
+     LEAFLET + OSRM + NOMINATIM
+     100% gratuito · sin registro
 ══════════════════════════════ -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-  var map = L.map('map', { scrollWheelZoom: false }).setView([-33.480, -70.660], 11);
+// ─── Variables globales ───────────────────────────────────────────────────────
+var _lmap, _routeLayer, _markersLayer;
+
+// ─── Inicializar mapa Leaflet ─────────────────────────────────────────────────
+function initMap() {
+  _lmap = L.map('map', { scrollWheelZoom: false }).setView([-33.480, -70.660], 11);
+
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 18
-  }).addTo(map);
+  }).addTo(_lmap);
 
-  var iconAcopio = L.divIcon({
-    className: '',
-    html: '<div style="width:16px;height:16px;border-radius:50%;background:#059669;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>',
-    iconSize: [16,16], iconAnchor: [8,8], popupAnchor: [0,-10]
-  });
-  var iconPlanta = L.divIcon({
-    className: '',
-    html: '<div style="width:16px;height:16px;border-radius:50%;background:#0891b2;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>',
-    iconSize: [16,16], iconAnchor: [8,8], popupAnchor: [0,-10]
-  });
-  var iconHub = L.divIcon({
-    className: '',
-    html: '<div style="width:16px;height:16px;border-radius:50%;background:#475569;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>',
-    iconSize: [16,16], iconAnchor: [8,8], popupAnchor: [0,-10]
-  });
+  _routeLayer   = L.layerGroup().addTo(_lmap);
+  _markersLayer = L.layerGroup().addTo(_lmap);
+}
 
-  L.marker([-33.502,-70.655], { icon:iconAcopio }).addTo(map)
-    .bindPopup('<strong style="color:#047857">Centro de Acopio San Miguel</strong><br><span style="font-size:12px;color:#475569">Material prioritario: Envases, Embalajes y Plásticos PET.</span>');
-  L.marker([-33.585,-70.702], { icon:iconPlanta }).addTo(map)
-    .bindPopup('<strong style="color:#0891b2">Planta de Compactación San Bernardo</strong><br><span style="font-size:12px;color:#475569">Operación: Generación de fardos de alta densidad para recicladoras nacionales.</span>');
-  L.marker([-33.435,-70.778], { icon:iconHub }).addTo(map)
-    .bindPopup('<strong style="color:#334155">Nodo Logístico Pudahuel</strong><br><span style="font-size:12px;color:#475569">Centro de consolidación de rutas de retorno vacío (Backhauling).</span>');
+// ─── Sugerencias con debounce (Nominatim → <datalist>) ───────────────────────
+var _debTimers = {};
+function debSuggest(inputId, listId) {
+  clearTimeout(_debTimers[inputId]);
+  _debTimers[inputId] = setTimeout(function() { fetchSugerencias(inputId, listId); }, 350);
+}
+
+async function fetchSugerencias(inputId, listId) {
+  var q = document.getElementById(inputId).value.trim();
+  if (q.length < 3) return;
+  try {
+    var url = 'https://nominatim.openstreetmap.org/search'
+      + '?q=' + encodeURIComponent(q)
+      + '&countrycodes=cl&format=json&limit=5&accept-language=es';
+    var res  = await fetch(url);
+    var data = await res.json();
+    var list = document.getElementById(listId);
+    list.innerHTML = '';
+    data.forEach(function(item) {
+      var opt   = document.createElement('option');
+      opt.value = item.display_name;
+      list.appendChild(opt);
+    });
+  } catch(e) { /* silencioso si no hay conexión */ }
+}
+
+// ─── Geocodificar dirección → coordenadas (Nominatim) ────────────────────────
+async function geocodificar(query) {
+  var url = 'https://nominatim.openstreetmap.org/search'
+    + '?q=' + encodeURIComponent(query)
+    + '&countrycodes=cl&format=json&limit=1&accept-language=es';
+  var res  = await fetch(url);
+  var data = await res.json();
+  if (!data.length) throw new Error('Dirección no encontrada: "' + query + '"');
+  return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+}
+
+// ─── Calcular ruta con OSRM (motor de rutas OpenStreetMap) ───────────────────
+async function calcularRuta() {
+  var origen  = document.getElementById('map-origin').value.trim();
+  var destino = document.getElementById('map-dest').value.trim();
+  if (!origen || !destino) {
+    alert('Por favor ingresa el punto de origen y el destino.');
+    return;
+  }
+
+  var btn = document.getElementById('btn-calcular-ruta');
+  btn.textContent = '⏳ Calculando…';
+  btn.disabled    = true;
+
+  try {
+    // 1. Geocodificar ambas direcciones
+    var ptOrigen  = await geocodificar(origen);
+    var ptDestino = await geocodificar(destino);
+
+    // 2. Solicitar ruta a OSRM (motor libre basado en OpenStreetMap)
+    var osrmUrl = 'https://router.project-osrm.org/route/v1/driving/'
+      + ptOrigen.lng  + ',' + ptOrigen.lat  + ';'
+      + ptDestino.lng + ',' + ptDestino.lat
+      + '?overview=full&geometries=geojson';
+
+    var osrmRes  = await fetch(osrmUrl);
+    var osrmData = await osrmRes.json();
+
+    if (osrmData.code !== 'Ok' || !osrmData.routes.length) {
+      throw new Error('No se encontró ruta entre los puntos indicados.');
+    }
+
+    var ruta    = osrmData.routes[0];
+    var distKm  = Math.round(ruta.distance / 1000);
+    var durMin  = Math.round(ruta.duration / 60);
+    var durText = durMin >= 60
+      ? Math.floor(durMin / 60) + 'h ' + (durMin % 60) + ' min'
+      : durMin + ' min';
+
+    // 3. Limpiar capas previas y dibujar nueva ruta
+    _routeLayer.clearLayers();
+    _markersLayer.clearLayers();
+
+    L.geoJSON(ruta.geometry, {
+      style: { color: '#059669', weight: 5, opacity: 0.85 }
+    }).addTo(_routeLayer);
+
+    // Marcadores origen (verde) y destino (rojo)
+    var mkOrigen = L.divIcon({
+      className: '',
+      html: '<div style="width:14px;height:14px;border-radius:50%;background:#059669;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4)"></div>',
+      iconSize: [14,14], iconAnchor: [7,7]
+    });
+    var mkDestino = L.divIcon({
+      className: '',
+      html: '<div style="width:14px;height:14px;border-radius:50%;background:#e74c3c;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4)"></div>',
+      iconSize: [14,14], iconAnchor: [7,7]
+    });
+
+    L.marker([ptOrigen.lat,  ptOrigen.lng],  { icon: mkOrigen  }).addTo(_markersLayer)
+      .bindPopup('<b>Origen:</b> ' + origen);
+    L.marker([ptDestino.lat, ptDestino.lng], { icon: mkDestino }).addTo(_markersLayer)
+      .bindPopup('<b>Destino:</b> ' + destino);
+
+    // 4. Ajustar vista al trayecto completo
+    _lmap.fitBounds(
+      L.latLngBounds([ptOrigen.lat, ptOrigen.lng], [ptDestino.lat, ptDestino.lng]),
+      { padding: [40, 40] }
+    );
+
+    // 5. Mostrar resultado en pantalla
+    document.getElementById('dist-label').textContent     = distKm + ' km';
+    document.getElementById('route-duration').textContent = '⏱ ' + durText;
+    document.getElementById('route-result').style.display = 'block';
+
+    // 6. Inyectar distancia en el Simulador Pro
+    inyectarDistancia(distKm);
+
+  } catch(err) {
+    alert('Error: ' + err.message);
+  } finally {
+    btn.textContent = '🧭 Calcular Ruta';
+    btn.disabled    = false;
+  }
+}
+
+// ─── Inyectar km en v-dist y disparar recálculo del simulador ────────────────
+function inyectarDistancia(km) {
+  var slider = document.getElementById('v-dist');
+  var label  = document.getElementById('lbl-dist');
+  if (!slider || !label) return;
+
+  var val = Math.max(5, Math.min(300, km));  // clamp al rango del slider
+  slider.value      = val;
+  label.textContent = val;
+
+  verificarDatos();  // actualiza estado del botón Generar
+
+  // Si el dashboard ya está visible → recalcular automáticamente
+  var dash = document.getElementById('dashboard-section');
+  if (dash && !dash.classList.contains('hidden')) {
+    generarDashboard();
+  }
+}
+
+// Inicializar mapa cuando el DOM esté listo
+window.addEventListener('DOMContentLoaded', initMap);
 </script>
 
 <!-- ══════════════════════════════
