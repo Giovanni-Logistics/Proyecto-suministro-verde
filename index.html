@@ -274,17 +274,6 @@
           <div class="flex justify-between text-xs text-slate-400 mt-0.5"><span>800</span><span>2.500 CLP/L</span></div>
         </div>
 
-        <!-- Precio material valorizable -->
-        <div>
-          <div class="flex justify-between mb-1">
-            <label class="text-xs font-semibold text-slate-500">🏭 Precio material valorizable</label>
-            <span class="text-xs font-black text-slate-700"><span id="lbl-material">85.000</span> CLP/t</span>
-          </div>
-          <input type="range" id="v-material" min="0" max="200000" value="85000" step="5000" class="w-full"
-            oninput="document.getElementById('lbl-material').textContent=parseInt(this.value).toLocaleString('es-CL'); verificarDatos()"/>
-          <div class="flex justify-between text-xs text-slate-400 mt-0.5"><span>0</span><span>200.000 CLP/t</span></div>
-        </div>
-
         <!-- Rendimiento de flota -->
         <div>
           <div class="flex justify-between mb-1">
@@ -484,13 +473,15 @@
 ══════════════════════════════ -->
 <script>
 // ─── Datos base ────────────────────────────────────────────────────────────────
+// precioMercado = precio de venta en mercado secundario (CLP/ton)
+// Envases: mezcla cartón ($60/kg) + PET ($200/kg) → promedio ~$120.000/t
 var tarifas = {
-  envases:      { reco:18000, trans:12000, val:22000, co2:0.8  },
-  neumaticos:   { reco:25000, trans:18000, val:30000, co2:1.4  },
-  pilas:        { reco:35000, trans:20000, val:45000, co2:0.4  },
-  raee:         { reco:40000, trans:25000, val:50000, co2:1.1  },
-  aceites:      { reco:22000, trans:15000, val:28000, co2:0.9  },
-  medicamentos: { reco:38000, trans:22000, val:48000, co2:0.3  },
+  envases:      { reco:18000, trans:12000, val:22000, co2:0.8,  precioMercado:120000 },
+  neumaticos:   { reco:25000, trans:18000, val:30000, co2:1.4,  precioMercado:30000  },
+  pilas:        { reco:35000, trans:20000, val:45000, co2:0.4,  precioMercado:180000 },
+  raee:         { reco:40000, trans:25000, val:50000, co2:1.1,  precioMercado:120000 },
+  aceites:      { reco:22000, trans:15000, val:28000, co2:0.9,  precioMercado:40000  },
+  medicamentos: { reco:38000, trans:22000, val:48000, co2:0.3,  precioMercado:15000  },
 };
 
 var PRODUCTOS = [
@@ -562,7 +553,6 @@ function generarDashboard() {
 
   // Leer variables operativas Pro
   var diesel    = parseFloat(document.getElementById('v-diesel').value);
-  var matPrice  = parseFloat(document.getElementById('v-material').value);
   var rendim    = parseFloat(document.getElementById('v-rendim').value);
   var distancia = parseFloat(document.getElementById('v-dist').value);
   var freq      = parseInt(document.getElementById('v-freq').value);    // retiros/año
@@ -573,7 +563,7 @@ function generarDashboard() {
   var freqEfic = { 12:1, 4:0.9, 2:0.85 }[freq] || 1;
 
   // ── calculateEcoTicket: acumular costos por producto ──────────────────────
-  var costoReco = 0, costoTransBase = 0, costoVal = 0, co2Total = 0;
+  var costoReco = 0, costoTransBase = 0, costoVal = 0, co2Total = 0, ingresoTotal = 0;
   var productosActivos = [];
 
   PRODUCTOS.forEach(function(p) {
@@ -590,6 +580,8 @@ function generarDashboard() {
     costoTransBase += tval * t.trans * regMult * freqEfic;
     costoVal       += tval * t.val   * regMult;
     co2Total       += tval * calidad * t.co2;
+    // Ingreso por venta de materiales en mercado secundario
+    ingresoTotal   += tval * calidad * t.precioMercado;
 
     productosActivos.push({ id:p.id, label:p.label, icon:p.icon, tons:tons, tval:tval });
   });
@@ -602,8 +594,8 @@ function generarDashboard() {
   var costoTrans = costoTransBase + costosDiesel;
   var costoTotal = costoReco + costoTrans + costoVal;
 
-  // Ingresos y balance
-  var ingresoVal   = tonsUtil * matPrice;
+  // Ingresos por venta en mercado secundario (monetización de residuos y economía circular)
+  var ingresoVal   = ingresoTotal;
   var rentabilidad = ingresoVal - costoTotal;
 
   // ROI / Payback en meses
@@ -615,8 +607,13 @@ function generarDashboard() {
   var demMensual = tonsVal / 12;
   var saturacion = Math.min(100, (demMensual / Math.max(0.1, capMensual)) * 100);
 
-  // Multas Art. 48 (meta mínima orientativa: 20%)
-  var multaRiesgo = meta < 0.20 ? (0.20 - meta) * tonsTotal * 195000 : 0;
+  // Multas Art. 48 (Ley 20.920): el incumplimiento de la meta de recolección genera multas SMA.
+  // Si tonsVal = 0 → riesgo máximo. A medida que recolectan y venden, el riesgo baja a $0.
+  var tonsObjetivo = tonsTotal * 0.20;          // meta mínima legal (~20% declarado)
+  var multaMaxima  = tonsObjetivo * 195000;      // multa si recolectan 0 toneladas
+  var multaRiesgo  = tonsVal < tonsObjetivo
+    ? Math.max(0, tonsObjetivo - tonsVal) * 195000
+    : 0;
 
   var costoPorTon = costoTotal / Math.max(1, tonsVal);
 
@@ -645,7 +642,6 @@ function generarDashboard() {
   };
 
   function cRent() {
-    if (!matPrice) return 'ambar';
     return rentabilidad >= 0 ? 'verde' : 'rojo';
   }
   function cSat()   { return saturacion > 80 ? 'rojo' : saturacion > 50 ? 'ambar' : 'verde'; }
@@ -654,10 +650,12 @@ function generarDashboard() {
 
   var kpis = [
     {
-      icon:'💰', titulo:'Rentabilidad Neta', color:cRent(),
+      icon:'💰', titulo:'Rentabilidad Operativa Neta', color:cRent(),
       valor:  clp(rentabilidad),
-      detalle: !matPrice ? 'Ingrese precio de material' : (rentabilidad >= 0 ? 'Operación rentable' : 'Déficit operacional'),
-      sub:    'Ingreso estimado: ' + clp(ingresoVal),
+      detalle: rentabilidad >= 0
+        ? 'Venta de materiales cubre el OPEX logístico'
+        : 'OPEX logístico supera los ingresos por venta',
+      sub:    'Ingresos por venta de materiales: ' + clp(ingresoVal),
     },
     {
       icon:'🚛', titulo:'Saturación de Flota', color:cSat(),
@@ -679,11 +677,11 @@ function generarDashboard() {
     },
     {
       icon:'⚖️', titulo:'Riesgo Multas Art. 48', color:cMulta(),
-      valor:  multaRiesgo > 0 ? clp(multaRiesgo) : 'Sin riesgo',
+      valor:  multaRiesgo > 0 ? clp(multaRiesgo) : 'Multa evitada',
       detalle: multaRiesgo > 0
-        ? 'Meta ' + (meta*100).toFixed(0) + '% < mínimo legal 20%'
-        : 'Meta ' + (meta*100).toFixed(0) + '% cumple la norma',
-      sub:    'Proyección de multas SMA',
+        ? 'Brecha de ' + (tonsObjetivo - tonsVal).toFixed(1) + ' t bajo meta SMA'
+        : 'Recolección y venta cubre la meta legal — $0 riesgo',
+      sub:    'Multa máx. posible: ' + clp(multaMaxima),
     },
     {
       icon:'💵', titulo:'Costo por Tonelada', color:'gris',
@@ -728,7 +726,7 @@ function generarDashboard() {
     { lbl:'— incluye costo de diésel',  val:costosDiesel, bold:false, tipo:'sub'   },
     { lbl:'Proceso de valorización',    val:costoVal,     bold:false, tipo:'costo' },
     { lbl:'Total costos operativos',    val:costoTotal,   bold:true,  tipo:'total' },
-    { lbl:'Ingreso por valorización',   val:ingresoVal,   bold:true,  tipo:'ingreso'},
+    { lbl:'Ingreso por venta de materiales (mercado secundario)', val:ingresoVal, bold:true, tipo:'ingreso'},
     { lbl:'Resultado neto anual',       val:rentabilidad, bold:true,  tipo:'neto'  },
   ];
 
