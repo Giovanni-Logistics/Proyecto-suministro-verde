@@ -178,7 +178,6 @@
     <li><a href="productores.html">Productores</a></li>
     <li><a href="transportistas.html">Transportistas</a></li>
     <li><a href="simulador.html">Simulador</a></li>
-    <li><a href="dashboard.html" class="active">Dashboard</a></li>
   </ul>
   <div class="nav-right">
     <span class="nav-badge-live">● EN VIVO</span>
@@ -201,38 +200,6 @@
 
 <!-- ── DASHBOARD GRID ── -->
 <div class="dash">
-
-  <!-- KPI 1 -->
-  <div class="card">
-    <div class="card-title">♻️ Retiros completados</div>
-    <div class="kpi-val" id="kpi-retiros">—</div>
-    <div class="kpi-sub">operaciones en el período</div>
-    <div class="kpi-delta up" id="delta-retiros">—</div>
-  </div>
-
-  <!-- KPI 2 -->
-  <div class="card">
-    <div class="card-title">⚖️ Toneladas valorizadas</div>
-    <div class="kpi-val" id="kpi-tons">—</div>
-    <div class="kpi-sub">residuos gestionados</div>
-    <div class="kpi-delta up" id="delta-tons">—</div>
-  </div>
-
-  <!-- KPI 3 -->
-  <div class="card">
-    <div class="card-title">🌿 CO₂e mitigado</div>
-    <div class="kpi-val" id="kpi-co2">—</div>
-    <div class="kpi-sub">toneladas equivalentes</div>
-    <div class="kpi-delta flat" id="delta-co2">Estimado</div>
-  </div>
-
-  <!-- KPI 4 -->
-  <div class="card">
-    <div class="card-title">📊 Cumplimiento REP</div>
-    <div class="kpi-val" id="kpi-cumpl">—</div>
-    <div class="kpi-sub">productores con meta activa</div>
-    <div class="kpi-delta up" id="delta-cumpl">—</div>
-  </div>
 
   <!-- METAS POR CATEGORÍA -->
   <div class="card span2">
@@ -291,10 +258,6 @@
   // Datos representativos (estructura real, valores de ejemplo)
   const datos = {
     mes: {
-      retiros: 38, retirosDelta: '+12% vs mes anterior',
-      tons: '94.2 t', tonsDelta: '+8% vs mes anterior',
-      co2: '82.4 tCO₂e',
-      cumpl: '87%', cumplDelta: 'de productores activos',
       categorias: [
         { nom:'Envases y embalajes', pct:72, color:'#2d7a4f' },
         { nom:'Neumáticos',          pct:55, color:'#f0a500' },
@@ -317,10 +280,6 @@
       ],
     },
     trimestre: {
-      retiros: 114, retirosDelta: '+9% vs trimestre anterior',
-      tons: '281.6 t', tonsDelta: '+6% vs trimestre anterior',
-      co2: '246.1 tCO₂e',
-      cumpl: '83%', cumplDelta: 'de productores activos',
       categorias: [
         { nom:'Envases y embalajes', pct:68, color:'#2d7a4f' },
         { nom:'Neumáticos',          pct:51, color:'#f0a500' },
@@ -343,10 +302,6 @@
       ],
     },
     anio: {
-      retiros: 421, retirosDelta: 'acumulado año en curso',
-      tons: '1.04 kt', tonsDelta: 'acumulado año en curso',
-      co2: '910 tCO₂e',
-      cumpl: '79%', cumplDelta: 'de productores activos',
       categorias: [
         { nom:'Envases y embalajes', pct:61, color:'#2d7a4f' },
         { nom:'Neumáticos',          pct:47, color:'#f0a500' },
@@ -381,15 +336,6 @@
 
   function renderDash() {
     const d = datos[filtroActual];
-
-    // KPIs
-    document.getElementById('kpi-retiros').textContent = d.retiros;
-    document.getElementById('delta-retiros').textContent = d.retirosDelta;
-    document.getElementById('kpi-tons').textContent = d.tons;
-    document.getElementById('delta-tons').textContent = d.tonsDelta;
-    document.getElementById('kpi-co2').textContent = d.co2;
-    document.getElementById('kpi-cumpl').textContent = d.cumpl;
-    document.getElementById('delta-cumpl').textContent = d.cumplDelta;
 
     // Metas por categoría
     document.getElementById('metas-categorias').innerHTML =
