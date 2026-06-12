@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Simulador de Ruta & Variables Pro — Damu SGC</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- ══════════════════════════════════════════════════════════
+       Stack GIS open-source — 100% gratuito, sin API key
+       Leaflet 1.9.4 · Leaflet Routing Machine 3.2.12 · Nominatim
+  ══════════════════════════════════════════════════════════ -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
+
+  <style>
+    input[type=range] { accent-color: #059669; }
+
+    /* ── Leaflet: evitar conflicto con Tailwind img max-width ── */
+    #map img { max-width: none !important; }
+
+    /* ── Leaflet: fijar z-index bajo el nav sticky (z-50 = 50) ── */
+    .leaflet-top,
+    .leaflet-bottom { z-index: 10 !important; }
+
+    /* ── Ocultar el panel de giro-a-giro; usamos nuestra propia barra ── */
+    .leaflet-routing-container { display: none !important; }
+
+    /* ── Altura fija para que Leaflet pueda renderizar ── */
+    #map { height: 440px; min-height: 300px; }
+
+    .bar-fill { transition: width 0.6s ease; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
+
+<!-- ══════════════════════════════ NAV ══════════════════════════════ -->
+<nav class="bg-slate-900 sticky top-0 z-50 flex items-center justify-between px-8 h-16 shadow-xl">
+  <a href="../index.html" class="flex items-center gap-3 no-underline">
+    <div class="w-9 h-9 rounded-full bg-emerald-600 flex items-center justify-center font-black text-white text-lg">D</div>
+    <div>
+      <span class="text-white font-bold text-base leading-none">Damu SGC</span>
+      <span class="block text-emerald-400 text-xs leading-none mt-0.5">Trazabilidad Ley REP</span>
+    </div>
+  </a>
+  <ul class="hidden md:flex items-center gap-1 list-none">
+    <li><a href="../index.html" class="text-slate-300 hover:text-white hover:bg-slate-700 px-3 py-1.5 rounded-md text-sm transition-colors">Inicio</a></li>
+    <li><a href="../auth/portal.html" class="text-slate-300 hover:text-white hover:bg-slate-700 px-3 py-1.5 rounded-md text-sm transition-colors">Portal</a></li>
+    <li class="relative group">
+      <button class="text-slate-300 hover:text-white hover:bg-slate-700 px-3 py-1.5 rounded-md text-sm transition-colors flex items-center gap-1.5 bg-transparent border-0 cursor-pointer">
+        Fichas Comerciales
+        <svg class="w-3.5 h-3.5 transition-transform duration-200 group-hover:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+      </button>
+      <div class="absolute top-[calc(100%+6px)] left-0 w-52 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 origin-top scale-95 group-hover:scale-100 z-50 py-1.5">
+        <a href="../pages/productores.html"    class="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700/60 rounded-lg mx-1 transition-colors"><span>🏭</span> Productores</a>
+        <a href="../pages/transportistas.html" class="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700/60 rounded-lg mx-1 transition-colors"><span>🚛</span> Transportistas</a>
+      </div>
+    </li>
+    <!-- Herramientas — ACTIVO -->
+    <li class="relative group">
+      <button class="text-white bg-slate-700 px-3 py-1.5 rounded-md text-sm font-semibold flex items-center gap-1.5 border-0 cursor-pointer">
+        Herramientas
+        <svg class="w-3.5 h-3.5 transition-transform duration-200 group-hover:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+      </button>
+      <div class="absolute top-[calc(100%+6px)] left-0 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 origin-top scale-95 group-hover:scale-100 z-50 py-1.5">
+        <a href="calculadora-rep.html" class="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700/60 rounded-lg mx-1 transition-colors"><span>🧾</span> Calculadora Eco-Ticket</a>
+        <a href="dashboard-kpi.html"   class="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700/60 rounded-lg mx-1 transition-colors"><span>📊</span> Dashboard KPI</a>
+        <a href="simulador-ruta.html"  class="flex items-center gap-2.5 px-4 py-2.5 text-sm text-emerald-400 bg-slate-700/50 rounded-lg mx-1 font-semibold"><span>🗺️</span> Simulador de Ruta</a>
+      </div>
+    </li>
+  </ul>
+  <a href="../index.html" class="text-emerald-400 hover:text-white text-xs font-semibold border border-emerald-800 hover:border-slate-600 px-3 py-1.5 rounded-lg transition-colors no-underline">← Volver</a>
+</nav>
+
+<!-- ══════════════════════════════ HERO ══════════════════════════════ -->
+<header class="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 text-white py-8 px-8">
+  <div class="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <span class="inline-block bg-white/10 border border-white/20 text-emerald-200 text-xs font-bold px-3 py-1 rounded-full mb-3">🗺️ Simulador de Ruta + Variables Pro</span>
+      <h1 class="text-2xl md:text-3xl font-black leading-tight mb-2">Planificación de Ruta Logística</h1>
+      <p class="text-slate-400 text-sm max-w-xl">Traza la ruta al centro de valorización y los kilómetros se inyectan automáticamente en el simulador de costos operativos.</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <span class="bg-white/10 border border-white/20 text-white/80 text-xs px-3 py-1 rounded-full">🌍 OpenStreetMap</span>
+      <span class="bg-white/10 border border-white/20 text-white/80 text-xs px-3 py-1 rounded-full">🧭 OSRM routing</span>
+      <span class="bg-white/10 border border-white/20 text-white/80 text-xs px-3 py-1 rounded-full">🔍 Nominatim geocoder</span>
+      <span class="bg-emerald-700/60 border border-emerald-600 text-emerald-200 text-xs px-3 py-1 rounded-full font-semibold">✓ 100% gratuito</span>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════════════════════════ MAIN ══════════════════════════════ -->
+<main class="max-w-5xl mx-auto w-full px-4 py-8 flex-1 space-y-8">
+
+  <!-- ─── MAPA + CONTROLES DE RUTA ─────────────────────────────── -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-slate-800 to-slate-700 px-5 py-4">
+      <h2 class="text-white font-bold text-sm flex items-center gap-2">
+        <span>🗺️</span> Calculadora de Ruta — OpenStreetMap · OSRM · Nominatim
+      </h2>
+      <p class="text-slate-400 text-xs mt-0.5">La distancia calculada se inyecta automáticamente en el simulador de variables</p>
+    </div>
+
+    <div class="p-5">
+
+      <!-- Inputs origen / destino con autocompletado Nominatim -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1.5">📍 Punto de origen</label>
+          <input id="map-origin" type="text" list="sg-origin" autocomplete="off"
+            placeholder="Ej: Maipú, Santiago"
+            oninput="debSuggest('map-origin','sg-origin')"
+            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"/>
+          <datalist id="sg-origin"></datalist>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1.5">🏭 Centro de valorización (destino)</label>
+          <input id="map-dest" type="text" list="sg-dest" autocomplete="off"
+            placeholder="Ej: San Bernardo, Santiago"
+            oninput="debSuggest('map-dest','sg-dest')"
+            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"/>
+          <datalist id="sg-dest"></datalist>
+        </div>
+      </div>
+
+      <!-- Paradas adicionales (inyectadas por JS) -->
+      <div id="waypoints-container" class="space-y-2 mb-3"></div>
+      <button onclick="agregarParada()" id="btn-add-waypoint"
+        class="text-xs text-emerald-700 font-semibold border border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50 px-3 py-1.5 rounded-lg transition-colors mb-3 disabled:opacity-40 disabled:cursor-not-allowed">
+        ＋ Agregar parada intermedia
+      </button>
+
+      <!-- Acciones -->
+      <div class="flex flex-wrap gap-3 mb-4">
+        <button onclick="calcularRuta()" id="btn-calcular"
+          class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+          🧭 Calcular Ruta
+        </button>
+        <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+          <input type="checkbox" id="chk-roundtrip" class="accent-emerald-600 w-4 h-4"/> Ida y vuelta
+        </label>
+      </div>
+
+      <!-- Barra de resultado (oculta hasta calcular) -->
+      <div id="route-result"
+        class="hidden mb-4 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-4 text-sm">
+        <span class="text-emerald-600 font-semibold">✅ Ruta calculada:</span>
+        <span class="font-black text-emerald-800" id="dist-label">— km</span>
+        <span class="text-slate-500" id="route-duration"></span>
+        <span class="text-xs text-emerald-600 ml-auto">↓ Distancia inyectada en Variables Pro</span>
+      </div>
+
+      <!-- Mapa Leaflet — Leaflet renderiza aquí; no poner contenido hijo -->
+      <div id="map" class="w-full rounded-xl border border-slate-200 overflow-hidden"></div>
+
+      <p class="text-xs text-slate-400 mt-2">
+        Datos cartográficos: © <a href="https://www.openstreetmap.org/copyright" target="_blank" class="underline">OpenStreetMap</a> contributors · Ruteo: OSRM · Geocodificación: Nominatim
+      </p>
+
+    </div>
+  </div>
+
+  <!-- ─── VARIABLES OPERATIVAS PRO ─────────────────────────────── -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-emerald-700 to-emerald-600 px-5 py-4">
+      <h2 class="text-white font-bold text-sm flex items-center gap-2"><span>🧮</span> Variables Operativas Pro</h2>
+      <p class="text-emerald-200 text-xs mt-0.5">Parámetros logísticos y financieros — la distancia se pre-carga desde el mapa</p>
+    </div>
+
+    <div class="p-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+
+        <!-- Precio diésel -->
+        <div>
+          <div class="flex justify-between mb-1.5">
+            <label class="text-xs font-bold text-slate-500">⛽ Precio diésel (CLP/L)</label>
+            <span class="text-xs font-black text-slate-700"><span id="lbl-diesel">1.200</span> CLP/L</span>
+          </div>
+          <input type="range" id="v-diesel" min="800" max="2500" value="1200" step="50" class="w-full"
+            oninput="document.getElementById('lbl-diesel').textContent=parseInt(this.value).toLocaleString('es-CL'); recalc()"/>
+          <div class="flex justify-between text-xs text-slate-400 mt-0.5"><span>$800</span><span>$2.500 /L</span></div>
+        </div>
+
+        <!-- Rendimiento -->
+        <div>
+          <div class="flex justify-between mb-1.5">
+            <label class="text-xs font-bold text-slate-500">🛢️ Rendimiento de flota</label>
+            <span class="text-xs font-black text-slate-700"><span id="lbl-rendim">12</span> km/L</span>
+          </div>
+          <input type="range" id="v-rendim" min="5" max="20" value="12" step="0.5" class="w-full"
+            oninput="document.getElementById('lbl-rendim').textContent=parseFloat(this.value).toFixed(1); recalc()"/>
+          <div class="flex justify-between text-xs text-slate-400 mt-0.5"><span>5 km/L</span><span>20 km/L</span></div>
+        </div>
+
+        <!-- Distancia — auto-inyectada desde el mapa -->
+        <div>
+          <div class="flex justify-between mb-1.5">
+            <label class="text-xs font-bold text-slate-500">📏 Distancia al gestor</label>
+            <span class="text-xs font-black text-emerald-600">
+              <span id="lbl-dist">40</span> km
+              <span id="dist-auto-badge"
+                class="hidden text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full ml-1 font-bold">✓ Mapa</span>
+            </span>
+          </div>
+          <input type="range" id="v-dist" min="5" max="1000" value="40" class="w-full"
+            oninput="document.getElementById('lbl-dist').textContent=this.value;
+                     document.getElementById('dist-auto-badge').classList.add('hidden');
+                     recalc()"/>
+          <div class="flex justify-between text-xs text-slate-400 mt-0.5"><span>5 km</span><span>1.000 km</span></div>
+        </div>
+
+        <!-- Frecuencia de retiro -->
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1.5">🔄 Frecuencia de retiro</label>
+          <select id="v-freq" onchange="recalc()"
+            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+            <option value="12">Mensual (12 retiros/año)</option>
+            <option value="4">Trimestral (4 retiros/año)</option>
+            <option value="2">Semestral (2 retiros/año)</option>
+          </select>
+        </div>
+
+        <!-- Inversión inicial -->
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1.5">💼 Inversión inicial (CLP)</label>
+          <input type="number" id="v-inversion" placeholder="Ej: 5000000" min="0" oninput="recalc()"
+            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"/>
+          <p class="text-xs text-slate-400 mt-1">Para cálculo de payback</p>
+        </div>
+
+        <!-- Calidad del material -->
+        <div>
+          <div class="flex justify-between mb-1.5">
+            <label class="text-xs font-bold text-slate-500">♻️ Calidad del material</label>
+            <span class="text-xs font-black text-slate-700"><span id="lbl-calidad">70</span>%</span>
+          </div>
+          <input type="range" id="v-calidad" min="20" max="100" value="70" class="w-full"
+            oninput="document.getElementById('lbl-calidad').textContent=this.value; recalc()"/>
+          <div class="flex justify-between text-xs text-slate-400 mt-0.5"><span>20%</span><span>100%</span></div>
+        </div>
+
+      </div>
+
+      <button onclick="recalc()"
+        class="mt-6 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm px-6 py-3 rounded-xl transition-colors">
+        ⚡ Calcular proyección operativa
+      </button>
+    </div>
+  </div>
+
+  <!-- ─── RESULTADOS ───────────────────────────────────────────── -->
+  <div id="results-section" class="hidden space-y-6">
+
+    <h2 class="text-lg font-black text-slate-700">Proyección de Costos Operativos</h2>
+    <div id="res-grid" class="grid grid-cols-2 md:grid-cols-3 gap-4"></div>
+
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+      <h3 class="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2"><span>📊</span> Desglose de costo anual</h3>
+      <div id="res-bars" class="space-y-3"></div>
+    </div>
+
+    <div class="bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-4 text-xs text-emerald-700">
+      ⚠ Proyección referencial. Los costos reales dependen de condiciones específicas del operador y los precios de combustible vigentes.
+    </div>
+
+  </div>
+
+</main>
+
+<!-- ══════════════════════════════ FOOTER ══════════════════════════════ -->
+<footer class="bg-slate-900 text-slate-400 text-xs py-5 border-t border-slate-800 mt-auto">
+  <div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-3">
+    <p><strong class="text-white">Damu SGC</strong> — Trazabilidad Ley REP · Chile</p>
+    <div class="flex gap-4 flex-wrap justify-center">
+      <a href="../auth/portal.html"          class="hover:text-white transition-colors">Portal</a>
+      <a href="../pages/productores.html"    class="hover:text-white transition-colors">Productores</a>
+      <a href="../pages/transportistas.html" class="hover:text-white transition-colors">Transportistas</a>
+    </div>
+    <p class="text-slate-600">© 2026 Damu SGC</p>
+  </div>
+</footer>
+
+<!-- ══════════════════════════════════════════════════════════
+     STACK GIS OPEN-SOURCE
+     Leaflet 1.9.4 · Leaflet Routing Machine 3.2.12 · Nominatim
+     Sin API key · Sin costo · Sin registro
+══════════════════════════════════════════════════════════ -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
+<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.min.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// GLOBALS
+// ═══════════════════════════════════════════════════════════════════════════
+var _map            = null;
+var _routingControl = null;
+var _waypointCount  = 0;
+var _debTimers      = {};
+
+// Colores y etiquetas para marcadores A…F
+var STOP_COLORS = ['#059669','#2980b9','#f59e0b','#8e44ad','#e74c3c','#1abc9c'];
+var STOP_LABELS = ['A','B','C','D','E','F'];
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INICIALIZACIÓN DEL MAPA (DOMContentLoaded)
+// ═══════════════════════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', function () {
+
+  // 1. Crear mapa centrado en Santiago de Chile
+  _map = L.map('map', { scrollWheelZoom: false })
+           .setView([-33.4489, -70.6693], 11);
+
+  // 2. Capa de teselas OpenStreetMap
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',
+    maxZoom: 19,
+  }).addTo(_map);
+
+  // 3. Crear routing control SIN waypoints (se asignan al calcular)
+  //    Router: OSRM demo público | show:false = sin panel turn-by-turn
+  _routingControl = L.Routing.control({
+    waypoints:          [],
+    router:             L.Routing.osrmv1({
+      serviceUrl:   'https://router.project-osrm.org/route/v1',
+      profile:      'driving',
+    }),
+    show:               false,
+    addWaypoints:       false,
+    draggableWaypoints: false,
+    fitSelectedRoutes:  true,
+    lineOptions: {
+      styles: [{ color: '#059669', weight: 5, opacity: 0.85 }],
+      extendToWaypoints:     true,
+      missingRouteTolerance: 1,
+    },
+    // Marcadores circulares con letra por orden de parada
+    createMarker: function (i, wp) {
+      var color = STOP_COLORS[Math.min(i, STOP_COLORS.length - 1)];
+      var letra = STOP_LABELS[Math.min(i, STOP_LABELS.length - 1)];
+      return L.marker(wp.latLng, {
+        icon: L.divIcon({
+          className: '',
+          html: '<div style="'
+            + 'width:28px;height:28px;border-radius:50%;'
+            + 'background:' + color + ';'
+            + 'border:2.5px solid #fff;'
+            + 'box-shadow:0 2px 8px rgba(0,0,0,.35);'
+            + 'display:flex;align-items:center;justify-content:center;'
+            + 'color:#fff;font-size:11px;font-weight:900'
+            + '">' + letra + '</div>',
+          iconSize:   [28, 28],
+          iconAnchor: [14, 14],
+        }),
+      });
+    },
+  }).addTo(_map);
+
+  // 4. Listener routesfound: extrae distancia e inyecta en Variables Pro
+  _routingControl.on('routesfound', function (e) {
+    var route   = e.routes[0];
+    var distKm  = Math.round(route.summary.totalDistance / 1000);
+    var durSecs = route.summary.totalTime;
+    var mins    = Math.round(durSecs / 60);
+    var durText = mins >= 60
+      ? Math.floor(mins / 60) + ' h ' + (mins % 60) + ' min'
+      : mins + ' min';
+
+    // Actualizar barra de resultado
+    document.getElementById('dist-label').textContent     = distKm + ' km';
+    document.getElementById('route-duration').textContent = '⏱ ' + durText;
+    document.getElementById('route-result').classList.remove('hidden');
+
+    // Inyectar distancia en el slider → dispara recalc()
+    inyectarDistancia(distKm);
+  });
+
+  // 5. Listener de error de ruteo
+  _routingControl.on('routingerror', function (e) {
+    alert('No se pudo calcular la ruta con OSRM.\n'
+      + (e.error && e.error.message ? e.error.message : 'Verifica los nombres de las localidades.'));
+    document.getElementById('btn-calcular').disabled    = false;
+    document.getElementById('btn-calcular').textContent = '🧭 Calcular Ruta';
+  });
+
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AUTOCOMPLETADO — Nominatim vía <datalist> con debounce 350 ms
+// ═══════════════════════════════════════════════════════════════════════════
+function debSuggest(inputId, listId) {
+  clearTimeout(_debTimers[inputId]);
+  _debTimers[inputId] = setTimeout(function () {
+    var q = document.getElementById(inputId).value.trim();
+    if (q.length < 3) return;
+    fetch('https://nominatim.openstreetmap.org/search'
+      + '?q=' + encodeURIComponent(q)
+      + '&countrycodes=cl&format=json&limit=5&accept-language=es')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var list = document.getElementById(listId);
+        list.innerHTML = '';
+        data.forEach(function (item) {
+          var opt   = document.createElement('option');
+          opt.value = item.display_name;
+          list.appendChild(opt);
+        });
+      })
+      .catch(function () {/* silencioso si Nominatim no responde */});
+  }, 350);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GEOCODIFICACIÓN — Nominatim single-point
+// ═══════════════════════════════════════════════════════════════════════════
+async function geocodificar(query) {
+  var url = 'https://nominatim.openstreetmap.org/search'
+    + '?q=' + encodeURIComponent(query)
+    + '&countrycodes=cl&format=json&limit=1&accept-language=es';
+  var res  = await fetch(url);
+  var data = await res.json();
+  if (!data.length) throw new Error('No se encontró la dirección: "' + query + '"');
+  return L.latLng(parseFloat(data[0].lat), parseFloat(data[0].lon));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PARADAS INTERMEDIAS DINÁMICAS
+// ═══════════════════════════════════════════════════════════════════════════
+function agregarParada() {
+  var container = document.getElementById('waypoints-container');
+  if (container.children.length >= 3) return;
+  _waypointCount++;
+  var idx    = _waypointCount;
+  var inpId  = 'wp-inp-'  + idx;
+  var lstId  = 'wp-list-' + idx;
+
+  var div = document.createElement('div');
+  div.className = 'flex gap-2 items-center';
+  div.innerHTML =
+    '<div class="flex-1">'
+    + '<input id="' + inpId + '" type="text" list="' + lstId + '" autocomplete="off"'
+    + ' placeholder="Parada ' + idx + ': ej. Pudahuel, Santiago"'
+    + ' oninput="debSuggest(\'' + inpId + '\',\'' + lstId + '\')"'
+    + ' class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50'
+    + '  focus:outline-none focus:ring-2 focus:ring-emerald-400"/>'
+    + '<datalist id="' + lstId + '"></datalist>'
+    + '</div>'
+    + '<button onclick="this.parentElement.remove(); actualizarBtnAgregar();"'
+    + ' class="text-red-400 hover:text-red-600 border border-red-200 hover:border-red-400'
+    + '  rounded-lg px-3 py-2 text-xs font-bold transition-colors flex-shrink-0">✕</button>';
+  container.appendChild(div);
+  actualizarBtnAgregar();
+}
+
+function actualizarBtnAgregar() {
+  var n = document.getElementById('waypoints-container').children.length;
+  document.getElementById('btn-add-waypoint').disabled = (n >= 3);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CALCULAR RUTA — geocodifica todos los puntos y los pasa a LRM
+// ═══════════════════════════════════════════════════════════════════════════
+async function calcularRuta() {
+  var originStr = document.getElementById('map-origin').value.trim();
+  var destStr   = document.getElementById('map-dest').value.trim();
+
+  if (!originStr || !destStr) {
+    alert('Ingresa el punto de origen y el destino para continuar.');
+    return;
+  }
+
+  var btn = document.getElementById('btn-calcular');
+  btn.textContent = '⏳ Geocodificando…';
+  btn.disabled    = true;
+
+  try {
+    // 1. Recoger paradas intermedias
+    var wpTexts = [];
+    document.querySelectorAll('#waypoints-container input').forEach(function (inp) {
+      if (inp.value.trim()) wpTexts.push(inp.value.trim());
+    });
+
+    var roundtrip = document.getElementById('chk-roundtrip').checked;
+
+    // 2. Geocodificar TODOS los puntos en paralelo
+    var allTexts  = [originStr].concat(wpTexts).concat([destStr]);
+    var allLatLng = await Promise.all(allTexts.map(geocodificar));
+
+    // 3. Ida y vuelta → añadir origen como último waypoint
+    var latlngs = roundtrip
+      ? allLatLng.concat([allLatLng[0]])
+      : allLatLng;
+
+    // 4. Construir array de L.Routing.Waypoint
+    var waypoints = latlngs.map(function (ll, i) {
+      return L.Routing.waypoint(ll, STOP_LABELS[Math.min(i, STOP_LABELS.length - 1)]);
+    });
+
+    // 5. Pasar waypoints al routing control (dispara routesfound al resolver)
+    btn.textContent = '⏳ Calculando ruta OSRM…';
+    _routingControl.setWaypoints(waypoints);
+
+  } catch (err) {
+    alert('Error: ' + err.message);
+    btn.textContent = '🧭 Calcular Ruta';
+    btn.disabled    = false;
+  }
+  // El botón se restaura en routesfound / routingerror
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INYECCIÓN DE DISTANCIA → slider v-dist → dispara recalc()
+// ═══════════════════════════════════════════════════════════════════════════
+function inyectarDistancia(km) {
+  var slider = document.getElementById('v-dist');
+  var label  = document.getElementById('lbl-dist');
+  var badge  = document.getElementById('dist-auto-badge');
+  var btn    = document.getElementById('btn-calcular');
+
+  if (!slider) return;
+
+  var val = Math.max(5, Math.min(1000, km));
+  slider.value      = val;
+  label.textContent = val;
+  badge.classList.remove('hidden');
+
+  // Restaurar botón
+  btn.textContent = '🧭 Calcular Ruta';
+  btn.disabled    = false;
+
+  // Disparar evento 'input' para que recalc() detecte el nuevo valor
+  slider.dispatchEvent(new Event('input'));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VARIABLES OPERATIVAS PRO — proyección de costos
+// ═══════════════════════════════════════════════════════════════════════════
+function recalc() {
+  var diesel    = parseFloat(document.getElementById('v-diesel').value);
+  var rendim    = parseFloat(document.getElementById('v-rendim').value);
+  var dist      = parseFloat(document.getElementById('v-dist').value);
+  var freq      = parseInt(document.getElementById('v-freq').value);
+  var inversion = parseFloat(document.getElementById('v-inversion').value) || 0;
+  var calidad   = parseFloat(document.getElementById('v-calidad').value) / 100;
+
+  var litrosPorViaje    = (dist * 2) / rendim;
+  var costoPorViaje     = litrosPorViaje * diesel;
+  var costoAnualDiesel  = costoPorViaje * freq;
+  var costoMensual      = costoAnualDiesel / 12;
+  var costoPorKm        = diesel / rendim;
+  var paybackMeses      = (inversion > 0 && costoAnualDiesel > 0)
+    ? (inversion / costoAnualDiesel * 12).toFixed(1)
+    : null;
+
+  function clp(n) {
+    return '$' + Math.round(n).toLocaleString('es-CL') + ' CLP';
+  }
+
+  // KPI cards
+  document.getElementById('res-grid').innerHTML = [
+    { icon:'⛽', lbl:'Costo por viaje',    val: clp(costoPorViaje),     col:'text-red-500'     },
+    { icon:'📅', lbl:'Costo anual diésel', val: clp(costoAnualDiesel),  col:'text-red-500'     },
+    { icon:'💳', lbl:'Costo mensual',      val: clp(costoMensual),      col:'text-amber-500'   },
+    { icon:'📏', lbl:'Costo por km',       val: clp(costoPorKm)+'/km',  col:'text-slate-700'   },
+    { icon:'🛢️', lbl:'Litros / viaje',     val: litrosPorViaje.toFixed(0)+' L', col:'text-slate-700' },
+    { icon:'⏱️', lbl:'Payback inversión',  val: paybackMeses ? paybackMeses+' meses' : '—', col:'text-emerald-600' },
+  ].map(function (k) {
+    return '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-center">'
+      + '<div class="text-2xl mb-1">' + k.icon + '</div>'
+      + '<div class="text-sm font-black ' + k.col + '">' + k.val + '</div>'
+      + '<div class="text-xs text-slate-500 mt-0.5">' + k.lbl + '</div>'
+      + '</div>';
+  }).join('');
+
+  // Barras de desglose
+  document.getElementById('res-bars').innerHTML = [
+    { lbl:'Costo por viaje',   val: costoPorViaje,    color:'#dc2626' },
+    { lbl:'Costo mensual',     val: costoMensual,     color:'#f59e0b' },
+    { lbl:'Costo anual total', val: costoAnualDiesel, color:'#059669' },
+  ].map(function (b) {
+    var pct = costoAnualDiesel > 0
+      ? Math.min(100, Math.round(b.val / costoAnualDiesel * 100))
+      : 0;
+    return '<div class="flex items-center gap-3">'
+      + '<div class="text-xs text-slate-500 text-right flex-shrink-0 w-28">' + b.lbl + '</div>'
+      + '<div class="flex-1 h-4 bg-slate-100 rounded-full overflow-hidden">'
+      + '<div class="bar-fill h-full rounded-full" style="width:' + pct + '%;background:' + b.color + '"></div>'
+      + '</div>'
+      + '<div class="text-xs font-semibold text-slate-600 flex-shrink-0 w-32 text-right">' + clp(b.val) + '</div>'
+      + '</div>';
+  }).join('');
+
+  document.getElementById('results-section').classList.remove('hidden');
+
+  // Persistir para Dashboard KPI
+  localStorage.setItem('damu_ruta_result', JSON.stringify({
+    dist:      dist,
+    costAnual: costoAnualDiesel,
+    costMes:   costoMensual,
+    freq:      freq,
+    ts:        Date.now(),
+  }));
+}
+</script>
+
+</body>
+</html>
