@@ -197,84 +197,198 @@
 </footer>
 
 <script>
-// ── Lee datos de localStorage (desde calculadora-rep o simulador-ruta) ──────
-function cargarDatos() {
-  const calc  = JSON.parse(localStorage.getItem('damu_calc_result')  || 'null');
-  const ruta  = JSON.parse(localStorage.getItem('damu_ruta_result')  || 'null');
+// ═══════════════════════════════════════════════════════════════════
+// DASHBOARD KPI — persistencia via localStorage
+// Lee: damu_datos_ruta (enriquecido) | damu_ruta_result (legado)
+//      damu_calc_result (calculadora REP)
+// Actualización cross-tab: evento 'storage'
+// ═══════════════════════════════════════════════════════════════════
 
-  const costoTotal   = calc  ? calc.costoTotal   : null;
-  const co2          = calc  ? calc.co2          : null;
-  const multa        = calc  ? calc.multa        : null;
-  const cumple       = calc  ? calc.cumple       : null;
-  const costDiesel   = ruta  ? ruta.costAnual    : null;
-  const distancia    = ruta  ? ruta.dist         : null;
+// Valores de demo para cuando localStorage está vacío
+var DEMO = {
+  diesel: 1350, rendim: 12, freq: 12, dist: 80,
+  costoPorViaje: 18000, costoAnualDiesel: 216000, costoMensual: 18000,
+  costoPorKm: 113, litrosPorViaje: 13.3, paybackMeses: null,
+};
 
-  if (calc || ruta) {
-    document.getElementById('data-source-label').textContent = 'Fuente: calculadora Damu SGC';
-    const ts = Math.max(calc ? calc.ts : 0, ruta ? ruta.ts : 0);
-    const dt = new Date(ts);
-    document.getElementById('last-update-ts').textContent = dt.toLocaleString('es-CL');
-    document.getElementById('last-update-badge').classList.remove('hidden');
-  }
-
-  const kpis = [
-    { icon:'💸', lbl:'Costo OPEX anual',   val: costoTotal ? '$' + Math.round(costoTotal).toLocaleString('es-CL') : '—', sub:'CLP estimado', col:'text-red-500'     },
-    { icon:'⛽', lbl:'Costo diésel anual', val: costDiesel ? '$' + Math.round(costDiesel).toLocaleString('es-CL') : '—', sub:'CLP logística', col:'text-amber-500'   },
-    { icon:'🌿', lbl:'CO₂e evitado',       val: co2 ? co2.toFixed(1) + ' t' : '—', sub:'toneladas CO₂e', col:'text-emerald-600' },
-    { icon:'📍', lbl:'Dist. al gestor',    val: distancia ? distancia + ' km' : '—', sub:'última ruta',    col:'text-blue-500'    },
-    { icon:'⚖️', lbl:'Multa en riesgo',    val: multa != null ? (multa === 0 ? '$0' : '$' + Math.round(multa).toLocaleString('es-CL')) : '—', sub:'Art. 48 Ley REP', col: multa === 0 ? 'text-emerald-600' : 'text-red-500' },
-    { icon:'✅', lbl:'Cumplimiento REP',   val: cumple === null ? '—' : (cumple ? 'OK' : 'En riesgo'), sub:'meta legal',       col: cumple ? 'text-emerald-600' : 'text-red-500' },
-  ];
-
-  document.getElementById('kpi-grid').innerHTML = kpis.map(k =>
-    `<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-center hover:shadow-md transition-shadow">
-      <div class="text-2xl mb-1.5">${k.icon}</div>
-      <div class="text-lg font-black ${k.col}">${k.val}</div>
-      <div class="text-xs font-semibold text-slate-700 mt-0.5">${k.lbl}</div>
-      <div class="text-xs text-slate-400">${k.sub}</div>
-    </div>`
-  ).join('');
-
-  // ── Distribución de costos (estimado o demo) ─────────────────────
-  const total = costoTotal || 1000000;
-  const bars  = [
-    { lbl:'Recolección',      pct:38, color:'#dc2626' },
-    { lbl:'Transporte',       pct:32, color:'#f59e0b' },
-    { lbl:'Valorización',     pct:30, color:'#2980b9' },
-  ];
-  if (costoTotal) {
-    bars[0].pct = 38; bars[1].pct = 32; bars[2].pct = 30;
-  }
-  document.getElementById('cost-chart').innerHTML = bars.map(b =>
-    `<div class="flex items-center gap-3">
-      <div class="text-xs text-slate-500 text-right flex-shrink-0 w-24">${b.lbl}</div>
-      <div class="flex-1 h-5 bg-slate-100 rounded-full overflow-hidden">
-        <div class="bar-fill h-full rounded-full" style="width:${b.pct}%;background:${b.color}"></div>
-      </div>
-      <div class="text-xs font-semibold text-slate-600 w-8 text-right">${b.pct}%</div>
-    </div>`
-  ).join('');
-
-  // ── Panel diésel / eficiencia ─────────────────────────────────────
-  const metricasDiesel = [
-    { lbl:'Precio diésel ref.',  val: '$1.350 CLP/L',  icon:'⛽' },
-    { lbl:'Rendimiento flota',   val: '12 km/L',       icon:'🚛' },
-    { lbl:'Costo por km',        val: '$113 CLP/km',   icon:'📏' },
-    { lbl:'Viajes / año (est.)', val: '12 retiros',    icon:'🔄' },
-  ];
-  if (ruta) {
-    metricasDiesel[0].val = 'Desde simulador';
-    metricasDiesel[3].val = ruta.freq + ' retiros/año';
-  }
-  document.getElementById('diesel-chart').innerHTML = metricasDiesel.map(m =>
-    `<div class="flex items-center justify-between border-b border-slate-100 pb-3">
-      <div class="flex items-center gap-2 text-sm text-slate-600"><span>${m.icon}</span>${m.lbl}</div>
-      <span class="text-sm font-bold text-slate-700">${m.val}</span>
-    </div>`
-  ).join('');
+function fmt(n) {
+  return '$' + Math.round(n).toLocaleString('es-CL') + ' CLP';
 }
 
+// ─────────────────────────────────────────────────────────────────
+function cargarDatos() {
+
+  // 1. Leer fuentes — clave enriquecida con fallback a legado
+  var calc = JSON.parse(localStorage.getItem('damu_calc_result') || 'null');
+  var ruta = JSON.parse(localStorage.getItem('damu_datos_ruta')  || 'null')
+          || JSON.parse(localStorage.getItem('damu_ruta_result') || 'null');
+
+  var tieneCalc  = !!(calc && calc.ts);
+  var tieneRuta  = !!(ruta && ruta.dist);
+  var tieneDatos = tieneCalc || tieneRuta;
+
+  // 2. Badge de última actualización ────────────────────────────
+  if (tieneDatos) {
+    var ts = Math.max(tieneCalc ? calc.ts : 0, tieneRuta ? ruta.ts : 0);
+    document.getElementById('last-update-ts').textContent =
+      new Date(ts).toLocaleString('es-CL');
+    document.getElementById('last-update-badge').classList.remove('hidden');
+    document.getElementById('data-source-label').textContent =
+      'Fuente: datos simulador Damu SGC';
+  } else {
+    document.getElementById('data-source-label').textContent =
+      'Fuente: estimaciones demo';
+  }
+
+  // 3. Normalizar valores de ruta (real vs demo) ────────────────
+  var r;
+  if (tieneRuta) {
+    r = {
+      dist:             ruta.dist,
+      diesel:           ruta.diesel           || DEMO.diesel,
+      rendim:           ruta.rendim           || DEMO.rendim,
+      freq:             ruta.freq             || DEMO.freq,
+      costoPorViaje:    ruta.costoPorViaje    || (ruta.costAnual / (ruta.freq || 12)),
+      costoAnualDiesel: ruta.costoAnualDiesel || ruta.costAnual,
+      costoMensual:     ruta.costoMensual     || ruta.costMes,
+      costoPorKm:       ruta.costoPorKm       || DEMO.costoPorKm,
+      litrosPorViaje:   ruta.litrosPorViaje   || null,
+      paybackMeses:     ruta.paybackMeses     || null,
+    };
+  } else {
+    r = DEMO;
+  }
+
+  // 4. KPI Grid ─────────────────────────────────────────────────
+  var kpis = [
+    {
+      icon:'💸', lbl:'Costo OPEX anual',
+      val: tieneCalc && calc.costoTotal ? fmt(calc.costoTotal) : '—',
+      sub: tieneCalc ? 'Calculadora REP' : 'sin datos REP',
+      col: tieneCalc && calc.costoTotal ? 'text-red-500' : 'text-slate-400',
+    },
+    {
+      icon:'⛽', lbl:'Costo diésel anual',
+      val: tieneRuta ? fmt(r.costoAnualDiesel) : '—',
+      sub: tieneRuta ? 'Simulador de ruta' : 'sin ruta simulada',
+      col: tieneRuta ? 'text-amber-500' : 'text-slate-400',
+    },
+    {
+      icon:'🌿', lbl:'CO₂e evitado',
+      val: tieneCalc && calc.co2 ? calc.co2.toFixed(1) + ' t' : '—',
+      sub: 'toneladas CO₂e',
+      col: tieneCalc && calc.co2 ? 'text-emerald-600' : 'text-slate-400',
+    },
+    {
+      icon:'📍', lbl:'Dist. al gestor',
+      val: tieneRuta ? r.dist + ' km' : '—',
+      sub: tieneRuta ? 'última ruta mapeada' : 'sin ruta',
+      col: tieneRuta ? 'text-blue-500' : 'text-slate-400',
+    },
+    {
+      icon:'⚖️', lbl:'Multa en riesgo',
+      val: tieneCalc && calc.multa != null
+        ? (calc.multa === 0 ? '$0 CLP' : fmt(calc.multa))
+        : '—',
+      sub: 'Art. 48 Ley REP',
+      col: tieneCalc && calc.multa != null
+        ? (calc.multa === 0 ? 'text-emerald-600' : 'text-red-500')
+        : 'text-slate-400',
+    },
+    {
+      icon: tieneCalc && calc.cumple === true  ? '✅'
+          : tieneCalc && calc.cumple === false ? '❌' : '❓',
+      lbl: 'Cumplimiento REP',
+      val: tieneCalc && calc.cumple != null
+        ? (calc.cumple ? 'Cumple' : 'En riesgo')
+        : '—',
+      sub: 'meta legal Decreto 12',
+      col: tieneCalc && calc.cumple === true  ? 'text-emerald-600'
+         : tieneCalc && calc.cumple === false ? 'text-red-500'
+         : 'text-slate-400',
+    },
+  ];
+
+  document.getElementById('kpi-grid').innerHTML = kpis.map(function(k) {
+    return '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-center hover:shadow-md transition-shadow">'
+      + '<div class="text-2xl mb-1.5">' + k.icon + '</div>'
+      + '<div class="text-lg font-black ' + k.col + '">' + k.val + '</div>'
+      + '<div class="text-xs font-semibold text-slate-700 mt-0.5">' + k.lbl + '</div>'
+      + '<div class="text-xs text-slate-400">' + k.sub + '</div>'
+      + '</div>';
+  }).join('');
+
+  // 5. Gráfico distribución de costos ───────────────────────────
+  var pctTransporte  = 32;    // base demo
+  var pctReco        = 38;
+  var pctVal         = 30;
+  var transporteReal = false;
+
+  if (tieneCalc && calc.costoTotal && tieneRuta && r.costoAnualDiesel) {
+    // Proporción real: diesel vs OPEX total
+    pctTransporte  = Math.min(75, Math.max(5,
+      Math.round(r.costoAnualDiesel / calc.costoTotal * 100)));
+    var resto  = 100 - pctTransporte;
+    pctReco    = Math.round(resto * 0.56);
+    pctVal     = 100 - pctTransporte - pctReco;
+    transporteReal = true;
+  }
+
+  var barras = [
+    { lbl:'Recolección',  pct: pctReco,      color:'#dc2626', real: false          },
+    { lbl:'Transporte',   pct: pctTransporte, color:'#f59e0b', real: transporteReal },
+    { lbl:'Valorización', pct: pctVal,        color:'#2980b9', real: false          },
+  ];
+
+  document.getElementById('cost-chart').innerHTML = barras.map(function(b) {
+    var etiqueta = b.real
+      ? '<span class="text-emerald-600 font-semibold">' + b.lbl + ' ✓</span>'
+      : '<span>' + b.lbl + '</span>';
+    return '<div class="flex items-center gap-3">'
+      + '<div class="text-xs text-slate-500 text-right flex-shrink-0 w-24">' + etiqueta + '</div>'
+      + '<div class="flex-1 h-5 bg-slate-100 rounded-full overflow-hidden">'
+      + '<div class="bar-fill h-full rounded-full" style="width:' + b.pct + '%;background:' + b.color + '"></div>'
+      + '</div>'
+      + '<div class="text-xs font-semibold text-slate-600 w-8 text-right">' + b.pct + '%</div>'
+      + '</div>';
+  }).join('');
+
+  // 6. Panel de eficiencia diésel ───────────────────────────────
+  var metricas = [
+    { lbl:'Precio diésel',  val: fmt(r.diesel).replace(' CLP','') + '/L',                     icon:'⛽', real: tieneRuta },
+    { lbl:'Rendimiento',    val: r.rendim + ' km/L',                                          icon:'🚛', real: tieneRuta },
+    { lbl:'Costo por km',   val: fmt(r.costoPorKm).replace(' CLP','') + '/km',                icon:'📏', real: tieneRuta },
+    { lbl:'Retiros / año',  val: r.freq + ' retiros',                                         icon:'🔄', real: tieneRuta },
+    { lbl:'Litros / viaje', val: r.litrosPorViaje ? r.litrosPorViaje.toFixed(1) + ' L' : '—', icon:'🛢️', real: tieneRuta && !!r.litrosPorViaje },
+    { lbl:'Payback',        val: r.paybackMeses ? r.paybackMeses + ' meses' : '—',            icon:'⏱️', real: !!r.paybackMeses },
+  ];
+
+  document.getElementById('diesel-chart').innerHTML = metricas.map(function(m, i) {
+    var borderClass = i < metricas.length - 1 ? 'border-b border-slate-100 pb-3' : '';
+    var badge       = m.real ? ' <span class="text-emerald-500 text-xs font-bold">✓</span>' : '';
+    var valColor    = m.real ? 'text-emerald-700' : 'text-slate-500';
+    return '<div class="flex items-center justify-between ' + borderClass + '">'
+      + '<div class="flex items-center gap-2 text-sm text-slate-600">'
+      + '<span>' + m.icon + '</span>' + m.lbl + badge
+      + '</div>'
+      + '<span class="text-sm font-bold ' + valColor + '">' + m.val + '</span>'
+      + '</div>';
+  }).join('');
+}
+
+// ── Inicializar ────────────────────────────────────────────────
 cargarDatos();
+
+// ── Actualización cross-tab en tiempo real ─────────────────────
+// Cuando el simulador guarda datos en otra pestaña, el dashboard
+// se actualiza automáticamente sin recargar la página.
+window.addEventListener('storage', function(e) {
+  if (e.key === 'damu_datos_ruta'
+   || e.key === 'damu_ruta_result'
+   || e.key === 'damu_calc_result') {
+    cargarDatos();
+  }
+});
 </script>
 </body>
 </html>
