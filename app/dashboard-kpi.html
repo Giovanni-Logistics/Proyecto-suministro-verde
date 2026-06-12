@@ -43,6 +43,7 @@
         <a href="calculadora-rep.html" class="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700/60 rounded-lg mx-1 transition-colors"><span>🧾</span> Calculadora Eco-Ticket</a>
         <a href="dashboard-kpi.html"   class="flex items-center gap-2.5 px-4 py-2.5 text-sm text-emerald-400 bg-slate-700/50 rounded-lg mx-1 font-semibold"><span>📊</span> Dashboard KPI</a>
         <a href="simulador-ruta.html"  class="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700/60 rounded-lg mx-1 transition-colors"><span>🗺️</span> Simulador de Ruta</a>
+        <a href="escaner-qr.html"      class="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700/60 rounded-lg mx-1 transition-colors"><span>📷</span> Escanear QR</a>
       </div>
     </li>
   </ul>
@@ -115,29 +116,29 @@
         <h3 class="text-white font-bold text-sm">Funciones en desarrollo</h3>
         <p class="text-slate-400 text-xs mt-0.5">Próximas integraciones del MVP</p>
       </div>
-      <span class="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold px-3 py-1 rounded-full">🚧 Próximamente</span>
+      <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold px-3 py-1 rounded-full">✓ QR activo · PDF próximamente</span>
     </div>
     <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
 
-      <!-- QR Scanner -->
-      <div class="border border-slate-200 rounded-xl p-5 opacity-60">
+      <!-- QR Scanner — ACTIVO -->
+      <div class="border border-emerald-200 bg-emerald-50/40 rounded-xl p-5">
         <div class="flex items-center gap-3 mb-3">
-          <div class="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-xl">📷</div>
+          <div class="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-xl">📷</div>
           <div>
             <p class="text-sm font-bold text-slate-700">Escanear Carga QR</p>
-            <p class="text-xs text-slate-400">Trazabilidad de bultos en tiempo real</p>
+            <p class="text-xs text-slate-500">Trazabilidad de bultos en tiempo real</p>
           </div>
         </div>
-        <ul class="text-xs text-slate-400 space-y-1 mb-4">
-          <li>• Lectura de QR mediante cámara</li>
-          <li>• Registro automático de peso y categoría</li>
-          <li>• Actualización del inventario en la nube</li>
+        <ul class="text-xs text-slate-500 space-y-1 mb-4">
+          <li>• Lectura de QR mediante cámara del dispositivo</li>
+          <li>• Registro automático de peso y categoría REP</li>
+          <li>• Historial guardado localmente en este dashboard</li>
         </ul>
-        <button disabled
-          class="w-full bg-slate-100 text-slate-400 text-sm font-semibold py-2.5 rounded-xl cursor-not-allowed flex items-center justify-center gap-2">
-          <span>📷</span> Escanear QR
-          <span class="text-xs bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full ml-auto">Próximamente</span>
-        </button>
+        <a href="escaner-qr.html"
+          class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors no-underline">
+          <span>📷</span> Abrir Escáner QR
+          <span class="text-xs bg-emerald-700 text-emerald-100 px-2 py-0.5 rounded-full ml-auto">Activo ✓</span>
+        </a>
       </div>
 
       <!-- PDF Certificate -->
