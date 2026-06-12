@@ -593,13 +593,29 @@ function recalc() {
 
   document.getElementById('results-section').classList.remove('hidden');
 
-  // Persistir para Dashboard KPI
+  // ── Persistir para Dashboard KPI ────────────────────────────────
+  // Objeto enriquecido con todos los valores computados
+  var datosRuta = {
+    dist:             dist,
+    diesel:           diesel,
+    rendim:           rendim,
+    freq:             freq,
+    inversion:        inversion,
+    calidad:          Math.round(calidad * 100),
+    litrosPorViaje:   Math.round(litrosPorViaje * 10) / 10,
+    costoPorViaje:    Math.round(costoPorViaje),
+    costoAnualDiesel: Math.round(costoAnualDiesel),
+    costoMensual:     Math.round(costoMensual),
+    costoPorKm:       Math.round(costoPorKm),
+    paybackMeses:     paybackMeses !== null ? parseFloat(paybackMeses) : null,
+    ts:               Date.now(),
+  };
+  // Clave enriquecida (Dashboard KPI lee esta primero)
+  localStorage.setItem('damu_datos_ruta', JSON.stringify(datosRuta));
+  // Clave legado mantenida por compatibilidad
   localStorage.setItem('damu_ruta_result', JSON.stringify({
-    dist:      dist,
-    costAnual: costoAnualDiesel,
-    costMes:   costoMensual,
-    freq:      freq,
-    ts:        Date.now(),
+    dist: dist, costAnual: datosRuta.costoAnualDiesel,
+    costMes: datosRuta.costoMensual, freq: freq, ts: datosRuta.ts,
   }));
 }
 </script>
