@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Calculadora REP & Multas Art. 48 — Damu SGC</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    input[type=range] { accent-color: #059669; }
+    .bar-fill { transition: width 0.6s ease; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
+
+<!-- ══════════════════════════════ NAV ══════════════════════════════ -->
+<nav class="bg-slate-900 sticky top-0 z-50 flex items-center justify-between px-8 h-16 shadow-xl">
+  <a href="../index.html" class="flex items-center gap-3 no-underline">
+    <div class="w-9 h-9 rounded-full bg-emerald-600 flex items-center justify-center font-black text-white text-lg">D</div>
+    <div>
+      <span class="text-white font-bold text-base leading-none">Damu SGC</span>
+      <span class="block text-emerald-400 text-xs leading-none mt-0.5">Trazabilidad Ley REP</span>
+    </div>
+  </a>
+  <ul class="hidden md:flex items-center gap-1 list-none">
+    <li><a href="../index.html" class="text-slate-300 hover:text-white hover:bg-slate-700 px-3 py-1.5 rounded-md text-sm transition-colors">Inicio</a></li>
+    <li><a href="../auth/portal.html" class="text-slate-300 hover:text-white hover:bg-slate-700 px-3 py-1.5 rounded-md text-sm transition-colors">Portal</a></li>
+    <li class="relative group">
+      <button class="text-slate-300 hover:text-white hover:bg-slate-700 px-3 py-1.5 rounded-md text-sm transition-colors flex items-center gap-1.5 bg-transparent border-0 cursor-pointer">
+        Fichas Comerciales
+        <svg class="w-3.5 h-3.5 transition-transform duration-200 group-hover:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+      </button>
+      <div class="absolute top-[calc(100%+6px)] left-0 w-52 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 origin-top scale-95 group-hover:scale-100 z-50 py-1.5">
+        <a href="../pages/productores.html" class="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700/60 rounded-lg mx-1 transition-colors"><span>🏭</span> Productores</a>
+        <a href="../pages/transportistas.html" class="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700/60 rounded-lg mx-1 transition-colors"><span>🚛</span> Transportistas</a>
+      </div>
+    </li>
+    <!-- Herramientas — ACTIVO -->
+    <li class="relative group">
+      <button class="text-white bg-slate-700 px-3 py-1.5 rounded-md text-sm font-semibold flex items-center gap-1.5 border-0 cursor-pointer">
+        Herramientas
+        <svg class="w-3.5 h-3.5 transition-transform duration-200 group-hover:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+      </button>
+      <div class="absolute top-[calc(100%+6px)] left-0 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 origin-top scale-95 group-hover:scale-100 z-50 py-1.5">
+        <a href="calculadora-rep.html" class="flex items-center gap-2.5 px-4 py-2.5 text-sm text-emerald-400 bg-slate-700/50 rounded-lg mx-1 font-semibold"><span>🧾</span> Calculadora Eco-Ticket</a>
+        <a href="dashboard-kpi.html"   class="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700/60 rounded-lg mx-1 transition-colors"><span>📊</span> Dashboard KPI</a>
+        <a href="simulador-ruta.html"  class="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700/60 rounded-lg mx-1 transition-colors"><span>🗺️</span> Simulador de Ruta</a>
+      </div>
+    </li>
+  </ul>
+  <a href="../index.html" class="text-emerald-400 hover:text-white text-xs font-semibold border border-emerald-800 hover:border-slate-600 px-3 py-1.5 rounded-lg transition-colors no-underline">← Volver</a>
+</nav>
+
+<!-- ══════════════════════════════ HERO ══════════════════════════════ -->
+<header class="bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-700 text-white py-8 px-8">
+  <div class="max-w-5xl mx-auto">
+    <span class="inline-block bg-white/15 border border-white/25 text-emerald-100 text-xs font-bold px-3 py-1 rounded-full mb-3">🧾 Calculadora Eco-Ticket</span>
+    <h1 class="text-2xl md:text-3xl font-black leading-tight mb-2">Costos REP & Estimador de Multas Art. 48</h1>
+    <p class="text-emerald-200 text-sm max-w-xl">Declara tus categorías Ley REP, proyecta tus costos operativos anuales y evalúa el riesgo de sanciones según el Decreto 12 · Ley 20.920.</p>
+  </div>
+</header>
+
+<!-- ══════════════════════════════ MAIN ══════════════════════════════ -->
+<main class="max-w-5xl mx-auto w-full px-4 py-8 flex-1">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+
+    <!-- ─── PANEL INPUTS ─────────────────────────────────────── -->
+    <div class="bg-white rounded-2xl border border-emerald-100 shadow-sm overflow-hidden">
+      <div class="bg-gradient-to-r from-emerald-700 to-emerald-600 px-5 py-4">
+        <h2 class="text-white font-bold text-sm">🏭 Parámetros del Productor</h2>
+        <p class="text-emerald-200 text-xs mt-0.5">Datos de tu declaración REP anual</p>
+      </div>
+      <div class="p-5 space-y-4">
+
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1.5">Categoría REP</label>
+          <select id="s-cat" onchange="recalc()" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+            <option value="envases">📦 Envases y embalajes</option>
+            <option value="neumaticos">🛞 Neumáticos</option>
+            <option value="pilas">🔋 Pilas y baterías</option>
+            <option value="raee">🖥️ Aparatos eléctricos (RAEE)</option>
+            <option value="aceites">🛢️ Aceites lubricantes</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1.5">Toneladas puestas en mercado / año</label>
+          <input type="number" id="s-tons" placeholder="Ej: 200" min="1" oninput="recalc()"
+            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"/>
+          <p class="text-xs text-slate-400 mt-1">Dato de tu declaración ante el SMA</p>
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-1.5">
+            <label class="text-xs font-bold text-slate-500">Meta de valorización</label>
+            <span id="sv-meta" class="text-xs font-black text-emerald-600">25%</span>
+          </div>
+          <input type="range" id="s-meta" min="5" max="80" value="25" class="w-full"
+            oninput="document.getElementById('sv-meta').textContent=this.value+'%'; recalc()"/>
+          <div class="flex justify-between text-xs mt-0.5">
+            <span class="text-slate-400">5%</span>
+            <span class="text-amber-500 font-semibold">⚠ Mínimo legal ≈ 20%</span>
+            <span class="text-slate-400">80%</span>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1.5">Región de operación</label>
+          <select id="s-region" onchange="recalc()" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+            <option value="1">Región Metropolitana</option>
+            <option value="1.08">Valparaíso</option>
+            <option value="1.12">Biobío</option>
+            <option value="1.2">Otra región</option>
+          </select>
+        </div>
+
+        <!-- Simulación de multas: override de toneladas reales -->
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <label class="block text-xs font-bold text-amber-800 mb-1.5">⚖️ ¿Qué pasaría si valorizas menos? (simulación)</label>
+          <input type="number" id="s-tons-real" placeholder="Dejar vacío = usa meta del slider" min="0" oninput="recalc()"
+            class="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"/>
+          <p class="text-xs text-amber-600 mt-1.5">Ingresa un valor menor a la meta para ver el riesgo de multa Art. 48.</p>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ─── PANEL RESULTADOS ──────────────────────────────────── -->
+    <div class="space-y-4">
+
+      <!-- Empty state -->
+      <div id="results-empty" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-12 text-center">
+        <div class="text-5xl mb-3">🧾</div>
+        <p class="text-slate-500 text-sm font-semibold">Ingresa los parámetros para calcular</p>
+        <p class="text-slate-400 text-xs mt-1">Los resultados aparecerán aquí en tiempo real</p>
+      </div>
+
+      <div id="results-content" class="hidden space-y-4">
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-2 gap-3" id="kpi-grid"></div>
+
+        <!-- Multas Art. 48 -->
+        <div id="multas-section"></div>
+
+        <!-- Desglose -->
+        <div class="bg-white rounded-2xl border border-emerald-100 shadow-sm p-5">
+          <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><span>📋</span> Desglose operativo anual</h3>
+          <table id="tabla-desglose" class="w-full text-xs"></table>
+          <p class="text-xs text-slate-400 mt-3 border-t border-slate-100 pt-3">⚠ Estimación referencial basada en rangos del mercado chileno de logística inversa. Los valores reales dependen de cada gestor autorizado.</p>
+        </div>
+
+        <!-- Bar chart -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><span>📊</span> Distribución de costos</h3>
+          <div id="bar-chart" class="space-y-3"></div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- ══════════════════════════════ FOOTER ══════════════════════════════ -->
+<footer class="bg-slate-900 text-slate-400 text-xs py-5 border-t border-slate-800 mt-auto">
+  <div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-3">
+    <p><strong class="text-white">Damu SGC</strong> — Trazabilidad Ley REP · Chile</p>
+    <div class="flex gap-4 flex-wrap justify-center">
+      <a href="../auth/portal.html"          class="hover:text-white transition-colors">Portal</a>
+      <a href="../pages/productores.html"    class="hover:text-white transition-colors">Productores</a>
+      <a href="../pages/transportistas.html" class="hover:text-white transition-colors">Transportistas</a>
+    </div>
+    <p class="text-slate-600">© 2026 Damu SGC</p>
+  </div>
+</footer>
+
+<script>
+const tarifas = {
+  envases:    { reco:18000, trans:12000, val:22000, co2:0.8,  precioMercado:120000 },
+  neumaticos: { reco:25000, trans:18000, val:30000, co2:1.4,  precioMercado:30000  },
+  pilas:      { reco:35000, trans:20000, val:45000, co2:0.4,  precioMercado:180000 },
+  raee:       { reco:40000, trans:25000, val:50000, co2:1.1,  precioMercado:120000 },
+  aceites:    { reco:22000, trans:15000, val:28000, co2:0.9,  precioMercado:40000  },
+};
+
+function clp(n) {
+  return (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('es-CL') + ' CLP';
+}
+
+function recalc() {
+  const cat       = document.getElementById('s-cat').value;
+  const tons      = parseFloat(document.getElementById('s-tons').value) || 0;
+  const meta      = parseFloat(document.getElementById('s-meta').value) / 100;
+  const regMult   = parseFloat(document.getElementById('s-region').value);
+  const rawReal   = parseFloat(document.getElementById('s-tons-real').value);
+
+  if (!tons) {
+    document.getElementById('results-empty').classList.remove('hidden');
+    document.getElementById('results-content').classList.add('hidden');
+    return;
+  }
+
+  const t        = tarifas[cat];
+  const tonsVal  = tons * meta;
+  const tonsReal = isNaN(rawReal) ? tonsVal : rawReal;
+
+  const costoReco  = tonsVal * t.reco  * regMult;
+  const costoTrans = tonsVal * t.trans * regMult;
+  const costoVal   = tonsVal * t.val   * regMult;
+  const costoTotal = costoReco + costoTrans + costoVal;
+  const co2        = tonsReal * 0.9 * t.co2;
+
+  // ── Multas Art. 48 (Ley 20.920) ────────────────────────────────────
+  // Meta mínima legal vigente ~ 20% del total declarado (Decreto 12)
+  const metaLegal = tons * 0.20;
+  const shortfall = Math.max(0, metaLegal - tonsReal);
+  const multa     = shortfall * 195000; // CLP/ton referencial
+  const cumple    = tonsReal >= metaLegal;
+
+  // ── Render ──────────────────────────────────────────────────────────
+  document.getElementById('results-empty').classList.add('hidden');
+  document.getElementById('results-content').classList.remove('hidden');
+
+  const kpis = [
+    { icon:'⚖️', lbl:'Tons. a valorizar',   val: tonsVal.toFixed(1) + ' t',  col:'text-emerald-600' },
+    { icon:'💸', lbl:'Costo total est.',     val: clp(costoTotal),             col:'text-red-500'     },
+    { icon:'🌿', lbl:'CO₂e evitado (est.)', val: co2.toFixed(1) + ' tCO₂e',  col:'text-emerald-600' },
+    { icon:'⚖️', lbl:'Multa en riesgo',     val: cumple ? 'Sin riesgo' : clp(multa), col: cumple ? 'text-emerald-600' : 'text-red-500' },
+  ];
+  document.getElementById('kpi-grid').innerHTML = kpis.map(k =>
+    `<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-center">
+      <div class="text-2xl mb-1">${k.icon}</div>
+      <div class="text-xs text-slate-500 mb-1">${k.lbl}</div>
+      <div class="text-sm font-black ${k.col}">${k.val}</div>
+    </div>`
+  ).join('');
+
+  const mBorder = cumple ? 'border-emerald-200' : 'border-red-200';
+  const mBg     = cumple ? 'bg-emerald-50'      : 'bg-red-50';
+  const mText   = cumple ? 'text-emerald-700'   : 'text-red-700';
+  const mTitle  = cumple
+    ? '✅ Cumplimiento: sin riesgo de multa'
+    : shortfall === metaLegal
+      ? '🚨 Incumplimiento total — multa máxima Art. 48'
+      : '⚠️ Riesgo parcial de multa Art. 48';
+
+  document.getElementById('multas-section').innerHTML = `
+    <div class="border ${mBorder} ${mBg} rounded-2xl p-5">
+      <h3 class="text-sm font-bold ${mText} mb-3">${mTitle}</h3>
+      <div class="space-y-1.5 text-xs text-slate-600">
+        <div class="flex justify-between"><span>Meta legal mínima (≈20%):</span><strong>${metaLegal.toFixed(1)} t</strong></div>
+        <div class="flex justify-between"><span>Toneladas valorizadas (sim.):</span><strong>${tonsReal.toFixed(1)} t</strong></div>
+        <div class="flex justify-between"><span>Brecha con meta legal:</span><strong>${shortfall.toFixed(1)} t</strong></div>
+        <div class="flex justify-between border-t border-slate-200 pt-2 mt-1">
+          <span class="font-bold">Multa estimada Art. 48:</span>
+          <strong class="${mText}">${cumple ? '$0 CLP' : clp(multa)}</strong>
+        </div>
+      </div>
+      ${!cumple ? '<p class="text-xs text-slate-400 mt-2.5">Valor referencial ~$195.000 CLP/ton incumplida · Consulta el texto íntegro del Decreto 12 y la Ley 20.920.</p>' : ''}
+    </div>`;
+
+  document.getElementById('tabla-desglose').innerHTML =
+    `<thead><tr class="text-left">
+      <th class="pb-2 pr-4 text-xs text-slate-400 font-semibold">Ítem</th>
+      <th class="pb-2 text-xs text-slate-400 font-semibold text-right">Monto / año</th>
+    </tr></thead><tbody>` +
+    [
+      ['Recolección en origen',   costoReco ],
+      ['Transporte al gestor',    costoTrans],
+      ['Proceso de valorización', costoVal  ],
+      ['Total costos operativos', costoTotal],
+    ].map(([lbl, monto], i) =>
+      `<tr class="border-t border-slate-100">
+        <td class="py-2 pr-4 text-slate-600${i === 3 ? ' font-bold text-slate-800' : ''}">${lbl}</td>
+        <td class="py-2 text-right font-bold${i === 3 ? ' text-emerald-700' : ' text-slate-700'}">${clp(monto)}</td>
+      </tr>`
+    ).join('') + '</tbody>';
+
+  const maxV = Math.max(costoReco, costoTrans, costoVal);
+  document.getElementById('bar-chart').innerHTML = [
+    { lbl:'Recolección',  val:costoReco,  color:'#dc2626' },
+    { lbl:'Transporte',   val:costoTrans, color:'#f59e0b' },
+    { lbl:'Valorización', val:costoVal,   color:'#2980b9' },
+  ].map(b => {
+    const pct = maxV ? Math.round(b.val / maxV * 100) : 0;
+    return `<div class="flex items-center gap-3">
+      <div class="text-xs text-slate-500 text-right flex-shrink-0 w-24">${b.lbl}</div>
+      <div class="flex-1 h-4 bg-slate-100 rounded-full overflow-hidden">
+        <div class="bar-fill h-full rounded-full" style="width:${pct}%;background:${b.color}"></div>
+      </div>
+      <div class="text-xs font-semibold text-slate-600 flex-shrink-0 w-28 text-right">${clp(b.val)}</div>
+    </div>`;
+  }).join('');
+
+  localStorage.setItem('damu_calc_result', JSON.stringify({
+    cat, tons, tonsVal, costoTotal, co2, multa, cumple, ts: Date.now()
+  }));
+}
+</script>
+</body>
+</html>
