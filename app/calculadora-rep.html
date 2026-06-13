@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Calculadora REP & Multas Art. 48 — Damu SGC</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- jsPDF — generación de PDF client-side, open-source, sin backend -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     input[type=range] { accent-color: #059669; }
     .bar-fill { transition: width 0.6s ease; }
@@ -156,6 +158,23 @@
           <div id="bar-chart" class="space-y-3"></div>
         </div>
 
+        <!-- ── Descargar Certificado PDF ─────────────────────────── -->
+        <div class="bg-gradient-to-r from-emerald-50 to-slate-50 border border-emerald-200 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <p class="text-sm font-bold text-emerald-800 flex items-center gap-2">
+              <span>📄</span> Certificado de Cumplimiento Ley REP
+            </p>
+            <p class="text-xs text-slate-500 mt-0.5">Genera y descarga un PDF formal con todos los datos de esta simulación — Decreto N° 12 · Ley 20.920</p>
+          </div>
+          <button onclick="generarCertificadoPDF()"
+            class="flex-shrink-0 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-sm px-6 py-3 rounded-xl transition-colors flex items-center gap-2 shadow-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+            Descargar Certificado (PDF)
+          </button>
+        </div>
+
       </div>
     </div>
 
@@ -296,6 +315,268 @@ function recalc() {
   localStorage.setItem('damu_calc_result', JSON.stringify({
     cat, tons, tonsVal, costoTotal, co2, multa, cumple, ts: Date.now()
   }));
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// GENERAR CERTIFICADO PDF — jsPDF client-side, sin backend
+// ═══════════════════════════════════════════════════════════════════
+function generarCertificadoPDF() {
+  var saved = JSON.parse(localStorage.getItem('damu_calc_result') || 'null');
+  if (!saved || !saved.costoTotal) {
+    alert('Primero ingresa los parámetros y calcula los resultados para generar el certificado.');
+    return;
+  }
+
+  // ── Leer formulario ───────────────────────────────────────────
+  var catVal    = document.getElementById('s-cat').value;
+  var tons      = parseFloat(document.getElementById('s-tons').value) || 0;
+  var metaPct   = parseFloat(document.getElementById('s-meta').value);
+  var regionEl  = document.getElementById('s-region');
+  var regionTxt = regionEl.options[regionEl.selectedIndex].text;
+  var regMult   = parseFloat(regionEl.value);
+  var rawReal   = parseFloat(document.getElementById('s-tons-real').value);
+  var tonsVal_  = saved.tonsVal;
+  var tonsReal  = isNaN(rawReal) ? tonsVal_ : rawReal;
+  var metaLegal = tons * 0.20;
+  var shortfall = saved.multa > 0 ? saved.multa / 195000 : 0;
+
+  var catNombres = {
+    envases:    'Envases y embalajes',
+    neumaticos: 'Neumaticos',
+    pilas:      'Pilas y baterias',
+    raee:       'Aparatos electricos (RAEE)',
+    aceites:    'Aceites lubricantes',
+  };
+  var catLabel   = catNombres[catVal] || catVal;
+  var cumple     = saved.cumple;
+  var multa      = saved.multa;
+  var co2        = saved.co2;
+  var costoTotal = saved.costoTotal;
+  var t          = tarifas[catVal];
+  var costoReco  = tonsVal_ * t.reco  * regMult;
+  var costoTrans = tonsVal_ * t.trans * regMult;
+  var costoValiz = tonsVal_ * t.val   * regMult;
+
+  function fmt(n) { return '$' + Math.round(Math.abs(n)).toLocaleString('es-CL') + ' CLP'; }
+
+  // ── Identificadores ───────────────────────────────────────────
+  var docId = 'DMU-' + new Date().getFullYear() + '-' + String(Date.now()).slice(-6);
+  var fechaEmision = new Date().toLocaleDateString('es-CL', {
+    year: 'numeric', month: 'long', day: 'numeric',
+  });
+
+  // ── Instanciar jsPDF (soporta versión UMD y legacy) ───────────
+  var JSPDF = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf.jsPDF : window.jsPDF;
+  var doc = new JSPDF({ unit: 'mm', format: 'a4' });
+  var W = 210, M = 14, CW = W - M * 2;
+  var rowIdx = 0;
+
+  // ── Helpers ───────────────────────────────────────────────────
+  function seccion(txt, y) {
+    doc.setFillColor(241, 245, 249);
+    doc.rect(M, y, CW, 6.5, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(txt, M + 3, y + 4.5);
+    rowIdx = 0;
+    return y + 6.5;
+  }
+
+  function fila(etiqueta, valor, y) {
+    if (rowIdx % 2 === 0) {
+      doc.setFillColor(248, 250, 252);
+      doc.rect(M, y, CW, 6, 'F');
+    }
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(etiqueta, M + 3, y + 4.2);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text(String(valor), W - M - 2, y + 4.2, { align: 'right' });
+    rowIdx++;
+    return y + 6;
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // ENCABEZADO oscuro
+  // ════════════════════════════════════════════════════════════════
+  doc.setFillColor(15, 23, 42);
+  doc.rect(0, 0, W, 40, 'F');
+
+  // Logo circular emerald
+  doc.setFillColor(5, 150, 105);
+  doc.circle(M + 7, 20, 7, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(255, 255, 255);
+  doc.text('D', M + 7, 24.5, { align: 'center' });
+
+  // Nombre y subtítulos
+  doc.setFontSize(12.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text('Damu SGC', M + 18, 17);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(148, 163, 184);
+  doc.text('Sistema de Gestion de Cumplimiento', M + 18, 23);
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Trazabilidad Ley REP - Decreto 12 - Chile', M + 18, 29);
+
+  // Badge "CERTIFICADO REP"
+  doc.setFillColor(5, 150, 105);
+  doc.roundedRect(W - M - 30, 14, 30, 8, 1.5, 1.5, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(255, 255, 255);
+  doc.text('CERTIFICADO REP', W - M - 15, 19.3, { align: 'center' });
+
+  // ════════════════════════════════════════════════════════════════
+  // TÍTULO
+  // ════════════════════════════════════════════════════════════════
+  var y = 50;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.setTextColor(15, 23, 42);
+  doc.text('Certificado de Simulacion - Ley REP', M, y);
+
+  y += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text('Decreto N 12  -  Ley 20.920  -  Ministerio del Medio Ambiente de Chile', M, y);
+
+  y += 4;
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.25);
+  doc.line(M, y, W - M, y);
+  y += 5;
+
+  // Metadatos en dos columnas
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139);
+  doc.text('N Documento:', M, y);
+  doc.setFont('helvetica', 'bold');   doc.setTextColor(15, 23, 42);
+  doc.text(docId, M + 26, y);
+  doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139);
+  doc.text('Fecha de emision:', W / 2 + 5, y);
+  doc.setFont('helvetica', 'bold');   doc.setTextColor(15, 23, 42);
+  doc.text(fechaEmision, W - M, y, { align: 'right' });
+
+  y += 5;
+  doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139);
+  doc.text('Emitido por:', M, y);
+  doc.setFont('helvetica', 'bold');   doc.setTextColor(5, 150, 105);
+  doc.text('Damu SGC - Plataforma de Trazabilidad REP', M + 26, y);
+  doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139);
+  doc.text('Tipo:', W / 2 + 5, y);
+  doc.setFont('helvetica', 'bold');   doc.setTextColor(15, 23, 42);
+  doc.text('Simulacion interna', W - M, y, { align: 'right' });
+  y += 9;
+
+  // ════════════════════════════════════════════════════════════════
+  // BANNER DE ESTADO (verde / rojo)
+  // ════════════════════════════════════════════════════════════════
+  if (cumple) {
+    doc.setFillColor(220, 252, 231); doc.setDrawColor(134, 239, 172);
+  } else {
+    doc.setFillColor(254, 226, 226); doc.setDrawColor(252, 165, 165);
+  }
+  doc.setLineWidth(0.3);
+  doc.roundedRect(M, y, CW, 12, 2, 2, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  if (cumple) { doc.setTextColor(22, 101, 52); }
+  else        { doc.setTextColor(153, 27, 27); }
+  var statusTxt = cumple
+    ? 'ESTADO: SIN RIESGO  -  Proyeccion sin sanciones Art. 48  |  Cumplimiento REP verificado'
+    : 'ESTADO: EN RIESGO  -  Incumplimiento detectado  |  Multa estimada Art. 48: ' + fmt(multa);
+  doc.text(statusTxt, W / 2, y + 7.5, { align: 'center' });
+  y += 18;
+
+  // ════════════════════════════════════════════════════════════════
+  // SECCIÓN 1 — Declaración REP
+  // ════════════════════════════════════════════════════════════════
+  y = seccion('1.  DATOS DE LA DECLARACION REP', y);
+  y = fila('Categoria de producto REP',        catLabel,                    y);
+  y = fila('Toneladas puestas en mercado',     tons.toFixed(1) + ' t',     y);
+  y = fila('Meta de valorizacion declarada',   metaPct + '%',              y);
+  y = fila('Toneladas a valorizar (meta)',      tonsVal_.toFixed(1) + ' t', y);
+  y = fila('Toneladas valorizadas (simulado)',  tonsReal.toFixed(1) + ' t', y);
+  y = fila('Region de operacion',              regionTxt,                   y);
+  y += 3;
+
+  // ════════════════════════════════════════════════════════════════
+  // SECCIÓN 2 — Cumplimiento legal
+  // ════════════════════════════════════════════════════════════════
+  y = seccion('2.  EVALUACION DE CUMPLIMIENTO  -  DECRETO N 12', y);
+  y = fila('Meta legal minima (~20% declarado)',   metaLegal.toFixed(1) + ' t',          y);
+  y = fila('Brecha con meta legal',                shortfall.toFixed(1) + ' t',          y);
+  y = fila('Estado de cumplimiento',               cumple ? 'CUMPLE' : 'EN RIESGO',      y);
+  y = fila('Multa estimada Art. 48 (Ley 20.920)',  multa === 0 ? '$0 CLP' : fmt(multa),  y);
+  y += 3;
+
+  // ════════════════════════════════════════════════════════════════
+  // SECCIÓN 3 — Proyección financiera
+  // ════════════════════════════════════════════════════════════════
+  y = seccion('3.  PROYECCION DE COSTOS OPERATIVOS', y);
+  y = fila('Recoleccion en origen',          fmt(costoReco),              y);
+  y = fila('Transporte al gestor',           fmt(costoTrans),             y);
+  y = fila('Proceso de valorizacion',        fmt(costoValiz),             y);
+  // Línea separadora antes del total
+  doc.setDrawColor(203, 213, 225); doc.setLineWidth(0.2);
+  doc.line(M + CW * 0.45, y, W - M, y);
+  y = fila('COSTO TOTAL OPERATIVO ESTIMADO', fmt(costoTotal),             y);
+  y = fila('CO2e evitado (estimado)',         co2.toFixed(2) + ' tCO2e', y);
+  y += 3;
+
+  // ════════════════════════════════════════════════════════════════
+  // NOTA LEGAL
+  // ════════════════════════════════════════════════════════════════
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(M, y, CW, 20, 2, 2, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(71, 85, 105);
+  doc.text('OBSERVACIONES Y LIMITACIONES DE USO', M + 4, y + 5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text('Este documento es una simulacion para trazabilidad interna y no constituye un certificado oficial.', M + 4, y + 10);
+  doc.text('Los valores son estimaciones basadas en rangos del mercado chileno de logistica inversa.', M + 4, y + 14.5);
+  doc.text('Para declaraciones formales ante el SMA, consulte con un gestor autorizado.', M + 4, y + 19);
+
+  // ════════════════════════════════════════════════════════════════
+  // FOOTER
+  // ════════════════════════════════════════════════════════════════
+  doc.setDrawColor(203, 213, 225); doc.setLineWidth(0.25);
+  doc.line(M, 276, W - M, 276);
+  doc.setFillColor(15, 23, 42);
+  doc.rect(0, 277, W, 20, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text('Damu SGC - Trazabilidad Ley REP - Chile', M, 285);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(148, 163, 184);
+  doc.text('Documento generado automaticamente para trazabilidad interna - ' + fechaEmision, M, 290.5);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(5, 150, 105);
+  doc.text(docId, W - M, 285, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Decreto 12 - Ley 20.920 - MMA Chile', W - M, 290.5, { align: 'right' });
+
+  // ── Descargar ─────────────────────────────────────────────────
+  doc.save('Certificado_Damu_LeyREP.pdf');
 }
 </script>
 </body>
