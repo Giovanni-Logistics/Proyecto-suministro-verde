@@ -166,17 +166,18 @@
 
 <script>
 // ═══════════════════════════════════════════════════════════════════
-// DASHBOARD KPI — persistencia via localStorage
-// Lee: damu_datos_ruta (enriquecido) | damu_ruta_result (legado)
-//      damu_calc_result (calculadora REP)
-// Actualización cross-tab: evento 'storage'
+// DASHBOARD KPI — datos en tiempo real desde Supabase
+// Lee: viajes_operativos (simulador + QR) | certificados_rep (REP)
+// RLS filtra automáticamente solo los registros del usuario actual
 // ═══════════════════════════════════════════════════════════════════
 
-// Valores de demo para cuando localStorage está vacío
-var DEMO = {
-  diesel: 1350, rendim: 12, freq: 12, dist: 80,
-  costoPorViaje: 18000, costoAnualDiesel: 216000, costoMensual: 18000,
-  costoPorKm: 113, litrosPorViaje: 13.3, paybackMeses: null,
+// Tarifas REP (mismas que calculadora-rep.html para reconstruir OPEX)
+var tarifas = {
+  envases:    { reco:18000, trans:12000, val:22000, co2:0.8  },
+  neumaticos: { reco:25000, trans:18000, val:30000, co2:1.4  },
+  pilas:      { reco:35000, trans:20000, val:45000, co2:0.4  },
+  raee:       { reco:40000, trans:25000, val:50000, co2:1.1  },
+  aceites:    { reco:22000, trans:15000, val:28000, co2:0.9  },
 };
 
 function fmt(n) {
@@ -184,100 +185,119 @@ function fmt(n) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-function cargarDatos() {
+async function cargarDatosDB() {
+  var sb = window.__damuSupabase;
+  if (!sb) return;
 
-  // 1. Leer fuentes — clave enriquecida con fallback a legado
-  var calc = JSON.parse(localStorage.getItem('damu_calc_result') || 'null');
-  var ruta = JSON.parse(localStorage.getItem('damu_datos_ruta')  || 'null')
-          || JSON.parse(localStorage.getItem('damu_ruta_result') || 'null');
+  // 1. Consultar ambas tablas en paralelo ───────────────────────
+  var resultados = await Promise.all([
+    sb.from('viajes_operativos')
+      .select('distancia_km, costo_diesel, cargas_qr_kg, created_at')
+      .order('created_at', { ascending: false }),
+    sb.from('certificados_rep')
+      .select('categoria, toneladas_declaradas, meta_valorizacion_porcentaje, riesgo_multa_estimado, created_at')
+      .order('created_at', { ascending: false })
+      .limit(1),
+  ]);
 
-  var tieneCalc  = !!(calc && calc.ts);
-  var tieneRuta  = !!(ruta && ruta.dist);
-  var tieneDatos = tieneCalc || tieneRuta;
+  var viajes = resultados[0].data || [];
+  var certs  = resultados[1].data || [];
 
-  // 2. Badge de última actualización ────────────────────────────
+  // 2. Procesar viajes ─────────────────────────────────────────
+  var ultimoViaje = viajes.find(function (v) { return v.distancia_km > 0; }) || null;
+  var totalQrKg   = viajes.reduce(function (a, v) { return a + (v.cargas_qr_kg || 0); }, 0);
+  var nEscaneos   = viajes.filter(function (v) { return v.cargas_qr_kg > 0; }).length;
+
+  // 3. Procesar certificados REP ────────────────────────────────
+  var ultimoCert = certs.length > 0 ? certs[0] : null;
+
+  var tieneViaje = !!ultimoViaje;
+  var tieneCert  = !!ultimoCert;
+  var tieneDatos = tieneViaje || tieneCert;
+
+  // 4. Badge de última actualización ────────────────────────────
   if (tieneDatos) {
-    var ts = Math.max(tieneCalc ? calc.ts : 0, tieneRuta ? ruta.ts : 0);
+    var ts = 0;
+    if (tieneViaje) ts = Math.max(ts, new Date(ultimoViaje.created_at).getTime());
+    if (tieneCert)  ts = Math.max(ts, new Date(ultimoCert.created_at).getTime());
     document.getElementById('last-update-ts').textContent =
       new Date(ts).toLocaleString('es-CL');
     document.getElementById('last-update-badge').classList.remove('hidden');
     document.getElementById('data-source-label').textContent =
-      'Fuente: datos simulador Damu SGC';
+      'Fuente: Supabase · datos en la nube';
   } else {
     document.getElementById('data-source-label').textContent =
-      'Fuente: estimaciones demo';
+      'Fuente: sin datos guardados aún';
   }
 
-  // 3. Normalizar valores de ruta (real vs demo) ────────────────
-  var r;
-  if (tieneRuta) {
-    r = {
-      dist:             ruta.dist,
-      diesel:           ruta.diesel           || DEMO.diesel,
-      rendim:           ruta.rendim           || DEMO.rendim,
-      freq:             ruta.freq             || DEMO.freq,
-      costoPorViaje:    ruta.costoPorViaje    || (ruta.costAnual / (ruta.freq || 12)),
-      costoAnualDiesel: ruta.costoAnualDiesel || ruta.costAnual,
-      costoMensual:     ruta.costoMensual     || ruta.costMes,
-      costoPorKm:       ruta.costoPorKm       || DEMO.costoPorKm,
-      litrosPorViaje:   ruta.litrosPorViaje   || null,
-      paybackMeses:     ruta.paybackMeses     || null,
+  // 5. Construir objeto de ruta ─────────────────────────────────
+  var r = tieneViaje ? {
+    dist:             ultimoViaje.distancia_km,
+    costoAnualDiesel: ultimoViaje.costo_diesel,
+    costoMensual:     ultimoViaje.costo_diesel / 12,
+  } : null;
+
+  // 6. Reconstruir métricas REP desde datos guardados ──────────
+  var calc = null;
+  if (tieneCert) {
+    var cat     = ultimoCert.categoria;
+    var tons    = ultimoCert.toneladas_declaradas;
+    var meta    = ultimoCert.meta_valorizacion_porcentaje / 100;
+    var tonsVal = tons * meta;
+    var t       = tarifas[cat] || tarifas.envases;
+    calc = {
+      costoTotal: Math.round(tonsVal * (t.reco + t.trans + t.val)),
+      co2:        tonsVal * 0.9 * t.co2,
+      multa:      ultimoCert.riesgo_multa_estimado,
+      cumple:     ultimoCert.riesgo_multa_estimado === 0,
     };
-  } else {
-    r = DEMO;
   }
 
-  // 4. KPI Grid ─────────────────────────────────────────────────
+  // 7. KPI Grid ─────────────────────────────────────────────────
   var kpis = [
     {
       icon:'💸', lbl:'Costo OPEX anual',
-      val: tieneCalc && calc.costoTotal ? fmt(calc.costoTotal) : '—',
-      sub: tieneCalc ? 'Calculadora REP' : 'sin datos REP',
-      col: tieneCalc && calc.costoTotal ? 'text-red-500' : 'text-slate-400',
+      val: calc ? fmt(calc.costoTotal) : '—',
+      sub: tieneCert ? 'Calculadora REP' : 'sin datos REP',
+      col: calc ? 'text-red-500' : 'text-slate-400',
     },
     {
       icon:'⛽', lbl:'Costo diésel anual',
-      val: tieneRuta ? fmt(r.costoAnualDiesel) : '—',
-      sub: tieneRuta ? 'Simulador de ruta' : 'sin ruta simulada',
-      col: tieneRuta ? 'text-amber-500' : 'text-slate-400',
+      val: r ? fmt(r.costoAnualDiesel) : '—',
+      sub: tieneViaje ? 'Simulador de ruta' : 'sin ruta guardada',
+      col: r ? 'text-amber-500' : 'text-slate-400',
     },
     {
       icon:'🌿', lbl:'CO₂e evitado',
-      val: tieneCalc && calc.co2 ? calc.co2.toFixed(1) + ' t' : '—',
-      sub: 'toneladas CO₂e',
-      col: tieneCalc && calc.co2 ? 'text-emerald-600' : 'text-slate-400',
+      val: calc ? calc.co2.toFixed(1) + ' t' : '—',
+      sub: 'toneladas CO₂e estimadas',
+      col: calc ? 'text-emerald-600' : 'text-slate-400',
     },
     {
       icon:'📍', lbl:'Dist. al gestor',
-      val: tieneRuta ? r.dist + ' km' : '—',
-      sub: tieneRuta ? 'última ruta mapeada' : 'sin ruta',
-      col: tieneRuta ? 'text-blue-500' : 'text-slate-400',
+      val: r ? r.dist + ' km' : '—',
+      sub: tieneViaje ? 'última ruta calculada' : 'sin ruta',
+      col: r ? 'text-blue-500' : 'text-slate-400',
     },
     {
       icon:'⚖️', lbl:'Multa en riesgo',
-      val: tieneCalc && calc.multa != null
-        ? (calc.multa === 0 ? '$0 CLP' : fmt(calc.multa))
-        : '—',
+      val: calc ? (calc.multa === 0 ? '$0 CLP' : fmt(calc.multa)) : '—',
       sub: 'Art. 48 Ley REP',
-      col: tieneCalc && calc.multa != null
-        ? (calc.multa === 0 ? 'text-emerald-600' : 'text-red-500')
-        : 'text-slate-400',
+      col: calc ? (calc.multa === 0 ? 'text-emerald-600' : 'text-red-500') : 'text-slate-400',
     },
     {
-      icon: tieneCalc && calc.cumple === true  ? '✅'
-          : tieneCalc && calc.cumple === false ? '❌' : '❓',
+      icon: calc && calc.cumple === true  ? '✅'
+          : calc && calc.cumple === false ? '❌' : '❓',
       lbl: 'Cumplimiento REP',
-      val: tieneCalc && calc.cumple != null
-        ? (calc.cumple ? 'Cumple' : 'En riesgo')
-        : '—',
+      val: calc ? (calc.cumple ? 'Cumple' : 'En riesgo') : '—',
       sub: 'meta legal Decreto 12',
-      col: tieneCalc && calc.cumple === true  ? 'text-emerald-600'
-         : tieneCalc && calc.cumple === false ? 'text-red-500'
+      col: calc && calc.cumple === true  ? 'text-emerald-600'
+         : calc && calc.cumple === false ? 'text-red-500'
          : 'text-slate-400',
     },
   ];
 
-  document.getElementById('kpi-grid').innerHTML = kpis.map(function(k) {
+  document.getElementById('kpi-grid').innerHTML = kpis.map(function (k) {
     return '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-center hover:shadow-md transition-shadow">'
       + '<div class="text-2xl mb-1.5">' + k.icon + '</div>'
       + '<div class="text-lg font-black ' + k.col + '">' + k.val + '</div>'
@@ -286,14 +306,13 @@ function cargarDatos() {
       + '</div>';
   }).join('');
 
-  // 5. Gráfico distribución de costos ───────────────────────────
-  var pctTransporte  = 32;    // base demo
+  // 8. Gráfico distribución de costos ───────────────────────────
+  var pctTransporte  = 32;
   var pctReco        = 38;
   var pctVal         = 30;
   var transporteReal = false;
 
-  if (tieneCalc && calc.costoTotal && tieneRuta && r.costoAnualDiesel) {
-    // Proporción real: diesel vs OPEX total
+  if (calc && calc.costoTotal && r && r.costoAnualDiesel) {
     pctTransporte  = Math.min(75, Math.max(5,
       Math.round(r.costoAnualDiesel / calc.costoTotal * 100)));
     var resto  = 100 - pctTransporte;
@@ -302,13 +321,11 @@ function cargarDatos() {
     transporteReal = true;
   }
 
-  var barras = [
+  document.getElementById('cost-chart').innerHTML = [
     { lbl:'Recolección',  pct: pctReco,      color:'#dc2626', real: false          },
     { lbl:'Transporte',   pct: pctTransporte, color:'#f59e0b', real: transporteReal },
     { lbl:'Valorización', pct: pctVal,        color:'#2980b9', real: false          },
-  ];
-
-  document.getElementById('cost-chart').innerHTML = barras.map(function(b) {
+  ].map(function (b) {
     var etiqueta = b.real
       ? '<span class="text-emerald-600 font-semibold">' + b.lbl + ' ✓</span>'
       : '<span>' + b.lbl + '</span>';
@@ -321,17 +338,17 @@ function cargarDatos() {
       + '</div>';
   }).join('');
 
-  // 6. Panel de eficiencia diésel ───────────────────────────────
+  // 9. Panel eficiencia diésel ──────────────────────────────────
   var metricas = [
-    { lbl:'Precio diésel',  val: fmt(r.diesel).replace(' CLP','') + '/L',                     icon:'⛽', real: tieneRuta },
-    { lbl:'Rendimiento',    val: r.rendim + ' km/L',                                          icon:'🚛', real: tieneRuta },
-    { lbl:'Costo por km',   val: fmt(r.costoPorKm).replace(' CLP','') + '/km',                icon:'📏', real: tieneRuta },
-    { lbl:'Retiros / año',  val: r.freq + ' retiros',                                         icon:'🔄', real: tieneRuta },
-    { lbl:'Litros / viaje', val: r.litrosPorViaje ? r.litrosPorViaje.toFixed(1) + ' L' : '—', icon:'🛢️', real: tieneRuta && !!r.litrosPorViaje },
-    { lbl:'Payback',        val: r.paybackMeses ? r.paybackMeses + ' meses' : '—',            icon:'⏱️', real: !!r.paybackMeses },
+    { lbl:'Costo diésel anual',  val: r ? fmt(r.costoAnualDiesel) : '—',                              icon:'⛽', real: tieneViaje },
+    { lbl:'Costo mensual',       val: r ? fmt(r.costoMensual)     : '—',                              icon:'💳', real: tieneViaje },
+    { lbl:'Distancia al gestor', val: r ? r.dist + ' km' : '—',                                      icon:'📏', real: tieneViaje },
+    { lbl:'OPEX anual REP',      val: calc ? fmt(calc.costoTotal) : '—',                              icon:'💸', real: tieneCert  },
+    { lbl:'Cargas QR acum.',     val: totalQrKg > 0 ? totalQrKg.toLocaleString('es-CL') + ' kg' : '—', icon:'📦', real: totalQrKg > 0 },
+    { lbl:'Escaneos totales',    val: nEscaneos > 0 ? nEscaneos + ' registros' : '—',                icon:'🔢', real: nEscaneos > 0 },
   ];
 
-  document.getElementById('diesel-chart').innerHTML = metricas.map(function(m, i) {
+  document.getElementById('diesel-chart').innerHTML = metricas.map(function (m, i) {
     var borderClass = i < metricas.length - 1 ? 'border-b border-slate-100 pb-3' : '';
     var badge       = m.real ? ' <span class="text-emerald-500 text-xs font-bold">✓</span>' : '';
     var valColor    = m.real ? 'text-emerald-700' : 'text-slate-500';
@@ -344,19 +361,9 @@ function cargarDatos() {
   }).join('');
 }
 
-// ── Inicializar ────────────────────────────────────────────────
-cargarDatos();
-
-// ── Actualización cross-tab en tiempo real ─────────────────────
-// Cuando el simulador guarda datos en otra pestaña, el dashboard
-// se actualiza automáticamente sin recargar la página.
-window.addEventListener('storage', function(e) {
-  if (e.key === 'damu_datos_ruta'
-   || e.key === 'damu_ruta_result'
-   || e.key === 'damu_calc_result') {
-    cargarDatos();
-  }
-});
+// ── Cargar al iniciar ──────────────────────────────────────────
+// __damuSupabase está disponible de forma síncrona desde auth-guard.js
+cargarDatosDB();
 </script>
 </body>
 </html>
