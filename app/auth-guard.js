@@ -38,9 +38,14 @@
     // Sesión válida: extraer perfil desde metadata Supabase o localStorage
     var user   = session.user;
     var meta   = (user && user.user_metadata) ? user.user_metadata : {};
-    var perfil = meta.perfil || localStorage.getItem('damu_perfil') || 'productor';
+    var perfil = meta.role
+              || meta.perfil
+              || localStorage.getItem('damu_role')
+              || localStorage.getItem('damu_perfil')
+              || 'productor';
 
     // Persistir perfil y datos de sesión
+    localStorage.setItem('damu_role',   perfil);
     localStorage.setItem('damu_perfil', perfil);
     localStorage.setItem('damu_session', JSON.stringify({
       email: user.email, userId: user.id, perfil: perfil, ts: Date.now()
