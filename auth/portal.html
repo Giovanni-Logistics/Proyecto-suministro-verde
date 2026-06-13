@@ -411,49 +411,31 @@ async function handleLogin() {
   setLoading('login', true);
   document.getElementById('msg-login').classList.add('hidden');
 
-  // ── Modo Supabase real ─────────────────────────────────────────
-  if (SUPA_READY) {
-    try {
-      var result = await supabase.auth.signInWithPassword({ email: email, password: pwd });
-      var data   = result.data;
-      var error  = result.error;
+  try {
+    var result = await supabase.auth.signInWithPassword({ email: email, password: pwd });
+    var data   = result.data;
+    var error  = result.error;
 
-      if (error) {
-        setMsg('login', 'err', traducirError(error.message));
-        setLoading('login', false);
-        return;
-      }
-
-      // Éxito
-      localStorage.setItem('damu_perfil', perfil);
-      localStorage.setItem('damu_session', JSON.stringify({
-        email:  data.user.email,
-        userId: data.user.id,
-        perfil: perfil,
-        ts:     Date.now(),
-      }));
-      setMsg('login', 'ok', '✓ Acceso concedido. Redirigiendo a tu plataforma…');
-      setTimeout(function () { redirigir(perfil); }, 900);
-
-    } catch (e) {
-      setMsg('login', 'err', '🌐 Error de conexión. Verifica tu internet.');
+    if (error) {
+      setMsg('login', 'err', traducirError(error.message));
       setLoading('login', false);
+      return;
     }
 
-  // ── Modo Demo (Supabase no configurado) ────────────────────────
-  } else {
-    setTimeout(function () {
-      // Simular latencia de red
-      localStorage.setItem('damu_perfil', perfil);
-      localStorage.setItem('damu_session', JSON.stringify({
-        email:  email,
-        perfil: perfil,
-        demo:   true,
-        ts:     Date.now(),
-      }));
-      setMsg('login', 'ok', '✓ Modo demo: acceso concedido. Redirigiendo…');
-      setTimeout(function () { redirigir(perfil); }, 900);
-    }, 1000);
+    // Éxito
+    localStorage.setItem('damu_perfil', perfil);
+    localStorage.setItem('damu_session', JSON.stringify({
+      email:  data.user.email,
+      userId: data.user.id,
+      perfil: perfil,
+      ts:     Date.now(),
+    }));
+    setMsg('login', 'ok', '✓ Acceso concedido. Redirigiendo a tu plataforma…');
+    setTimeout(function () { redirigir(perfil); }, 900);
+
+  } catch (e) {
+    setMsg('login', 'err', '🌐 Error de conexión. Verifica tu internet.');
+    setLoading('login', false);
   }
 }
 
