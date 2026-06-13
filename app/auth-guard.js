@@ -6,7 +6,7 @@
 (function () {
   'use strict';
 
-  var SUPABASE_URL      = 'https://iaqvcpxseljwbstcnma.supabase.co';
+  var SUPABASE_URL      = 'https://iaqvcpxselfjwbstcnma.supabase.co';
   var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhcXZjcHhzZWxmandic3Rjbm1hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyOTkwODgsImV4cCI6MjA5Njg3NTA4OH0.EzadAJxFjKdru0xpy6YGhIRc-Lk1_QroLSAM0fKdJM0';
 
   // 1 — Ocultar inmediatamente: evita flash de contenido protegido
