@@ -355,22 +355,71 @@ function reiniciarEscaner() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// RENDER HISTORIAL + STATS
+// GUARDAR CARGA EN SUPABASE
 // ═══════════════════════════════════════════════════════════════════
-function renderHistorial() {
-  var cargas = JSON.parse(localStorage.getItem('damu_cargas_qr') || '[]');
+async function _guardarCargaDB(carga) {
+  var sb = window.__damuSupabase;
+  if (!sb) return;
+
+  var sesion = await sb.auth.getSession();
+  if (!sesion.data || !sesion.data.session) return;
+  var uid = sesion.data.session.user.id;
+
+  var { error } = await sb.from('viajes_operativos').insert({
+    user_id:      uid,
+    origen:       (carga.qrContent || '').slice(0, 250),
+    destino:      carga.categoria || null,
+    distancia_km: 0,
+    costo_diesel: 0,
+    cargas_qr_kg: carga.kgs || 0,
+  });
+
+  if (error) {
+    console.warn('[Damu] Error guardando carga QR:', error.message);
+  } else {
+    renderHistorial();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER HISTORIAL + STATS — lee desde Supabase
+// ═══════════════════════════════════════════════════════════════════
+async function renderHistorial() {
+  var sb     = window.__damuSupabase;
+  var cargas = [];
+
+  if (sb) {
+    var resultado = await sb
+      .from('viajes_operativos')
+      .select('id, origen, destino, cargas_qr_kg, created_at')
+      .gt('cargas_qr_kg', 0)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (!resultado.error && resultado.data) {
+      cargas = resultado.data.map(function (row) {
+        var dt = new Date(row.created_at);
+        return {
+          id:        row.id,
+          qrContent: row.origen  || '—',
+          categoria: row.destino || '—',
+          kgs:       row.cargas_qr_kg || 0,
+          fecha:     dt.toLocaleDateString('es-CL'),
+          hora:      dt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
+        };
+      });
+    }
+  }
 
   // ── Stats ─────────────────────────────────────────────────────
-  var hoy        = new Date().toLocaleDateString('es-CL');
-  var totalKg    = cargas.reduce(function(a, c) { return a + (c.kgs || 0); }, 0);
-  var hoyCuenta  = cargas.filter(function(c) { return c.fecha === hoy; }).length;
+  var hoy       = new Date().toLocaleDateString('es-CL');
+  var totalKg   = cargas.reduce(function (a, c) { return a + (c.kgs || 0); }, 0);
+  var hoyCuenta = cargas.filter(function (c) { return c.fecha === hoy; }).length;
 
-  // Categoría más frecuente
   var freq = {};
-  cargas.forEach(function(c) { freq[c.categoria] = (freq[c.categoria] || 0) + 1; });
-  var topCat = null;
-  var topN   = 0;
-  Object.keys(freq).forEach(function(k) { if (freq[k] > topN) { topCat = k; topN = freq[k]; } });
+  cargas.forEach(function (c) { freq[c.categoria] = (freq[c.categoria] || 0) + 1; });
+  var topCat = null, topN = 0;
+  Object.keys(freq).forEach(function (k) { if (freq[k] > topN) { topCat = k; topN = freq[k]; } });
 
   document.getElementById('stat-total-kg').textContent  = totalKg.toLocaleString('es-CL') + ' kg';
   document.getElementById('stat-escaneos').textContent  = hoyCuenta;
@@ -387,30 +436,41 @@ function renderHistorial() {
   document.getElementById('historial-empty').classList.add('hidden');
   document.getElementById('historial-table').classList.remove('hidden');
 
-  document.getElementById('historial-tbody').innerHTML = cargas.map(function(c, i) {
-    var colorClases = COLORES[c.categoria] || 'text-slate-700 bg-slate-50 border-slate-200';
-    var trBg = i % 2 === 0 ? '' : 'bg-slate-50/50';
+  document.getElementById('historial-tbody').innerHTML = cargas.map(function (c, i) {
+    var cat         = c.categoria || '—';
+    var colorClases = COLORES[cat] || 'text-slate-700 bg-slate-50 border-slate-200';
+    var trBg        = i % 2 === 0 ? '' : 'bg-slate-50/50';
     return '<tr class="border-b border-slate-100 ' + trBg + ' hover:bg-emerald-50/30 transition-colors">'
       + '<td class="px-4 py-2.5">'
       + '<span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-1 rounded-full border ' + colorClases + '">'
-      + (ICONOS[c.categoria] || '📦') + ' ' + (c.categoria || '—')
+      + (ICONOS[cat] || '📦') + ' ' + cat
       + '</span></td>'
       + '<td class="px-4 py-2.5 font-bold text-slate-700">' + (c.kgs || 0).toLocaleString('es-CL') + ' kg</td>'
       + '<td class="px-4 py-2.5 text-slate-500 font-mono max-w-[140px]">'
       + '<span class="truncate block max-w-[130px]" title="' + (c.qrContent || '') + '">'
-      + (c.qrContent ? (c.qrContent.length > 18 ? c.qrContent.slice(0, 18) + '…' : c.qrContent) : '—')
+      + (c.qrContent.length > 18 ? c.qrContent.slice(0, 18) + '…' : c.qrContent)
       + '</span></td>'
-      + '<td class="px-4 py-2.5 text-slate-400 whitespace-nowrap">' + (c.fecha || '') + ' ' + (c.hora || '') + '</td>'
+      + '<td class="px-4 py-2.5 text-slate-400 whitespace-nowrap">' + c.fecha + ' ' + c.hora + '</td>'
       + '</tr>';
   }).join('');
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// LIMPIAR HISTORIAL
+// LIMPIAR HISTORIAL — elimina registros QR del usuario en Supabase
 // ═══════════════════════════════════════════════════════════════════
-function limpiarHistorial() {
+async function limpiarHistorial() {
   if (!confirm('¿Eliminar todos los registros de escaneos? Esta acción no se puede deshacer.')) return;
-  localStorage.removeItem('damu_cargas_qr');
+
+  var sb = window.__damuSupabase;
+  if (sb) {
+    var { error } = await sb
+      .from('viajes_operativos')
+      .delete()
+      .gt('cargas_qr_kg', 0);
+
+    if (error) console.warn('[Damu] Error eliminando cargas:', error.message);
+  }
+
   renderHistorial();
 }
 </script>
