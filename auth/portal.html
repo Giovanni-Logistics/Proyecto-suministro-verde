@@ -335,7 +335,8 @@ async function handleSubmit() {
       await doRegistro(email, pwd);
     }
   } catch (e) {
-    setMsg('err', '🌐 Error de conexión. Verifica tu internet.');
+    console.error('[Damu] Error inesperado en submit:', e);
+    setMsg('err', traducirError(e));
     setLoading(false);
   }
 }
