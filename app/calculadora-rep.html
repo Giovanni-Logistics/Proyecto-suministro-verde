@@ -282,9 +282,8 @@ function recalc() {
     </div>`;
   }).join('');
 
-  localStorage.setItem('damu_calc_result', JSON.stringify({
-    cat, tons, tonsVal, costoTotal, co2, multa, cumple, ts: Date.now()
-  }));
+  _lastCalcResult = { cat, tons, tonsVal, costoTotal, co2, multa, cumple,
+    meta: parseFloat(document.getElementById('s-meta').value), ts: Date.now() };
 }
 
 // ═══════════════════════════════════════════════════════════════════
