@@ -289,11 +289,30 @@ function recalc() {
 // ═══════════════════════════════════════════════════════════════════
 // GENERAR CERTIFICADO PDF — jsPDF client-side, sin backend
 // ═══════════════════════════════════════════════════════════════════
-function generarCertificadoPDF() {
-  var saved = JSON.parse(localStorage.getItem('damu_calc_result') || 'null');
+async function generarCertificadoPDF() {
+  var saved = _lastCalcResult;
   if (!saved || !saved.costoTotal) {
     alert('Primero ingresa los parámetros y calcula los resultados para generar el certificado.');
     return;
+  }
+
+  // ── Guardar en Supabase antes de generar el PDF ───────────────
+  var sb = window.__damuSupabase;
+  if (sb) {
+    try {
+      var sesion = await sb.auth.getSession();
+      if (sesion.data && sesion.data.session) {
+        await sb.from('certificados_rep').insert({
+          user_id:                     sesion.data.session.user.id,
+          categoria:                   saved.cat,
+          toneladas_declaradas:        saved.tons,
+          meta_valorizacion_porcentaje: saved.meta || 0,
+          riesgo_multa_estimado:       saved.multa || 0,
+        });
+      }
+    } catch (e) {
+      console.warn('[Damu] Error guardando certificado:', e.message);
+    }
   }
 
   // ── Leer formulario ───────────────────────────────────────────
