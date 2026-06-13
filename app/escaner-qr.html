@@ -303,11 +303,8 @@ function onScanSuccess(decodedText) {
     hora:      ahora.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
   };
 
-  // Persistir en localStorage
-  var cargas = JSON.parse(localStorage.getItem('damu_cargas_qr') || '[]');
-  cargas.unshift(carga);
-  if (cargas.length > 100) cargas = cargas.slice(0, 100);
-  localStorage.setItem('damu_cargas_qr', JSON.stringify(cargas));
+  // Persistir en Supabase (async, no bloquea el modal)
+  _guardarCargaDB(carga);
 
   // Mostrar modal
   document.getElementById('modal-icono').textContent      = icono;
