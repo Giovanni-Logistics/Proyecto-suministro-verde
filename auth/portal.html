@@ -200,18 +200,22 @@ var CLS_TRANS_INACT  = 'border-2 border-slate-200 bg-white rounded-xl p-4 text-c
 // ═══════════════════════════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', async function () {
   // Restaurar preferencia de perfil guardada
-  var perfilGuardado = localStorage.getItem('damu_perfil');
-  if (perfilGuardado) setPerfil(perfilGuardado);
+  var roleGuardado = localStorage.getItem('damu_role') || localStorage.getItem('damu_perfil');
+  if (roleGuardado) setPerfil(roleGuardado);
 
   // Verificar sesión Supabase activa → redirigir si ya está autenticado
   try {
     var result  = await supabase.auth.getSession();
     var session = result.data && result.data.session;
     if (session) {
-      var p = localStorage.getItem('damu_perfil') || 'productor';
+      var meta = (session.user.user_metadata) || {};
+      var role = meta.role
+              || localStorage.getItem('damu_role')
+              || localStorage.getItem('damu_perfil')
+              || 'productor';
       setMsg('login', 'ok', '✓ Sesión activa. Redirigiendo...');
       document.getElementById('form-login').classList.add('opacity-50', 'pointer-events-none');
-      setTimeout(function () { redirigir(p); }, 800);
+      setTimeout(function () { redirigir(role); }, 800);
     }
   } catch (e) { console.warn('[Damu] Error al verificar sesión:', e.message); }
 });
