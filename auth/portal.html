@@ -359,16 +359,19 @@ async function handleLogin() {
       return;
     }
 
-    // Éxito
-    localStorage.setItem('damu_perfil', perfil);
+    // Leer rol desde los metadatos de Supabase (fuente de verdad)
+    var role = (data.user.user_metadata && data.user.user_metadata.role)
+            || perfil;
+    localStorage.setItem('damu_role',   role);
+    localStorage.setItem('damu_perfil', role); // backward compat con auth-guard.js
     localStorage.setItem('damu_session', JSON.stringify({
       email:  data.user.email,
       userId: data.user.id,
-      perfil: perfil,
+      perfil: role,
       ts:     Date.now(),
     }));
     setMsg('login', 'ok', '✓ Acceso concedido. Redirigiendo a tu plataforma…');
-    setTimeout(function () { redirigir(perfil); }, 900);
+    setTimeout(function () { redirigir(role); }, 900);
 
   } catch (e) {
     setMsg('login', 'err', '🌐 Error de conexión. Verifica tu internet.');
