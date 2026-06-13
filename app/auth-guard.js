@@ -19,6 +19,7 @@
   // 3 — Cierre de sesión (llamado por el botón "Salir" del nav)
   window.__damuSignOut = async function () {
     try { await _sb.auth.signOut(); } catch (e) {}
+    localStorage.removeItem('damu_role');
     localStorage.removeItem('damu_perfil');
     localStorage.removeItem('damu_session');
     window.location.href = '../index.html';
