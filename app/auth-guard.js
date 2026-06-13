@@ -63,7 +63,7 @@
       window.location.replace('../auth/portal.html');
       return;
     }
-    var perfil = localStorage.getItem('damu_perfil') || 'productor';
+    var perfil = localStorage.getItem('damu_role') || localStorage.getItem('damu_perfil') || 'productor';
     window.__damuPerfil = perfil;
     window.__damuUser   = { email: localSess.email || '' };
     _renderizar(perfil, window.__damuUser);
