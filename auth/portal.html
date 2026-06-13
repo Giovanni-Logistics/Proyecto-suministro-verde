@@ -5,18 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Portal de Acceso — Damu SGC</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Supabase JS v2 — Auth Backend as a Service -->
+  <!-- Supabase JS v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     input[type=password]::-ms-reveal,
     input[type=password]::-webkit-credentials-auto-fill-button { display: none; }
-    /* Animación de entrada de la card */
     @keyframes slideUp {
       from { opacity: 0; transform: translateY(24px); }
       to   { opacity: 1; transform: translateY(0); }
     }
     .card-enter { animation: slideUp 0.4s ease both; }
-    /* Spinner */
     @keyframes spin { to { transform: rotate(360deg); } }
     .spinner { animation: spin 0.8s linear infinite; }
   </style>
@@ -44,110 +42,93 @@
 
     <!-- ── CABECERA CARD ──────────────────────────────────────────── -->
     <div class="bg-gradient-to-br from-emerald-900 to-emerald-600 px-6 py-7 text-center relative overflow-hidden">
-      <!-- Círculo decorativo de fondo -->
-      <div class="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/5"></div>
-      <div class="absolute -bottom-6 -left-6 w-24 h-24 rounded-full bg-white/5"></div>
-      <!-- Logo -->
+      <div class="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/5 pointer-events-none"></div>
+      <div class="absolute -bottom-6 -left-6 w-24 h-24 rounded-full bg-white/5 pointer-events-none"></div>
       <div class="w-14 h-14 rounded-full bg-white/15 border-2 border-white/25 flex items-center justify-center font-black text-white text-2xl mx-auto mb-4 relative z-10">D</div>
       <h1 class="text-white font-black text-xl mb-1 relative z-10">Acceso al Sistema Damu</h1>
       <p class="text-emerald-200 text-xs relative z-10">Selecciona tu perfil para ingresar o registrarte</p>
     </div>
 
     <!-- ── SELECTOR DE PERFIL ─────────────────────────────────────── -->
-    <div class="grid grid-cols-2 gap-3 p-5 pb-3">
-      <button id="btn-prod" onclick="setPerfil('productor')"
-        class="border-2 border-emerald-500 bg-emerald-50 rounded-xl p-4 text-center cursor-pointer transition-all">
-        <span class="text-3xl block mb-2">🏭</span>
-        <span class="text-sm font-bold text-emerald-700 block">Empresa Productora</span>
-        <span class="text-xs text-emerald-500 mt-0.5 block">Portal REP · Eco-Ticket</span>
+    <!-- relative + z-10 garantizan que ningún elemento del formulario tape los botones -->
+    <div class="grid grid-cols-2 gap-3 p-5 pb-3 relative z-10">
+
+      <button id="btn-prod" type="button"
+        class="border-2 border-emerald-500 bg-emerald-50 rounded-xl p-4 text-center cursor-pointer transition-all ring-2 ring-emerald-300 ring-offset-1">
+        <span class="text-3xl block mb-2 pointer-events-none">🏭</span>
+        <span class="text-sm font-bold text-emerald-700 block pointer-events-none">Empresa Productora</span>
+        <span class="text-xs text-emerald-500 mt-0.5 block pointer-events-none">Portal REP · Eco-Ticket</span>
       </button>
-      <button id="btn-trans" onclick="setPerfil('transportista')"
-        class="border-2 border-slate-200 bg-white rounded-xl p-4 text-center cursor-pointer transition-all hover:border-blue-300 hover:bg-blue-50/50">
-        <span class="text-3xl block mb-2">🚚</span>
-        <span class="text-sm font-bold text-slate-500 block">Socio Transportista</span>
-        <span class="text-xs text-slate-400 mt-0.5 block">TMS · Rutas · KPIs</span>
+
+      <button id="btn-trans" type="button"
+        class="border-2 border-slate-200 bg-white rounded-xl p-4 text-center cursor-pointer transition-all hover:border-blue-300 hover:bg-blue-50/40">
+        <span class="text-3xl block mb-2 pointer-events-none">🚚</span>
+        <span class="text-sm font-bold text-slate-500 block pointer-events-none">Socio Transportista</span>
+        <span class="text-xs text-slate-400 mt-0.5 block pointer-events-none">TMS · Rutas · KPIs</span>
       </button>
+
     </div>
 
-    <!-- ── FORMULARIO LOGIN ──────────────────────────────────────── -->
-    <div id="form-login" class="px-5 py-5">
+    <!-- ── FORMULARIO UNIFICADO (Login / Registro) ─────────────────── -->
+    <div id="form-auth" class="px-5 pt-3 pb-5">
+
+      <!-- Título dinámico del formulario -->
+      <p id="form-title" class="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wide">Iniciar sesión</p>
 
       <div class="space-y-4">
+
+        <!-- Email -->
         <div>
           <label class="block text-xs font-semibold text-slate-500 mb-1.5">Correo electrónico</label>
-          <input type="email" id="login-email" autocomplete="email"
+          <input type="email" id="auth-email" autocomplete="email"
             placeholder="contacto@empresa.cl"
             class="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm bg-slate-50
                    focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 focus:bg-white transition-all"/>
         </div>
 
+        <!-- Contraseña -->
         <div>
-          <div class="flex justify-between mb-1.5">
+          <!-- Fila de label + "¿Olvidaste?" — visible solo en modo login -->
+          <div id="row-label-login" class="flex justify-between mb-1.5">
             <label class="text-xs font-semibold text-slate-500">Contraseña</label>
-            <button onclick="handleForgotPassword()" tabindex="-1"
+            <button type="button" onclick="handleForgotPassword()" tabindex="-1"
               class="text-xs text-emerald-600 hover:text-emerald-700 bg-transparent border-0 cursor-pointer p-0">
               ¿Olvidaste tu contraseña?
             </button>
           </div>
-          <input type="password" id="login-pwd" autocomplete="current-password"
+          <!-- Label simple — visible solo en modo registro -->
+          <label id="row-label-reg" class="hidden text-xs font-semibold text-slate-500 mb-1.5 block">
+            Contraseña <span class="font-normal text-slate-400">(mín. 8 caracteres)</span>
+          </label>
+
+          <input type="password" id="auth-pwd" autocomplete="current-password"
             placeholder="••••••••"
-            onkeydown="if(event.key==='Enter') handleLogin()"
             class="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm bg-slate-50
                    focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 focus:bg-white transition-all"/>
         </div>
+
       </div>
 
-      <button id="btn-login" onclick="handleLogin()"
+      <!-- Botón de submit unificado -->
+      <button id="btn-submit" type="button" onclick="handleSubmit()"
         class="mt-5 w-full bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-sm py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
-        <span id="btn-login-text">Ingresar al sistema</span>
-        <svg id="btn-login-spin" class="hidden w-4 h-4 spinner" viewBox="0 0 24 24" fill="none">
+        <span id="btn-submit-text">Ingresar al sistema</span>
+        <svg id="btn-submit-spin" class="hidden w-4 h-4 spinner" viewBox="0 0 24 24" fill="none">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
         </svg>
       </button>
 
-      <div id="msg-login" class="hidden mt-3 text-xs px-4 py-3 rounded-xl border font-medium"></div>
-      <p class="mt-4 text-center text-xs text-slate-400">
+      <!-- Mensaje de feedback (errores en rojo, éxito en verde) -->
+      <div id="msg-auth" class="hidden mt-4 text-xs px-4 py-3 rounded-xl border font-medium"></div>
+
+      <!-- Toggle Login ↔ Registro -->
+      <p id="toggle-link" class="mt-4 text-center text-xs text-slate-400">
         ¿No tienes cuenta?
-        <button onclick="setTab('registro')" class="text-emerald-600 hover:text-emerald-700 font-semibold bg-transparent border-0 cursor-pointer p-0 underline">Crear cuenta</button>
-      </p>
-
-    </div>
-
-    <!-- ── FORMULARIO REGISTRO ───────────────────────────────────── -->
-    <div id="form-registro" class="hidden px-5 py-5">
-
-      <div class="space-y-3.5">
-        <div>
-          <label class="block text-xs font-semibold text-slate-500 mb-1.5">Correo electrónico *</label>
-          <input type="email" id="reg-email" autocomplete="email"
-            placeholder="contacto@empresa.cl"
-            class="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm bg-slate-50
-                   focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 focus:bg-white transition-all"/>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-500 mb-1.5">Contraseña * <span class="font-normal text-slate-400">(mín. 8 caracteres)</span></label>
-          <input type="password" id="reg-pwd" autocomplete="new-password"
-            placeholder="••••••••"
-            onkeydown="if(event.key==='Enter') handleRegistro()"
-            class="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm bg-slate-50
-                   focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 focus:bg-white transition-all"/>
-        </div>
-      </div>
-
-      <button id="btn-registro" onclick="handleRegistro()"
-        class="mt-5 w-full bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-sm py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
-        <span id="btn-registro-text">Crear cuenta</span>
-        <svg id="btn-registro-spin" class="hidden w-4 h-4 spinner" viewBox="0 0 24 24" fill="none">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-        </svg>
-      </button>
-
-      <div id="msg-registro" class="hidden mt-3 text-xs px-4 py-3 rounded-xl border font-medium"></div>
-      <p class="mt-4 text-center text-xs text-slate-400">
-        ¿Ya tienes cuenta?
-        <button onclick="setTab('login')" class="text-emerald-600 hover:text-emerald-700 font-semibold bg-transparent border-0 cursor-pointer p-0 underline">Iniciar sesión</button>
+        <button type="button" onclick="toggleMode()"
+          class="text-emerald-600 hover:text-emerald-700 font-semibold bg-transparent border-0 cursor-pointer p-0 underline">
+          Crear cuenta
+        </button>
       </p>
 
     </div>
@@ -172,128 +153,311 @@
   </div>
 </footer>
 
-<!-- ══════════════════════════════════════════════════════════
-     SCRIPT — Supabase Auth + UI
-══════════════════════════════════════════════════════════ -->
 <script>
 // ═══════════════════════════════════════════════════════════════════
-// CONFIGURACIÓN SUPABASE
+// SUPABASE
 // ═══════════════════════════════════════════════════════════════════
-const SUPABASE_URL      = 'https://iaqvcpxseljwbstcnma.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhcXZjcHhzZWxmandic3Rjbm1hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyOTkwODgsImV4cCI6MjA5Njg3NTA4OH0.EzadAJxFjKdru0xpy6YGhIRc-Lk1_QroLSAM0fKdJM0';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+var SUPABASE_URL      = 'https://iaqvcpxseljwbstcnma.supabase.co';
+var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhcXZjcHhzZWxmandic3Rjbm1hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyOTkwODgsImV4cCI6MjA5Njg3NTA4OH0.EzadAJxFjKdru0xpy6YGhIRc-Lk1_QroLSAM0fKdJM0';
+var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ═══════════════════════════════════════════════════════════════════
-// ESTADO DE LA UI
+// ESTADO — variables globales de control
 // ═══════════════════════════════════════════════════════════════════
-var perfil = 'productor';
-var tab    = 'login';
+var selectedRole = 'productor'; // 'productor' | 'transportista'
+var isLoginMode  = true;        // true = Login, false = Registro
 
-// ── Clases CSS para botones de perfil ────────────────────────────
-var CLS_PROD_ACTIVE  = 'border-2 border-emerald-500 bg-emerald-50 rounded-xl p-4 text-center cursor-pointer transition-all';
-var CLS_TRANS_ACTIVE = 'border-2 border-blue-500 bg-blue-50 rounded-xl p-4 text-center cursor-pointer transition-all';
-var CLS_PROD_INACT   = 'border-2 border-slate-200 bg-white rounded-xl p-4 text-center cursor-pointer transition-all hover:border-emerald-300 hover:bg-emerald-50/50';
-var CLS_TRANS_INACT  = 'border-2 border-slate-200 bg-white rounded-xl p-4 text-center cursor-pointer transition-all hover:border-blue-300 hover:bg-blue-50/50';
+// ── Clases CSS para los botones de rol ───────────────────────────
+var CLS = {
+  prodOn:   'border-2 border-emerald-500 bg-emerald-50 rounded-xl p-4 text-center cursor-pointer transition-all ring-2 ring-emerald-300 ring-offset-1',
+  prodOff:  'border-2 border-slate-200 bg-white rounded-xl p-4 text-center cursor-pointer transition-all hover:border-emerald-300 hover:bg-emerald-50/40',
+  transOn:  'border-2 border-blue-500 bg-blue-50 rounded-xl p-4 text-center cursor-pointer transition-all ring-2 ring-blue-300 ring-offset-1',
+  transOff: 'border-2 border-slate-200 bg-white rounded-xl p-4 text-center cursor-pointer transition-all hover:border-blue-300 hover:bg-blue-50/40',
+};
 
 // ═══════════════════════════════════════════════════════════════════
-// INICIALIZACIÓN — verificar sesión activa al cargar la página
+// INICIALIZACIÓN
 // ═══════════════════════════════════════════════════════════════════
-window.addEventListener('DOMContentLoaded', async function () {
-  // Restaurar preferencia de perfil guardada
+window.addEventListener('DOMContentLoaded', function () {
+
+  // ── Registrar clics en los botones de rol via addEventListener
+  //    (más robusto que onclick inline; funciona aunque cambie innerHTML)
+  document.getElementById('btn-prod').addEventListener('click', function () {
+    selectRole('productor');
+  });
+  document.getElementById('btn-trans').addEventListener('click', function () {
+    selectRole('transportista');
+  });
+
+  // ── Enter en el campo contraseña → submit
+  document.getElementById('auth-pwd').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') handleSubmit();
+  });
+  document.getElementById('auth-email').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') handleSubmit();
+  });
+
+  // ── Restaurar rol guardado de sesión anterior
   var roleGuardado = localStorage.getItem('damu_role') || localStorage.getItem('damu_perfil');
-  if (roleGuardado) setPerfil(roleGuardado);
+  selectRole(roleGuardado || 'productor');
 
-  // Verificar sesión Supabase activa → redirigir si ya está autenticado
+  // ── Verificar sesión activa → redirigir automáticamente
+  checkSession();
+});
+
+// ─────────────────────────────────────────────────────────────────
+async function checkSession() {
   try {
     var result  = await supabase.auth.getSession();
     var session = result.data && result.data.session;
-    if (session) {
-      var meta = (session.user.user_metadata) || {};
-      var role = meta.role
-              || localStorage.getItem('damu_role')
-              || localStorage.getItem('damu_perfil')
-              || 'productor';
-      setMsg('login', 'ok', '✓ Sesión activa. Redirigiendo...');
-      document.getElementById('form-login').classList.add('opacity-50', 'pointer-events-none');
-      setTimeout(function () { redirigir(role); }, 800);
-    }
-  } catch (e) { console.warn('[Damu] Error al verificar sesión:', e.message); }
-});
+    if (!session) return;
+
+    var meta = session.user.user_metadata || {};
+    var role = meta.role
+            || localStorage.getItem('damu_role')
+            || localStorage.getItem('damu_perfil')
+            || 'productor';
+
+    setMsg('ok', '✓ Sesión activa. Redirigiendo...');
+    // Solo el submit button se deshabilita, NO el formulario entero
+    // (evita el bug de pointer-events-none que bloqueaba el toggle)
+    document.getElementById('btn-submit').disabled = true;
+    setTimeout(function () { redirigir(role); }, 900);
+
+  } catch (e) { /* sin sesión, continuar normal */ }
+}
 
 // ═══════════════════════════════════════════════════════════════════
-// CAMBIO DE PERFIL
+// SELECCIÓN DE ROL
 // ═══════════════════════════════════════════════════════════════════
-function setPerfil(p) {
-  perfil = p;
+function selectRole(role) {
+  selectedRole = role;
 
   var btnProd  = document.getElementById('btn-prod');
   var btnTrans = document.getElementById('btn-trans');
+  var btnSubmit = document.getElementById('btn-submit');
 
-  if (p === 'productor') {
-    btnProd.className  = CLS_PROD_ACTIVE;
-    btnTrans.className = CLS_TRANS_INACT;
-    btnProd.innerHTML  = '<span class="text-3xl block mb-2">🏭</span>'
-      + '<span class="text-sm font-bold text-emerald-700 block">Empresa Productora</span>'
-      + '<span class="text-xs text-emerald-500 mt-0.5 block">Portal REP · Eco-Ticket</span>';
-    btnTrans.innerHTML = '<span class="text-3xl block mb-2">🚚</span>'
-      + '<span class="text-sm font-bold text-slate-500 block">Socio Transportista</span>'
-      + '<span class="text-xs text-slate-400 mt-0.5 block">TMS · Rutas · KPIs</span>';
-
-    // Botones de submit color emerald
-    document.getElementById('btn-login').className   =
-      'mt-5 w-full bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-sm py-3 rounded-xl transition-colors flex items-center justify-center gap-2';
-    document.getElementById('btn-registro').className =
-      'mt-5 w-full bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-sm py-3 rounded-xl transition-colors flex items-center justify-center gap-2';
-    document.getElementById('btn-login-text').textContent   = 'Ingresar al sistema';
-
+  if (role === 'productor') {
+    btnProd.className  = CLS.prodOn;
+    btnTrans.className = CLS.transOff;
+    // Color del submit → emerald
+    btnSubmit.className = btnSubmit.className
+      .replace(/bg-blue-\d+/g, 'bg-emerald-600')
+      .replace(/hover:bg-blue-\d+/g, 'hover:bg-emerald-500')
+      .replace(/active:bg-blue-\d+/g, 'active:bg-emerald-700');
+    if (!btnSubmit.className.includes('bg-emerald-600')) {
+      btnSubmit.className = 'mt-5 w-full bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-sm py-3 rounded-xl transition-colors flex items-center justify-center gap-2';
+    }
+    if (isLoginMode) {
+      document.getElementById('btn-submit-text').textContent = 'Ingresar al sistema';
+    }
   } else {
-    btnTrans.className = CLS_TRANS_ACTIVE;
-    btnProd.className  = CLS_PROD_INACT;
-    btnTrans.innerHTML = '<span class="text-3xl block mb-2">🚚</span>'
-      + '<span class="text-sm font-bold text-blue-700 block">Socio Transportista</span>'
-      + '<span class="text-xs text-blue-500 mt-0.5 block">TMS · Rutas · KPIs</span>';
-    btnProd.innerHTML  = '<span class="text-3xl block mb-2">🏭</span>'
-      + '<span class="text-sm font-bold text-slate-500 block">Empresa Productora</span>'
-      + '<span class="text-xs text-slate-400 mt-0.5 block">Portal REP · Eco-Ticket</span>';
-
-    // Botones de submit color blue
-    document.getElementById('btn-login').className   =
-      'mt-5 w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-sm py-3 rounded-xl transition-colors flex items-center justify-center gap-2';
-    document.getElementById('btn-registro').className =
-      'mt-5 w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-sm py-3 rounded-xl transition-colors flex items-center justify-center gap-2';
-    document.getElementById('btn-login-text').textContent   = 'Ingresar al TMS';
+    btnTrans.className = CLS.transOn;
+    btnProd.className  = CLS.prodOff;
+    // Color del submit → blue
+    btnSubmit.className = 'mt-5 w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-sm py-3 rounded-xl transition-colors flex items-center justify-center gap-2';
+    if (isLoginMode) {
+      document.getElementById('btn-submit-text').textContent = 'Ingresar al TMS';
+    }
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// CAMBIO DE VISTA (Login ↔ Registro)
+// ALTERNAR LOGIN ↔ REGISTRO
 // ═══════════════════════════════════════════════════════════════════
-function setTab(t) {
-  tab = t;
-  var isLogin = t === 'login';
-  document.getElementById('form-login').classList.toggle('hidden', !isLogin);
-  document.getElementById('form-registro').classList.toggle('hidden', isLogin);
-  document.getElementById('msg-login').classList.add('hidden');
-  document.getElementById('msg-registro').classList.add('hidden');
+function toggleMode() {
+  isLoginMode = !isLoginMode;
+  clearMsg();
+
+  var submitText   = document.getElementById('btn-submit-text');
+  var toggleLink   = document.getElementById('toggle-link');
+  var rowLogin     = document.getElementById('row-label-login');
+  var rowReg       = document.getElementById('row-label-reg');
+  var formTitle    = document.getElementById('form-title');
+  var pwdField     = document.getElementById('auth-pwd');
+
+  if (isLoginMode) {
+    // ── Modo LOGIN ──────────────────────────────────────────────
+    formTitle.textContent = 'Iniciar sesión';
+    submitText.textContent = selectedRole === 'productor' ? 'Ingresar al sistema' : 'Ingresar al TMS';
+    rowLogin.classList.remove('hidden');
+    rowReg.classList.add('hidden');
+    pwdField.setAttribute('autocomplete', 'current-password');
+    toggleLink.innerHTML =
+      '¿No tienes cuenta? '
+      + '<button type="button" onclick="toggleMode()" '
+      + 'class="text-emerald-600 hover:text-emerald-700 font-semibold bg-transparent border-0 cursor-pointer p-0 underline">'
+      + 'Crear cuenta</button>';
+  } else {
+    // ── Modo REGISTRO ───────────────────────────────────────────
+    formTitle.textContent = 'Crear cuenta';
+    submitText.textContent = 'Crear cuenta';
+    rowLogin.classList.add('hidden');
+    rowReg.classList.remove('hidden');
+    pwdField.setAttribute('autocomplete', 'new-password');
+    toggleLink.innerHTML =
+      '¿Ya tienes cuenta? '
+      + '<button type="button" onclick="toggleMode()" '
+      + 'class="text-emerald-600 hover:text-emerald-700 font-semibold bg-transparent border-0 cursor-pointer p-0 underline">'
+      + 'Iniciar sesión</button>';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SUBMIT UNIFICADO — delega a doLogin() o doRegistro() según isLoginMode
+// ═══════════════════════════════════════════════════════════════════
+async function handleSubmit() {
+  var email = (document.getElementById('auth-email').value || '').trim();
+  var pwd   =  document.getElementById('auth-pwd').value   || '';
+
+  clearMsg();
+
+  // ── Validación ────────────────────────────────────────────────
+  if (!email) {
+    setMsg('err', '⚠️ Ingresa tu correo electrónico.'); return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    setMsg('err', '⚠️ El correo electrónico no es válido.'); return;
+  }
+  if (!pwd) {
+    setMsg('err', '⚠️ Ingresa tu contraseña.'); return;
+  }
+  if (!isLoginMode && pwd.length < 8) {
+    setMsg('err', '🔒 La contraseña debe tener al menos 8 caracteres.'); return;
+  }
+
+  setLoading(true);
+
+  try {
+    if (isLoginMode) {
+      await doLogin(email, pwd);
+    } else {
+      await doRegistro(email, pwd);
+    }
+  } catch (e) {
+    setMsg('err', '🌐 Error de conexión. Verifica tu internet.');
+    setLoading(false);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+async function doLogin(email, pwd) {
+  var result = await supabase.auth.signInWithPassword({ email: email, password: pwd });
+  var data   = result.data;
+  var error  = result.error;
+
+  if (error) {
+    setMsg('err', traducirError(error.message));
+    setLoading(false);
+    return;
+  }
+
+  // Recuperar rol desde metadatos de Supabase (fuente de verdad)
+  var role = (data.user.user_metadata && data.user.user_metadata.role)
+          || selectedRole;
+
+  persistirSesion(data.user, role);
+  setMsg('ok', '✓ Acceso concedido. Redirigiendo a tu plataforma…');
+  setTimeout(function () { redirigir(role); }, 900);
+}
+
+// ─────────────────────────────────────────────────────────────────
+async function doRegistro(email, pwd) {
+  var result = await supabase.auth.signUp({
+    email:    email,
+    password: pwd,
+    options:  { data: { role: selectedRole } }, // rol en metadata Supabase
+  });
+  var data  = result.data;
+  var error = result.error;
+
+  if (error) {
+    setMsg('err', traducirError(error.message));
+    setLoading(false);
+    return;
+  }
+
+  if (data.user && !data.session) {
+    // Email confirmation activa → avisar sin redirigir
+    setMsg('warn', '📧 Cuenta creada. Revisa tu correo ' + email + ' para confirmar el acceso.');
+    setLoading(false);
+  } else {
+    // Confirmación desactivada → redirigir automáticamente
+    var role = (data.user.user_metadata && data.user.user_metadata.role) || selectedRole;
+    persistirSesion(data.user, role);
+    localStorage.setItem('damu_role', selectedRole); // guardado explícito del rol seleccionado
+    setMsg('ok', '✓ Cuenta creada exitosamente. Redirigiendo a tu plataforma…');
+    setTimeout(function () { redirigir(role); }, 1200);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+function persistirSesion(user, role) {
+  localStorage.setItem('damu_role',    role);
+  localStorage.setItem('damu_perfil',  role); // backward compat con auth-guard.js
+  localStorage.setItem('damu_session', JSON.stringify({
+    email:  user.email,
+    userId: user.id,
+    perfil: role,
+    ts:     Date.now(),
+  }));
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RECUPERAR CONTRASEÑA
+// ═══════════════════════════════════════════════════════════════════
+async function handleForgotPassword() {
+  var email = (document.getElementById('auth-email').value || '').trim();
+
+  if (!email) {
+    setMsg('warn', '📧 Ingresa tu correo arriba para recibir el enlace de recuperación.');
+    return;
+  }
+
+  try {
+    var result = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/auth/portal.html',
+    });
+    if (result.error) {
+      setMsg('err', traducirError(result.error.message));
+    } else {
+      setMsg('ok', '📧 Enlace enviado a ' + email + '. Revisa tu bandeja de entrada.');
+    }
+  } catch (e) {
+    setMsg('err', '🌐 Error de conexión.');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// REDIRECCIÓN POR ROL
+// ═══════════════════════════════════════════════════════════════════
+function redirigir(role) {
+  window.location.href = role === 'productor'
+    ? '../app/calculadora-rep.html'
+    : '../app/dashboard-kpi.html';
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // HELPERS UI
 // ═══════════════════════════════════════════════════════════════════
-function setMsg(ctx, tipo, texto) {
-  var el = document.getElementById('msg-' + ctx);
+function setMsg(tipo, texto) {
+  var el = document.getElementById('msg-auth');
   el.className = tipo === 'ok'
-    ? 'mt-3 text-xs px-4 py-3 rounded-xl border font-medium bg-emerald-50 border-emerald-200 text-emerald-700'
+    ? 'mt-4 text-xs px-4 py-3 rounded-xl border font-medium bg-emerald-50 border-emerald-200 text-emerald-700'
     : tipo === 'warn'
-    ? 'mt-3 text-xs px-4 py-3 rounded-xl border font-medium bg-amber-50 border-amber-200 text-amber-700'
-    : 'mt-3 text-xs px-4 py-3 rounded-xl border font-medium bg-red-50 border-red-200 text-red-700';
+    ? 'mt-4 text-xs px-4 py-3 rounded-xl border font-medium bg-amber-50 border-amber-200 text-amber-700'
+    : 'mt-4 text-xs px-4 py-3 rounded-xl border font-medium bg-red-50 border-red-200 text-red-700';
   el.textContent = texto;
   el.classList.remove('hidden');
 }
 
-function setLoading(ctx, loading) {
-  var btn  = document.getElementById('btn-' + ctx);
-  var spin = document.getElementById('btn-' + ctx + '-spin');
+function clearMsg() {
+  document.getElementById('msg-auth').classList.add('hidden');
+}
+
+function setLoading(loading) {
+  var btn  = document.getElementById('btn-submit');
+  var spin = document.getElementById('btn-submit-spin');
   btn.disabled = loading;
   if (loading) {
     spin.classList.remove('hidden');
@@ -313,156 +477,13 @@ function traducirError(msg) {
     return '📧 Confirma tu correo antes de ingresar. Revisa tu bandeja de entrada.';
   if (m.includes('too many requests') || m.includes('rate limit'))
     return '⏳ Demasiados intentos. Espera unos minutos.';
-  if (m.includes('user not found') || m.includes('user already'))
+  if (m.includes('user already') || m.includes('already registered'))
     return '⚠️ El correo ya está registrado. Intenta iniciar sesión.';
   if (m.includes('weak password') || m.includes('password'))
     return '🔒 La contraseña debe tener al menos 8 caracteres.';
   if (m.includes('network') || m.includes('fetch'))
     return '🌐 Error de conexión. Verifica tu internet.';
   return '⚠️ ' + msg;
-}
-
-function redirigir(p) {
-  var destino = p === 'productor'
-    ? '../app/calculadora-rep.html'
-    : '../app/dashboard-kpi.html';
-  window.location.href = destino;
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// LOGIN
-// ═══════════════════════════════════════════════════════════════════
-async function handleLogin() {
-  var email = (document.getElementById('login-email').value || '').trim();
-  var pwd   =  document.getElementById('login-pwd').value || '';
-
-  if (!email || !pwd) {
-    setMsg('login', 'err', '⚠️ Por favor completa correo y contraseña.');
-    return;
-  }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    setMsg('login', 'err', '⚠️ Ingresa un correo electrónico válido.');
-    return;
-  }
-
-  setLoading('login', true);
-  document.getElementById('msg-login').classList.add('hidden');
-
-  try {
-    var result = await supabase.auth.signInWithPassword({ email: email, password: pwd });
-    var data   = result.data;
-    var error  = result.error;
-
-    if (error) {
-      setMsg('login', 'err', traducirError(error.message));
-      setLoading('login', false);
-      return;
-    }
-
-    // Leer rol desde los metadatos de Supabase (fuente de verdad)
-    var role = (data.user.user_metadata && data.user.user_metadata.role)
-            || perfil;
-    localStorage.setItem('damu_role',   role);
-    localStorage.setItem('damu_perfil', role); // backward compat con auth-guard.js
-    localStorage.setItem('damu_session', JSON.stringify({
-      email:  data.user.email,
-      userId: data.user.id,
-      perfil: role,
-      ts:     Date.now(),
-    }));
-    setMsg('login', 'ok', '✓ Acceso concedido. Redirigiendo a tu plataforma…');
-    setTimeout(function () { redirigir(role); }, 900);
-
-  } catch (e) {
-    setMsg('login', 'err', '🌐 Error de conexión. Verifica tu internet.');
-    setLoading('login', false);
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// REGISTRO
-// ═══════════════════════════════════════════════════════════════════
-async function handleRegistro() {
-  var email = (document.getElementById('reg-email').value || '').trim();
-  var pwd   =  document.getElementById('reg-pwd').value || '';
-
-  if (!email || !pwd) {
-    setMsg('registro', 'err', '⚠️ Por favor completa correo y contraseña.');
-    return;
-  }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    setMsg('registro', 'err', '⚠️ Ingresa un correo electrónico válido.');
-    return;
-  }
-  if (pwd.length < 8) {
-    setMsg('registro', 'err', '🔒 La contraseña debe tener al menos 8 caracteres.');
-    return;
-  }
-
-  setLoading('registro', true);
-  document.getElementById('msg-registro').classList.add('hidden');
-
-  try {
-    var result = await supabase.auth.signUp({
-      email:    email,
-      password: pwd,
-      options:  { data: { role: perfil } },
-    });
-    var data  = result.data;
-    var error = result.error;
-
-    if (error) {
-      setMsg('registro', 'err', traducirError(error.message));
-      setLoading('registro', false);
-      return;
-    }
-
-    if (data.user && !data.session) {
-      // Confirmación por email requerida
-      setMsg('registro', 'warn',
-        '📧 Cuenta creada. Revisa tu correo ' + email + ' para confirmar el acceso.');
-      setLoading('registro', false);
-    } else {
-      // Confirmación desactivada → redirigir directamente
-      var role = (data.user.user_metadata && data.user.user_metadata.role) || perfil;
-      localStorage.setItem('damu_role',   role);
-      localStorage.setItem('damu_perfil', role);
-      localStorage.setItem('damu_session', JSON.stringify({
-        email: data.user.email, userId: data.user.id, perfil: role, ts: Date.now()
-      }));
-      setMsg('registro', 'ok', '✓ Cuenta creada exitosamente. Redirigiendo a tu plataforma…');
-      setTimeout(function () { redirigir(role); }, 1200);
-    }
-
-  } catch (e) {
-    setMsg('registro', 'err', '🌐 Error de conexión. Verifica tu internet.');
-    setLoading('registro', false);
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// RECUPERAR CONTRASEÑA
-// ═══════════════════════════════════════════════════════════════════
-async function handleForgotPassword() {
-  var email = (document.getElementById('login-email').value || '').trim();
-
-  if (!email) {
-    setMsg('login', 'warn', '📧 Ingresa tu correo arriba para recibir el enlace de recuperación.');
-    return;
-  }
-
-  try {
-    var result = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + '/auth/portal.html',
-    });
-    if (result.error) {
-      setMsg('login', 'err', traducirError(result.error.message));
-    } else {
-      setMsg('login', 'ok', '📧 Enlace de recuperación enviado a ' + email + '. Revisa tu bandeja de entrada.');
-    }
-  } catch (e) {
-    setMsg('login', 'err', '🌐 Error de conexión.');
-  }
 }
 </script>
 
