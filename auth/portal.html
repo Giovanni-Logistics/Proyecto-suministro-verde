@@ -266,24 +266,15 @@ function setPerfil(p) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// CAMBIO DE TAB (Login / Registro)
+// CAMBIO DE VISTA (Login ↔ Registro)
 // ═══════════════════════════════════════════════════════════════════
 function setTab(t) {
   tab = t;
   var isLogin = t === 'login';
-  var color   = perfil === 'productor' ? 'emerald' : 'blue';
-
-  document.getElementById('tab-login').className =
-    CLS_TAB_ACTIVE + (isLogin
-      ? ' text-' + color + '-600 border-' + color + '-500'
-      : ' text-slate-400 border-transparent hover:text-slate-600');
-  document.getElementById('tab-registro').className =
-    CLS_TAB_ACTIVE + (!isLogin
-      ? ' text-' + color + '-600 border-' + color + '-500'
-      : ' text-slate-400 border-transparent hover:text-slate-600');
-
   document.getElementById('form-login').classList.toggle('hidden', !isLogin);
   document.getElementById('form-registro').classList.toggle('hidden', isLogin);
+  document.getElementById('msg-login').classList.add('hidden');
+  document.getElementById('msg-registro').classList.add('hidden');
 }
 
 // ═══════════════════════════════════════════════════════════════════
