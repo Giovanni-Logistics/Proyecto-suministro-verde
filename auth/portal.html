@@ -515,10 +515,6 @@ async function handleForgotPassword() {
     setMsg('login', 'warn', '📧 Ingresa tu correo arriba para recibir el enlace de recuperación.');
     return;
   }
-  if (!SUPA_READY) {
-    setMsg('login', 'warn', '⚙️ Configura Supabase para usar la recuperación de contraseña.');
-    return;
-  }
 
   try {
     var result = await supabase.auth.resetPasswordForEmail(email, {
