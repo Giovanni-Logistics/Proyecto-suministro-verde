@@ -566,30 +566,43 @@ function recalc() {
 
   document.getElementById('results-section').classList.remove('hidden');
 
-  // ── Persistir para Dashboard KPI ────────────────────────────────
-  // Objeto enriquecido con todos los valores computados
-  var datosRuta = {
-    dist:             dist,
-    diesel:           diesel,
-    rendim:           rendim,
-    freq:             freq,
-    inversion:        inversion,
-    calidad:          Math.round(calidad * 100),
-    litrosPorViaje:   Math.round(litrosPorViaje * 10) / 10,
-    costoPorViaje:    Math.round(costoPorViaje),
-    costoAnualDiesel: Math.round(costoAnualDiesel),
-    costoMensual:     Math.round(costoMensual),
-    costoPorKm:       Math.round(costoPorKm),
-    paybackMeses:     paybackMeses !== null ? parseFloat(paybackMeses) : null,
-    ts:               Date.now(),
-  };
-  // Clave enriquecida (Dashboard KPI lee esta primero)
-  localStorage.setItem('damu_datos_ruta', JSON.stringify(datosRuta));
-  // Clave legado mantenida por compatibilidad
-  localStorage.setItem('damu_ruta_result', JSON.stringify({
-    dist: dist, costAnual: datosRuta.costoAnualDiesel,
-    costMes: datosRuta.costoMensual, freq: freq, ts: datosRuta.ts,
-  }));
+  // ── Persistir en Supabase (solo cuando hay ruta calculada) ──────
+  if (_routeCalculated) {
+    var datosRuta = {
+      dist:             dist,
+      costoAnualDiesel: Math.round(costoAnualDiesel),
+    };
+    clearTimeout(_timerGuardarViaje);
+    _timerGuardarViaje = setTimeout(function () { _guardarViajeDB(datosRuta); }, 2000);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GUARDAR VIAJE EN SUPABASE — llamado por debounce de recalc()
+// ═══════════════════════════════════════════════════════════════════════════
+async function _guardarViajeDB(datos) {
+  var sb = window.__damuSupabase;
+  if (!sb) return;
+
+  var sesion = await sb.auth.getSession();
+  if (!sesion.data || !sesion.data.session) return;
+  var uid = sesion.data.session.user.id;
+
+  var origen  = (document.getElementById('map-origin').value || '').trim() || null;
+  var destino = (document.getElementById('map-dest').value   || '').trim() || null;
+
+  var { error } = await sb.from('viajes_operativos').insert({
+    user_id:      uid,
+    origen:       origen,
+    destino:      destino,
+    distancia_km: datos.dist,
+    costo_diesel: datos.costoAnualDiesel,
+    cargas_qr_kg: 0,
+  });
+
+  if (error) {
+    console.warn('[Damu] Error guardando viaje:', error.message);
+  }
 }
 </script>
 
