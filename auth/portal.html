@@ -230,26 +230,10 @@
 <script>
 // ═══════════════════════════════════════════════════════════════════
 // CONFIGURACIÓN SUPABASE
-// Rellena con las credenciales de tu proyecto en supabase.com
 // ═══════════════════════════════════════════════════════════════════
-const SUPABASE_URL      = 'TU_URL_AQUI';
-const SUPABASE_ANON_KEY = 'TU_KEY_AQUI';
-
-// ── Inicialización segura del cliente ────────────────────────────
-var _supabase     = null;
-var SUPA_READY    = false;
-
-(function () {
-  try {
-    if (SUPABASE_URL !== 'TU_URL_AQUI' && SUPABASE_ANON_KEY !== 'TU_KEY_AQUI') {
-      var createClient = window.supabase.createClient;
-      _supabase  = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      SUPA_READY = true;
-    }
-  } catch (e) {
-    console.warn('[Damu] Supabase no inicializado:', e.message);
-  }
-})();
+const SUPABASE_URL      = 'https://iaqvcpxseljwbstcnma.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhcXZjcHhzZWxmandic3Rjbm1hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyOTkwODgsImV4cCI6MjA5Njg3NTA4OH0.EzadAJxFjKdru0xpy6YGhIRc-Lk1_QroLSAM0fKdJM0';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ═══════════════════════════════════════════════════════════════════
 // ESTADO DE LA UI
@@ -281,7 +265,7 @@ window.addEventListener('DOMContentLoaded', async function () {
   // Verificar sesión Supabase activa
   if (SUPA_READY) {
     try {
-      var result = await _supabase.auth.getSession();
+      var result = await supabase.auth.getSession();
       var session = result.data && result.data.session;
       if (session) {
         var p = localStorage.getItem('damu_perfil') || 'productor';
@@ -444,7 +428,7 @@ async function handleLogin() {
   // ── Modo Supabase real ─────────────────────────────────────────
   if (SUPA_READY) {
     try {
-      var result = await _supabase.auth.signInWithPassword({ email: email, password: pwd });
+      var result = await supabase.auth.signInWithPassword({ email: email, password: pwd });
       var data   = result.data;
       var error  = result.error;
 
@@ -523,7 +507,7 @@ async function handleRegistro() {
   // ── Modo Supabase real ─────────────────────────────────────────
   if (SUPA_READY) {
     try {
-      var result = await _supabase.auth.signUp({
+      var result = await supabase.auth.signUp({
         email:    email,
         password: pwd,
         options:  { data: meta },
@@ -580,7 +564,7 @@ async function handleForgotPassword() {
   }
 
   try {
-    var result = await _supabase.auth.resetPasswordForEmail(email, {
+    var result = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: window.location.origin + '/auth/portal.html',
     });
     if (result.error) {
