@@ -253,35 +253,21 @@ var CLS_TAB_INACT    = 'flex-1 py-3 text-sm font-semibold text-slate-400 border-
 // INICIALIZACIÓN — verificar sesión activa al cargar la página
 // ═══════════════════════════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', async function () {
-  // Mostrar banner de modo demo si Supabase no está configurado
-  if (!SUPA_READY) {
-    document.getElementById('demo-banner').classList.remove('hidden');
-  }
-
   // Restaurar preferencia de perfil guardada
   var perfilGuardado = localStorage.getItem('damu_perfil');
   if (perfilGuardado) setPerfil(perfilGuardado);
 
-  // Verificar sesión Supabase activa
-  if (SUPA_READY) {
-    try {
-      var result = await supabase.auth.getSession();
-      var session = result.data && result.data.session;
-      if (session) {
-        var p = localStorage.getItem('damu_perfil') || 'productor';
-        setMsg('login', 'ok', '✓ Sesión activa. Redirigiendo...');
-        document.getElementById('form-login').classList.add('opacity-50', 'pointer-events-none');
-        setTimeout(function () { redirigir(p); }, 800);
-      }
-    } catch (e) { /* Ignorar — Supabase puede no estar disponible */ }
-  } else {
-    // Modo demo: verificar sesión en localStorage
-    var demoSession = JSON.parse(localStorage.getItem('damu_session') || 'null');
-    if (demoSession && demoSession.demo && (Date.now() - demoSession.ts) < 3600000) {
-      setMsg('login', 'ok', '✓ Sesión demo activa. Redirigiendo...');
-      setTimeout(function () { redirigir(demoSession.perfil || 'productor'); }, 800);
+  // Verificar sesión Supabase activa → redirigir si ya está autenticado
+  try {
+    var result  = await supabase.auth.getSession();
+    var session = result.data && result.data.session;
+    if (session) {
+      var p = localStorage.getItem('damu_perfil') || 'productor';
+      setMsg('login', 'ok', '✓ Sesión activa. Redirigiendo...');
+      document.getElementById('form-login').classList.add('opacity-50', 'pointer-events-none');
+      setTimeout(function () { redirigir(p); }, 800);
     }
-  }
+  } catch (e) { console.warn('[Damu] Error al verificar sesión:', e.message); }
 });
 
 // ═══════════════════════════════════════════════════════════════════
