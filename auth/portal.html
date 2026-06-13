@@ -422,12 +422,14 @@ async function handleForgotPassword() {
       redirectTo: window.location.origin + '/auth/portal.html',
     });
     if (result.error) {
-      setMsg('err', traducirError(result.error.message));
+      console.error('[Damu] Error en resetPassword:', result.error);
+      setMsg('err', traducirError(result.error));
     } else {
       setMsg('ok', '📧 Enlace enviado a ' + email + '. Revisa tu bandeja de entrada.');
     }
   } catch (e) {
-    setMsg('err', '🌐 Error de conexión.');
+    console.error('[Damu] Error inesperado en resetPassword:', e);
+    setMsg('err', traducirError(e));
   }
 }
 
