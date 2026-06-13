@@ -347,7 +347,8 @@ async function doLogin(email, pwd) {
   var error  = result.error;
 
   if (error) {
-    setMsg('err', traducirError(error.message));
+    console.error('[Damu] Error en login:', error);
+    setMsg('err', traducirError(error));
     setLoading(false);
     return;
   }
@@ -372,7 +373,8 @@ async function doRegistro(email, pwd) {
   var error = result.error;
 
   if (error) {
-    setMsg('err', traducirError(error.message));
+    console.error('[Damu] Error en registro:', error);
+    setMsg('err', traducirError(error));
     setLoading(false);
     return;
   }
