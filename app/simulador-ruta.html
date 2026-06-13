@@ -262,10 +262,12 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // GLOBALS
 // ═══════════════════════════════════════════════════════════════════════════
-var _map            = null;
-var _routingControl = null;
-var _waypointCount  = 0;
-var _debTimers      = {};
+var _map              = null;
+var _routingControl   = null;
+var _waypointCount    = 0;
+var _debTimers        = {};
+var _routeCalculated  = false;
+var _timerGuardarViaje = null;
 
 // Colores y etiquetas para marcadores A…F
 var STOP_COLORS = ['#059669','#2980b9','#f59e0b','#8e44ad','#e74c3c','#1abc9c'];
@@ -334,6 +336,9 @@ window.addEventListener('DOMContentLoaded', function () {
     var durText = mins >= 60
       ? Math.floor(mins / 60) + ' h ' + (mins % 60) + ' min'
       : mins + ' min';
+
+    // Marcar que existe una ruta real para habilitar la persistencia
+    _routeCalculated = true;
 
     // Actualizar barra de resultado
     document.getElementById('dist-label').textContent     = distKm + ' km';
