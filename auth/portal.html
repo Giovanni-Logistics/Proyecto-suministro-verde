@@ -385,10 +385,9 @@ async function handleLogin() {
 async function handleRegistro() {
   var email = (document.getElementById('reg-email').value || '').trim();
   var pwd   =  document.getElementById('reg-pwd').value || '';
-  var razon = (document.getElementById('reg-razon').value || '').trim();
 
-  if (!email || !pwd || !razon) {
-    setMsg('registro', 'err', '⚠️ Completa todos los campos obligatorios (*).');
+  if (!email || !pwd) {
+    setMsg('registro', 'err', '⚠️ Por favor completa correo y contraseña.');
     return;
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -400,15 +399,6 @@ async function handleRegistro() {
     return;
   }
 
-  // Construir metadata del usuario
-  var meta = { razonSocial: razon, perfil: perfil };
-  if (perfil === 'productor') {
-    meta.categoriaREP = document.getElementById('reg-cat').value;
-  } else {
-    meta.patente   = (document.getElementById('reg-patente').value || '').trim();
-    meta.tipoFlota = document.getElementById('reg-flota').value;
-  }
-
   setLoading('registro', true);
   document.getElementById('msg-registro').classList.add('hidden');
 
@@ -416,7 +406,7 @@ async function handleRegistro() {
     var result = await supabase.auth.signUp({
       email:    email,
       password: pwd,
-      options:  { data: meta },
+      options:  { data: { role: perfil } },
     });
     var data  = result.data;
     var error = result.error;
@@ -427,16 +417,21 @@ async function handleRegistro() {
       return;
     }
 
-    // ¿Supabase requiere confirmación por email?
     if (data.user && !data.session) {
+      // Confirmación por email requerida
       setMsg('registro', 'warn',
         '📧 Cuenta creada. Revisa tu correo ' + email + ' para confirmar el acceso.');
       setLoading('registro', false);
     } else {
-      // Sin confirmación requerida → redirigir directamente
-      localStorage.setItem('damu_perfil', perfil);
-      setMsg('registro', 'ok', '✓ Cuenta creada. Acceso concedido. Redirigiendo…');
-      setTimeout(function () { redirigir(perfil); }, 1200);
+      // Confirmación desactivada → redirigir directamente
+      var role = (data.user.user_metadata && data.user.user_metadata.role) || perfil;
+      localStorage.setItem('damu_role',   role);
+      localStorage.setItem('damu_perfil', role);
+      localStorage.setItem('damu_session', JSON.stringify({
+        email: data.user.email, userId: data.user.id, perfil: role, ts: Date.now()
+      }));
+      setMsg('registro', 'ok', '✓ Cuenta creada exitosamente. Redirigiendo a tu plataforma…');
+      setTimeout(function () { redirigir(role); }, 1200);
     }
 
   } catch (e) {
