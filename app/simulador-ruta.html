@@ -175,8 +175,38 @@
       <!-- Mapa Leaflet — Leaflet renderiza aquí; no poner contenido hijo -->
       <div id="map" class="w-full rounded-xl border border-slate-200 overflow-hidden"></div>
 
+      <!-- Estado de la red cargada -->
+      <div class="flex flex-wrap items-center gap-4 mt-2.5 text-xs">
+        <span id="status-acopios" class="text-slate-400 flex items-center gap-1">
+          <svg class="w-3 h-3 animate-spin text-slate-300" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+          Cargando acopios...
+        </span>
+        <span id="status-criticos" class="hidden text-xs font-semibold"></span>
+        <span id="status-flota"    class="hidden text-slate-400 text-xs"></span>
+
+        <!-- Leyenda de marcadores -->
+        <div class="flex items-center gap-3 ml-auto flex-wrap">
+          <span class="flex items-center gap-1.5 text-slate-400">
+            <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:#2ecc71;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+            Libre &lt;50%
+          </span>
+          <span class="flex items-center gap-1.5 text-slate-400">
+            <span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:#f59e0b;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+            Medio 50–80%
+          </span>
+          <span class="flex items-center gap-1.5 text-slate-400">
+            <span style="display:inline-block;width:13px;height:13px;border-radius:50%;background:#e74c3c;border:2.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+            Crítico &gt;80%
+          </span>
+          <span class="text-slate-400">🚛 Flota</span>
+        </div>
+      </div>
+
       <p class="text-xs text-slate-400 mt-2">
-        Datos cartográficos: © <a href="https://www.openstreetmap.org/copyright" target="_blank" class="underline">OpenStreetMap</a> contributors · Ruteo: OSRM · Geocodificación: Nominatim
+        Cartografía: © <a href="https://www.openstreetmap.org/copyright" target="_blank" class="underline">OpenStreetMap</a> · Ruteo: OSRM · Geocodificación: Nominatim
       </p>
 
     </div>
