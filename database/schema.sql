@@ -138,7 +138,73 @@ CREATE POLICY "flota_delete_own"
   ON public.flota_vehiculos FOR DELETE
   USING (user_id = auth.uid());
 
--- ── 12. Datos de demostración — Puntos de Acopio Región Metropolitana ─────
+-- ════════════════════════════════════════════════════════════════════════════
+-- PERFILES DE ROL — Soporte para usuarios con múltiples roles
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- ── 12. Tabla perfiles ────────────────────────────────────────────────────
+--    Almacena los roles habilitados por usuario. Un mismo usuario puede tener
+--    una fila para 'productor' y otra para 'transportista', habilitando el
+--    selector de rol en el login sin depender de user_metadata (que es fijo
+--    desde el signup y no cambia al iniciar sesión con un perfil distinto).
+--
+--    Flujo:
+--      • Signup → se inserta la fila inicial con el rol del registro (trigger).
+--      • Login  → el client usa selectedRole; esta tabla permite validar en
+--                 el futuro que el usuario tiene ese rol habilitado.
+--      • Admin  → puede agregar una segunda fila para habilitar el otro rol.
+CREATE TABLE IF NOT EXISTS public.perfiles (
+  id         uuid        NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id    uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  rol        text        NOT NULL CHECK (rol IN ('productor', 'transportista')),
+  activo     boolean     NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, rol)
+);
+
+CREATE INDEX IF NOT EXISTS idx_perfiles_user ON public.perfiles (user_id, activo);
+
+-- RLS: cada usuario solo ve y gestiona sus propias filas
+ALTER TABLE public.perfiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "perfiles_select_own"
+  ON public.perfiles FOR SELECT
+  USING (user_id = auth.uid());
+
+CREATE POLICY "perfiles_insert_own"
+  ON public.perfiles FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "perfiles_update_own"
+  ON public.perfiles FOR UPDATE
+  USING (user_id = auth.uid());
+
+-- Trigger: al crear un usuario, insertar automáticamente su perfil inicial
+--          tomando el rol desde raw_user_meta_data (guardado en signup).
+CREATE OR REPLACE FUNCTION public._on_new_user_insert_perfil()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  _rol text;
+BEGIN
+  _rol := COALESCE(
+    NEW.raw_user_meta_data ->> 'role',
+    'productor'   -- default si el signup no incluyó rol
+  );
+  -- solo insertar si el valor es válido
+  IF _rol IN ('productor', 'transportista') THEN
+    INSERT INTO public.perfiles (user_id, rol)
+    VALUES (NEW.id, _rol)
+    ON CONFLICT (user_id, rol) DO NOTHING;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE TRIGGER trg_new_user_perfil
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public._on_new_user_insert_perfil();
+
+-- ── 13. Datos de demostración — Puntos de Acopio Región Metropolitana ─────
 --    Ejecutar en SQL Editor para activar el Mapa Operativo con datos reales.
 --    Los porcentajes están calculados en el comentario: carga/capacidad × 100
 INSERT INTO public.puntos_acopio
