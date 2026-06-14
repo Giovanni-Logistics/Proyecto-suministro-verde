@@ -386,11 +386,11 @@ async function doRegistro(email, pwd) {
     setLoading(false);
   } else {
     // Confirmación desactivada → redirigir automáticamente
-    var role = (data.user.user_metadata && data.user.user_metadata.role) || selectedRole;
+    var role = selectedRole;
     persistirSesion(data.user, role);
-    localStorage.setItem('damu_role', selectedRole); // guardado explícito del rol seleccionado
     setMsg('ok', '✓ Cuenta creada exitosamente. Redirigiendo a tu plataforma…');
-    setTimeout(function () { redirigir(role); }, 1200);
+    await _cachearEmpresaLogin(data.user, role).catch(function() {});
+    setTimeout(function () { redirigir(role); }, 900);
   }
 }
 
