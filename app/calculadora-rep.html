@@ -699,6 +699,497 @@ async function generarCertificadoPDF() {
   // ── Descargar ─────────────────────────────────────────────────
   doc.save('Certificado_Damu_LeyREP.pdf');
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// MIS CERTIFICADOS — Estado del módulo
+// ═══════════════════════════════════════════════════════════════════
+var _datosViajes = [];
+var _datosCerts  = [];
+var _sessionUser = null;
+
+window.addEventListener('DOMContentLoaded', function () {
+  cargarCertificados();
+});
+
+// ── Carga de datos reales desde Supabase ─────────────────────────
+async function cargarCertificados() {
+  var sb = window.__damuSupabase;
+  if (!sb) { _setCertUI('error', 'No se pudo inicializar la conexion con Supabase.'); return; }
+
+  _setCertUI('loading');
+
+  try {
+    var sesRes = await sb.auth.getSession();
+    if (!sesRes.data || !sesRes.data.session) {
+      _setCertUI('error', 'Sesion no activa. Por favor inicia sesion nuevamente.');
+      return;
+    }
+    _sessionUser = sesRes.data.session.user;
+
+    var results = await Promise.all([
+      sb.from('viajes_operativos')
+        .select('id, origen, destino, distancia_km, costo_diesel, cargas_qr_kg, created_at')
+        .order('created_at', { ascending: false }),
+      sb.from('certificados_rep')
+        .select('id, categoria, toneladas_declaradas, meta_valorizacion_porcentaje, riesgo_multa_estimado, created_at')
+        .order('created_at', { ascending: false }),
+    ]);
+
+    var vRes = results[0];
+    var cRes = results[1];
+
+    if (vRes.error) throw new Error(vRes.error.message);
+    if (cRes.error) throw new Error(cRes.error.message);
+
+    _datosViajes = vRes.data || [];
+    _datosCerts  = cRes.data || [];
+
+    _renderizarDisponibilidad();
+
+  } catch (err) {
+    console.error('[Damu] Error cargando certificados:', err);
+    _setCertUI('error', 'Error al consultar datos: ' + (err.message || String(err)));
+  }
+}
+
+// ── Control de estados de la UI ──────────────────────────────────
+function _setCertUI(estado, msg) {
+  var ids = ['certs-loading', 'certs-error', 'certs-content'];
+  ids.forEach(function (id) { document.getElementById(id).classList.add('hidden'); });
+
+  if (estado === 'loading') {
+    document.getElementById('certs-loading').classList.remove('hidden');
+  } else if (estado === 'error') {
+    var errMsg = document.getElementById('certs-error-msg');
+    if (errMsg) errMsg.textContent = msg || 'Error desconocido.';
+    document.getElementById('certs-error').classList.remove('hidden');
+  } else {
+    document.getElementById('certs-content').classList.remove('hidden');
+  }
+}
+
+function _renderizarDisponibilidad() {
+  var hayViajes = _datosViajes.some(function (v) { return (v.distancia_km || 0) > 0; });
+  var hayCargas = _datosViajes.some(function (v) { return (v.cargas_qr_kg  || 0) > 0; });
+  var hayCerts  = _datosCerts.length > 0;
+  var hayOp     = hayViajes || hayCargas;
+
+  _setCertUI('content');
+
+  _setDispCert('btn-cert-trazabilidad', hayOp,
+    'Sin retiros ni cargas QR registrados. Opera en la plataforma para habilitar.');
+  _setDispCert('btn-cert-meta', hayCerts,
+    'Sin calculos REP guardados. Usa la calculadora y genera al menos un certificado.');
+  _setDispCert('btn-cert-co2', hayOp || hayCerts,
+    'Sin datos operativos. Registra viajes o calculos REP para habilitar este certificado.');
+}
+
+function _setDispCert(btnId, disponible, mensajeVacio) {
+  var btn = document.getElementById(btnId);
+  if (!btn) return;
+  var row      = btn.closest('.cert-row-wrap');
+  var noDataEl = row ? row.querySelector('.cert-no-data') : null;
+
+  if (disponible) {
+    btn.disabled = false;
+    btn.classList.remove('opacity-40', 'cursor-not-allowed');
+    if (noDataEl) noDataEl.classList.add('hidden');
+  } else {
+    btn.disabled = true;
+    btn.classList.add('opacity-40', 'cursor-not-allowed');
+    if (noDataEl) { noDataEl.textContent = mensajeVacio; noDataEl.classList.remove('hidden'); }
+  }
+}
+
+function _certBtnLoading(btnId, loading) {
+  var btn = document.getElementById(btnId);
+  if (!btn) return;
+  btn.disabled = loading;
+  if (loading) {
+    btn.innerHTML =
+      '<svg class="w-3.5 h-3.5 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">'
+      + '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>'
+      + '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>'
+      + '</svg> Generando documento...';
+    btn.classList.add('cursor-wait', 'opacity-75');
+  } else {
+    btn.innerHTML =
+      '<svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">'
+      + '<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>'
+      + '</svg> Generar PDF';
+    btn.classList.remove('cursor-wait', 'opacity-75');
+    btn.disabled = false;
+  }
+}
+
+function _notifCert(tipo, texto) {
+  var el = document.getElementById('cert-notif');
+  if (!el) return;
+  el.className = 'text-xs px-4 py-3 rounded-xl border font-medium '
+    + (tipo === 'ok'  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+     : tipo === 'err' ? 'bg-red-50 border-red-200 text-red-700'
+                      : 'bg-amber-50 border-amber-200 text-amber-700');
+  el.textContent = texto;
+  el.classList.remove('hidden');
+  setTimeout(function () { el.classList.add('hidden'); }, 7000);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// HELPERS COMPARTIDOS DE PDF
+// ═══════════════════════════════════════════════════════════════════
+function _pdfMkDoc() {
+  var JSPDF = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf.jsPDF : window.jsPDF;
+  return new JSPDF({ unit: 'mm', format: 'a4' });
+}
+
+function _pdfHdr(doc, W, M, badge) {
+  doc.setFillColor(15, 23, 42);  doc.rect(0, 0, W, 40, 'F');
+  doc.setFillColor(5, 150, 105); doc.circle(M + 7, 20, 7, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(255, 255, 255);
+  doc.text('D', M + 7, 24.5, { align: 'center' });
+  doc.setFontSize(12.5); doc.text('Damu SGC', M + 18, 17);
+  doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(148, 163, 184);
+  doc.text('Sistema de Gestion de Cumplimiento', M + 18, 23);
+  doc.setFontSize(7.5); doc.setTextColor(100, 116, 139);
+  doc.text('Trazabilidad Ley REP - Decreto 12 - Chile', M + 18, 29);
+  var bw = Math.max(badge.length * 1.65 + 8, 30);
+  doc.setFillColor(5, 150, 105); doc.roundedRect(W - M - bw, 14, bw, 8, 1.5, 1.5, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(255, 255, 255);
+  doc.text(badge, W - M - bw / 2, 19.3, { align: 'center' });
+}
+
+function _pdfTit(doc, M, titulo, subtitulo) {
+  var y = 50;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(15, 23, 42);
+  doc.text(titulo, M, y); y += 6;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(71, 85, 105);
+  doc.text(subtitulo, M, y); y += 4;
+  doc.setDrawColor(203, 213, 225); doc.setLineWidth(0.25);
+  doc.line(M, y, 210 - M, y);
+  return y + 5;
+}
+
+function _pdfMeta(doc, W, M, docId, fecha, email, tipo, y) {
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139);
+  doc.text('N Documento:', M, y);
+  doc.setFont('helvetica', 'bold'); doc.setTextColor(15, 23, 42);
+  doc.text(docId, M + 26, y);
+  doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139);
+  doc.text('Fecha:', W / 2 + 5, y);
+  doc.setFont('helvetica', 'bold'); doc.setTextColor(15, 23, 42);
+  doc.text(fecha, W - M, y, { align: 'right' }); y += 5;
+  doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139);
+  doc.text('Operador:', M, y);
+  doc.setFont('helvetica', 'bold'); doc.setTextColor(5, 150, 105);
+  var em = email.length > 52 ? email.slice(0, 49) + '...' : email;
+  doc.text(em, M + 26, y);
+  doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139);
+  doc.text('Tipo:', W / 2 + 5, y);
+  doc.setFont('helvetica', 'bold'); doc.setTextColor(15, 23, 42);
+  doc.text(tipo, W - M, y, { align: 'right' });
+  return y + 9;
+}
+
+function _pdfSec(doc, M, CW, titulo, y) {
+  doc.setFillColor(241, 245, 249); doc.rect(M, y, CW, 6.5, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(71, 85, 105);
+  doc.text(titulo, M + 3, y + 4.5);
+  return y + 6.5;
+}
+
+function _pdfRow(doc, W, M, CW, idx, lbl, val, y) {
+  if (idx % 2 === 0) { doc.setFillColor(248, 250, 252); doc.rect(M, y, CW, 6, 'F'); }
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(100, 116, 139);
+  doc.text(lbl, M + 3, y + 4.2);
+  doc.setFont('helvetica', 'bold'); doc.setTextColor(15, 23, 42);
+  doc.text(String(val), W - M - 2, y + 4.2, { align: 'right' });
+  return y + 6;
+}
+
+function _pdfNota(doc, M, CW, y) {
+  if (y > 243) return;
+  doc.setFillColor(248, 250, 252); doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.25);
+  doc.roundedRect(M, y, CW, 18, 2, 2, 'FD');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(71, 85, 105);
+  doc.text('NOTA LEGAL', M + 4, y + 5);
+  doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139);
+  doc.text('Este documento fue generado automaticamente por la plataforma Damu SGC.', M + 4, y + 10);
+  doc.text('Los datos provienen de los registros del usuario autenticado en la plataforma.', M + 4, y + 14.5);
+}
+
+function _pdfFtr(doc, W, M, fecha, docId) {
+  doc.setDrawColor(203, 213, 225); doc.setLineWidth(0.25); doc.line(M, 276, W - M, 276);
+  doc.setFillColor(15, 23, 42); doc.rect(0, 277, W, 20, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(255, 255, 255);
+  doc.text('Damu SGC - Trazabilidad Ley REP - Chile', M, 285);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(148, 163, 184);
+  doc.text('Generado automaticamente - ' + fecha, M, 290.5);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(5, 150, 105);
+  doc.text(docId, W - M, 285, { align: 'right' });
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(100, 116, 139);
+  doc.text('Decreto 12 - Ley 20.920 - MMA Chile', W - M, 290.5, { align: 'right' });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PDF 1: Certificado de Trazabilidad
+// ═══════════════════════════════════════════════════════════════════
+async function generarCertTrazabilidad() {
+  if (!_datosViajes || _datosViajes.length === 0) {
+    _notifCert('warn', 'No hay datos operativos suficientes para generar este certificado.');
+    return;
+  }
+  _certBtnLoading('btn-cert-trazabilidad', true);
+  try {
+    var email = _sessionUser ? _sessionUser.email : 'Usuario Damu';
+    var fecha = new Date().toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' });
+    var docId = 'TRZ-' + new Date().getFullYear() + '-' + String(Date.now()).slice(-6);
+    var W = 210, M = 14, CW = W - M * 2;
+
+    var rutasLista  = _datosViajes.filter(function (v) { return (v.distancia_km || 0) > 0; });
+    var cargasLista = _datosViajes.filter(function (v) { return (v.cargas_qr_kg  || 0) > 0; });
+    var totalKm  = rutasLista.reduce(function (a, v)  { return a + (v.distancia_km || 0); }, 0);
+    var totalKgs = cargasLista.reduce(function (a, v) { return a + (v.cargas_qr_kg || 0); }, 0);
+
+    var doc = _pdfMkDoc();
+    _pdfHdr(doc, W, M, 'TRAZABILIDAD');
+    var y = _pdfTit(doc, M,
+      'Certificado de Trazabilidad Operativa',
+      'Registro de retiros y cargas QR - Red de Recoleccion Damu SGC');
+    y = _pdfMeta(doc, W, M, docId, fecha, email, 'Trazabilidad', y);
+
+    y = _pdfSec(doc, M, CW, '1.  RESUMEN DE OPERACIONES', y);
+    y = _pdfRow(doc, W, M, CW, 0, 'Operador registrado',           email, y);
+    y = _pdfRow(doc, W, M, CW, 1, 'Total registros en plataforma', _datosViajes.length + ' registro(s)', y);
+    y = _pdfRow(doc, W, M, CW, 0, 'Viajes de recoleccion',          rutasLista.length + ' viaje(s)', y);
+    y = _pdfRow(doc, W, M, CW, 1, 'Distancia total recorrida',      totalKm.toFixed(1) + ' km', y);
+    y = _pdfRow(doc, W, M, CW, 0, 'Cargas QR escaneadas',           cargasLista.length + ' carga(s)', y);
+    y = _pdfRow(doc, W, M, CW, 1, 'Total carga QR registrada',
+      (totalKgs / 1000).toFixed(4) + ' t  (' + totalKgs.toFixed(2) + ' kg)', y);
+    y += 4;
+
+    var n = Math.min(_datosViajes.length, 15);
+    y = _pdfSec(doc, M, CW, '2.  DETALLE DE REGISTROS  (ultimos ' + n + ' de ' + _datosViajes.length + ')', y);
+
+    // Encabezado de tabla
+    var colW = [24, 58, 30, 26, 20];
+    var cols = ['Fecha', 'Punto / Origen', 'Categoria', 'Peso QR (kg)', 'Km'];
+    doc.setFillColor(241, 245, 249); doc.rect(M, y, CW, 6.5, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(71, 85, 105);
+    var cx = M + 2;
+    cols.forEach(function (c, i) { doc.text(c, cx, y + 4.5); cx += colW[i]; });
+    y += 6.5;
+
+    _datosViajes.slice(0, 15).forEach(function (v, idx) {
+      if (y > 255) { doc.addPage(); y = 20; }
+      var dt   = new Date(v.created_at);
+      var dtS  = dt.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: '2-digit' });
+      var vals = [
+        dtS,
+        (v.origen  || '—').slice(0, 30),
+        (v.destino || '—').slice(0, 18),
+        (v.cargas_qr_kg || 0) > 0 ? (v.cargas_qr_kg).toFixed(2) : '—',
+        (v.distancia_km || 0) > 0 ? (v.distancia_km).toFixed(1) : '—',
+      ];
+      if (idx % 2 === 0) { doc.setFillColor(248, 250, 252); doc.rect(M, y, CW, 5.8, 'F'); }
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(100, 116, 139);
+      var cx2 = M + 2;
+      vals.forEach(function (vv, i) { doc.text(String(vv), cx2, y + 4); cx2 += colW[i]; });
+      y += 5.8;
+    });
+
+    y += 5;
+    _pdfNota(doc, M, CW, y);
+    _pdfFtr(doc, W, M, fecha, docId);
+    doc.save('Trazabilidad_Damu_' + new Date().getFullYear() + '.pdf');
+    _notifCert('ok', '✓ Certificado de Trazabilidad descargado correctamente.');
+
+  } catch (err) {
+    console.error('[Damu] Error generando Trazabilidad:', err);
+    _notifCert('err', 'Error al generar el PDF. Intenta nuevamente.');
+  } finally {
+    _certBtnLoading('btn-cert-trazabilidad', false);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PDF 2: Reporte de Meta Anual REP
+// ═══════════════════════════════════════════════════════════════════
+async function generarCertMetaAnual() {
+  if (!_datosCerts || _datosCerts.length === 0) {
+    _notifCert('warn', 'No hay datos operativos suficientes para generar este certificado.');
+    return;
+  }
+  _certBtnLoading('btn-cert-meta', true);
+  try {
+    var email = _sessionUser ? _sessionUser.email : 'Usuario Damu';
+    var fecha = new Date().toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' });
+    var docId = 'META-' + new Date().getFullYear() + '-' + String(Date.now()).slice(-6);
+    var W = 210, M = 14, CW = W - M * 2;
+
+    var ultimo  = _datosCerts[0];
+    var catMap  = {
+      envases: 'Envases y embalajes', neumaticos: 'Neumaticos',
+      pilas: 'Pilas y baterias', raee: 'Aparatos electricos (RAEE)', aceites: 'Aceites lubricantes'
+    };
+    var catLbl  = catMap[ultimo.categoria] || ultimo.categoria;
+    var tons    = parseFloat(ultimo.toneladas_declaradas) || 0;
+    var meta    = parseFloat(ultimo.meta_valorizacion_porcentaje) || 0;
+    var multa   = parseFloat(ultimo.riesgo_multa_estimado) || 0;
+    var tonsVal = tons * (meta / 100);
+    var metaLeg = tons * 0.20;
+    var cumple  = tonsVal >= metaLeg;
+    function fmtClp(n) { return '$' + Math.round(Math.abs(n)).toLocaleString('es-CL') + ' CLP'; }
+
+    var doc = _pdfMkDoc();
+    _pdfHdr(doc, W, M, 'META ANUAL REP');
+    var y = _pdfTit(doc, M,
+      'Reporte de Meta Anual REP',
+      'Cumplimiento de metas de valorizacion - Decreto N 12 - Ley 20.920');
+    y = _pdfMeta(doc, W, M, docId, fecha, email, 'Meta Anual', y);
+
+    // Banner estado
+    if (cumple) { doc.setFillColor(220, 252, 231); doc.setDrawColor(134, 239, 172); }
+    else        { doc.setFillColor(254, 226, 226); doc.setDrawColor(252, 165, 165); }
+    doc.setLineWidth(0.3); doc.roundedRect(M, y, CW, 12, 2, 2, 'FD');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
+    doc.setTextColor(cumple ? 22 : 153, cumple ? 101 : 27, cumple ? 52 : 27);
+    doc.text(
+      cumple
+        ? 'ESTADO: SIN RIESGO  -  Cumplimiento REP verificado'
+        : 'ESTADO: EN RIESGO  -  Multa estimada Art. 48: ' + fmtClp(multa),
+      W / 2, y + 7.5, { align: 'center' });
+    y += 18;
+
+    y = _pdfSec(doc, M, CW, '1.  DATOS DE LA DECLARACION REP  (calculo mas reciente)', y);
+    y = _pdfRow(doc, W, M, CW, 0, 'Categoria de producto REP',         catLbl, y);
+    y = _pdfRow(doc, W, M, CW, 1, 'Toneladas declaradas en mercado',   tons.toFixed(1) + ' t', y);
+    y = _pdfRow(doc, W, M, CW, 0, 'Meta de valorizacion declarada',    meta.toFixed(1) + '%', y);
+    y = _pdfRow(doc, W, M, CW, 1, 'Toneladas a valorizar (meta)',      tonsVal.toFixed(1) + ' t', y);
+    y = _pdfRow(doc, W, M, CW, 0, 'Fecha del calculo',
+      new Date(ultimo.created_at).toLocaleDateString('es-CL'), y);
+    y += 4;
+
+    y = _pdfSec(doc, M, CW, '2.  EVALUACION DE CUMPLIMIENTO  -  DECRETO N 12', y);
+    y = _pdfRow(doc, W, M, CW, 0, 'Meta legal minima (~20% declarado)', metaLeg.toFixed(1) + ' t', y);
+    y = _pdfRow(doc, W, M, CW, 1, 'Estado de cumplimiento',             cumple ? 'CUMPLE' : 'EN RIESGO', y);
+    y = _pdfRow(doc, W, M, CW, 0, 'Multa estimada Art. 48',             multa === 0 ? '$0 CLP (sin riesgo)' : fmtClp(multa), y);
+    y += 4;
+
+    if (_datosCerts.length > 1) {
+      var nh = Math.min(_datosCerts.length, 8);
+      y = _pdfSec(doc, M, CW, '3.  HISTORIAL DE CALCULOS REP  (ultimos ' + nh + ')', y);
+      _datosCerts.slice(0, 8).forEach(function (c, idx) {
+        if (y > 255) { doc.addPage(); y = 20; }
+        var dt  = new Date(c.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: '2-digit' });
+        var cLb = (catMap[c.categoria] || c.categoria).slice(0, 25);
+        var tn  = parseFloat(c.toneladas_declaradas).toFixed(1) + ' t · ' + parseFloat(c.meta_valorizacion_porcentaje).toFixed(0) + '%';
+        y = _pdfRow(doc, W, M, CW, idx, dt + '  —  ' + cLb, tn, y);
+      });
+      y += 4;
+    }
+
+    _pdfNota(doc, M, CW, y);
+    _pdfFtr(doc, W, M, fecha, docId);
+    doc.save('MetaAnualREP_Damu_' + new Date().getFullYear() + '.pdf');
+    _notifCert('ok', '✓ Reporte de Meta Anual REP descargado correctamente.');
+
+  } catch (err) {
+    console.error('[Damu] Error generando Meta Anual REP:', err);
+    _notifCert('err', 'Error al generar el PDF. Intenta nuevamente.');
+  } finally {
+    _certBtnLoading('btn-cert-meta', false);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PDF 3: Certificado de CO₂e Mitigado
+// ═══════════════════════════════════════════════════════════════════
+async function generarCertCO2() {
+  var hayOp = (_datosViajes && _datosViajes.some(function (v) {
+    return (v.cargas_qr_kg || 0) > 0 || (v.distancia_km || 0) > 0;
+  })) || (_datosCerts && _datosCerts.length > 0);
+
+  if (!hayOp) {
+    _notifCert('warn', 'No hay datos operativos suficientes para generar este certificado.');
+    return;
+  }
+  _certBtnLoading('btn-cert-co2', true);
+  try {
+    var email = _sessionUser ? _sessionUser.email : 'Usuario Damu';
+    var fecha = new Date().toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' });
+    var docId = 'CO2-' + new Date().getFullYear() + '-' + String(Date.now()).slice(-6);
+    var W = 210, M = 14, CW = W - M * 2;
+
+    // CO2e desde cargas QR (factor 0.9 kg CO2e / kg residuo gestionado)
+    var totalKgsQR = (_datosViajes || []).reduce(function (a, v) { return a + (v.cargas_qr_kg || 0); }, 0);
+    var co2QR      = totalKgsQR * 0.0009; // → tCO2e
+
+    // CO2e desde cálculos REP (usando factores del objeto tarifas)
+    var co2Certs = 0;
+    if (_datosCerts && _datosCerts.length > 0) {
+      _datosCerts.forEach(function (c) {
+        var t    = tarifas[c.categoria];
+        var fact = t ? (t.co2 || 0.9) : 0.9;
+        var tv   = parseFloat(c.toneladas_declaradas) * (parseFloat(c.meta_valorizacion_porcentaje) / 100);
+        co2Certs += tv * fact;
+      });
+    }
+
+    var co2Total = co2QR + co2Certs;
+    var arboles  = Math.round(co2Total * 45);   // ~1 árbol absorbe 22 kg CO2/año
+    var kmAuto   = Math.round(co2Total * 4545); // ~220 g CO2/km en auto promedio
+
+    var doc = _pdfMkDoc();
+    _pdfHdr(doc, W, M, 'CO2e MITIGADO');
+    var y = _pdfTit(doc, M,
+      'Certificado de CO₂e Mitigado',
+      'Toneladas de CO₂ equivalente evitadas - Gestion de Residuos Ley REP');
+    y = _pdfMeta(doc, W, M, docId, fecha, email, 'Emision CO2e', y);
+
+    // Banner total CO2e
+    doc.setFillColor(220, 252, 231); doc.setDrawColor(134, 239, 172); doc.setLineWidth(0.3);
+    doc.roundedRect(M, y, CW, 14, 2, 2, 'FD');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(22, 101, 52);
+    doc.text(co2Total.toFixed(4) + ' tCO₂e evitadas', W / 2, y + 6, { align: 'center' });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(21, 128, 61);
+    doc.text(
+      'Equivalente a ' + arboles.toLocaleString('es-CL') + ' arboles/ano o ' + kmAuto.toLocaleString('es-CL') + ' km en auto evitados',
+      W / 2, y + 11.5, { align: 'center' });
+    y += 20;
+
+    y = _pdfSec(doc, M, CW, '1.  DESGLOSE POR FUENTE DE DATOS', y);
+    y = _pdfRow(doc, W, M, CW, 0, 'CO2e desde cargas QR escaneadas',
+      co2QR.toFixed(4) + ' tCO2e  (' + totalKgsQR.toFixed(2) + ' kg gestionados)', y);
+    y = _pdfRow(doc, W, M, CW, 1, 'CO2e desde calculos REP',
+      co2Certs.toFixed(4) + ' tCO2e  (' + _datosCerts.length + ' calculo(s))', y);
+    y = _pdfRow(doc, W, M, CW, 0, 'TOTAL CO2e EVITADO (estimado)', co2Total.toFixed(4) + ' tCO2e', y);
+    y += 4;
+
+    y = _pdfSec(doc, M, CW, '2.  METODOLOGIA DE CALCULO', y);
+    y = _pdfRow(doc, W, M, CW, 0, 'Factor cargas QR',   '0.9 kg CO2e / kg residuo gestionado', y);
+    y = _pdfRow(doc, W, M, CW, 1, 'Factores REP',        'Segun categoria (0.4 - 1.4 tCO2e/t)', y);
+    y = _pdfRow(doc, W, M, CW, 0, 'Fuente factores',     'Referencial logistica inversa Chile', y);
+    y = _pdfRow(doc, W, M, CW, 1, 'Periodo evaluado',    'Acumulado historico plataforma', y);
+    y += 4;
+
+    y = _pdfSec(doc, M, CW, '3.  EQUIVALENCIAS AMBIENTALES', y);
+    y = _pdfRow(doc, W, M, CW, 0, 'Arboles equivalentes absorbiendo CO2', arboles.toLocaleString('es-CL') + ' arboles / 1 ano', y);
+    y = _pdfRow(doc, W, M, CW, 1, 'Km en auto evitados', kmAuto.toLocaleString('es-CL') + ' km (vehiculo promedio)', y);
+    y += 4;
+
+    _pdfNota(doc, M, CW, y);
+    _pdfFtr(doc, W, M, fecha, docId);
+    doc.save('CO2e_Mitigado_Damu_' + new Date().getFullYear() + '.pdf');
+    _notifCert('ok', '✓ Certificado de CO₂e Mitigado descargado correctamente.');
+
+  } catch (err) {
+    console.error('[Damu] Error generando CO2e:', err);
+    _notifCert('err', 'Error al generar el PDF. Intenta nuevamente.');
+  } finally {
+    _certBtnLoading('btn-cert-co2', false);
+  }
+}
 </script>
 </body>
 </html>
