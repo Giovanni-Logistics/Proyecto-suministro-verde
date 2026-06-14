@@ -57,6 +57,24 @@
     <div id="kpi-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4"></div>
   </div>
 
+  <!-- ─── KPIs DE EMPRESA ─────────────────────────────────────── -->
+  <div id="kpi-empresa-section" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-blue-900 to-blue-800 px-6 py-4 flex items-center justify-between">
+      <div>
+        <h3 class="text-white font-bold text-sm flex items-center gap-2">🏢 KPIs Consolidados de la Empresa</h3>
+        <p id="empresa-nombre-label" class="text-blue-300 text-xs mt-0.5">Cargando información de la empresa…</p>
+      </div>
+      <span class="bg-white/10 border border-white/20 text-white/80 text-xs px-3 py-1 rounded-full font-semibold">Visión empresa</span>
+    </div>
+    <div class="p-6">
+      <div id="kpi-empresa-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5"></div>
+      <div id="kpi-empresa-viajes" class="hidden border-t border-slate-100 pt-4">
+        <p class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Últimos viajes de la empresa</p>
+        <div id="empresa-viajes-list" class="space-y-1.5"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ─── GRÁFICOS ─────────────────────────────────────────────── -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
