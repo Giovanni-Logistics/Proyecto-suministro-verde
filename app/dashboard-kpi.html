@@ -379,9 +379,127 @@ async function cargarDatosDB() {
   }).join('');
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// KPIs DE EMPRESA — agrega viajes + certs por empresa_id
+// ═══════════════════════════════════════════════════════════════════════
+async function cargarKPIsEmpresa(sb, uid) {
+  // 1. Resolver empresa_id según el rol activo
+  var empresaId   = null;
+  var empresaNombre = null;
+  var esProductor = (localStorage.getItem('damu_role') || '') === 'productor';
+
+  try {
+    if (esProductor) {
+      var eRes = await sb.from('empresas').select('id, nombre').eq('user_id_productor', uid).maybeSingle();
+      if (eRes.data) { empresaId = eRes.data.id; empresaNombre = eRes.data.nombre; }
+    } else {
+      var tRes = await sb.from('transportistas_empresa')
+        .select('empresa_id, empresas(nombre)')
+        .eq('user_id', uid).eq('activo', true).maybeSingle();
+      if (tRes.data) {
+        empresaId     = tRes.data.empresa_id;
+        empresaNombre = tRes.data.empresas && tRes.data.empresas.nombre;
+      }
+    }
+  } catch (_) {
+    // Tabla aún no creada — ignorar silenciosamente
+  }
+
+  if (!empresaId) return; // sin empresa configurada → no mostrar sección
+
+  // 2. Consultar datos de la empresa en paralelo
+  var resultados = await Promise.all([
+    sb.from('viajes_operativos')
+      .select('distancia_km, costo_diesel, cargas_qr_kg, created_at, origen, destino')
+      .eq('empresa_id', empresaId)
+      .order('created_at', { ascending: false })
+      .limit(50),
+    sb.from('certificados_rep')
+      .select('categoria, toneladas_declaradas, meta_valorizacion_porcentaje, riesgo_multa_estimado')
+      .eq('empresa_id', empresaId)
+      .order('created_at', { ascending: false })
+      .limit(1),
+  ]);
+
+  var viajesEmp = resultados[0].data || [];
+  var certsEmp  = resultados[1].data || [];
+
+  // 3. Agregar métricas de empresa
+  var totalKmEmp    = viajesEmp.reduce(function (a, v) { return a + (v.distancia_km  || 0); }, 0);
+  var totalQrKgEmp  = viajesEmp.reduce(function (a, v) { return a + (v.cargas_qr_kg  || 0); }, 0);
+  var totalViajesEmp = viajesEmp.length;
+  var certEmp        = certsEmp.length > 0 ? certsEmp[0] : null;
+  var multaEmp       = certEmp ? certEmp.riesgo_multa_estimado : null;
+
+  // 4. Render KPI grid de empresa
+  var kpisEmp = [
+    {
+      icon: '🚚', lbl: 'Viajes registrados',
+      val: totalViajesEmp > 0 ? totalViajesEmp + ' viaje' + (totalViajesEmp !== 1 ? 's' : '') : '—',
+      col: totalViajesEmp > 0 ? 'text-blue-600' : 'text-slate-400',
+    },
+    {
+      icon: '📏', lbl: 'Km acumulados',
+      val: totalKmEmp > 0 ? totalKmEmp.toFixed(1) + ' km' : '—',
+      col: totalKmEmp > 0 ? 'text-blue-600' : 'text-slate-400',
+    },
+    {
+      icon: '📦', lbl: 'Cargas QR (empresa)',
+      val: totalQrKgEmp > 0 ? (totalQrKgEmp / 1000).toFixed(3) + ' t' : '—',
+      col: totalQrKgEmp > 0 ? 'text-emerald-600' : 'text-slate-400',
+    },
+    {
+      icon: multaEmp === 0 ? '✅' : multaEmp > 0 ? '❌' : '❓',
+      lbl: 'Riesgo multa empresa',
+      val: multaEmp === null ? '—' : multaEmp === 0 ? 'Sin riesgo' : '$' + Math.round(multaEmp).toLocaleString('es-CL'),
+      col: multaEmp === 0 ? 'text-emerald-600' : multaEmp > 0 ? 'text-red-500' : 'text-slate-400',
+    },
+  ];
+
+  document.getElementById('empresa-nombre-label').textContent =
+    (empresaNombre || 'Empresa') + ' · ' + totalViajesEmp + ' viaje(s) registrado(s)';
+
+  document.getElementById('kpi-empresa-grid').innerHTML = kpisEmp.map(function (k) {
+    return '<div class="bg-slate-50 rounded-xl border border-slate-200 p-4 text-center">'
+      + '<div class="text-2xl mb-1.5">' + k.icon + '</div>'
+      + '<div class="text-base font-black ' + k.col + '">' + k.val + '</div>'
+      + '<div class="text-xs font-semibold text-slate-600 mt-0.5">' + k.lbl + '</div>'
+      + '</div>';
+  }).join('');
+
+  // 5. Últimos viajes de la empresa (máx 5)
+  if (viajesEmp.length > 0) {
+    var listaViajes = viajesEmp.slice(0, 5).map(function (v) {
+      var dtS = new Date(v.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: '2-digit' });
+      return '<div class="flex items-center justify-between text-xs text-slate-500 py-1.5 border-b border-slate-100 last:border-0">'
+        + '<span class="text-slate-400">' + dtS + '</span>'
+        + '<span class="text-slate-600 flex-1 mx-3 truncate">'
+        + (v.origen ? v.origen + ' → ' + (v.destino || '—') : (v.destino || '—'))
+        + '</span>'
+        + '<span class="font-semibold text-slate-700 flex-shrink-0">'
+        + (v.distancia_km > 0 ? v.distancia_km + ' km' : v.cargas_qr_kg > 0 ? v.cargas_qr_kg + ' kg QR' : '—')
+        + '</span>'
+        + '</div>';
+    }).join('');
+    document.getElementById('empresa-viajes-list').innerHTML = listaViajes;
+    document.getElementById('kpi-empresa-viajes').classList.remove('hidden');
+  }
+
+  // 6. Mostrar sección
+  document.getElementById('kpi-empresa-section').classList.remove('hidden');
+}
+
 // ── Cargar al iniciar ──────────────────────────────────────────
 // __damuSupabase está disponible de forma síncrona desde auth-guard.js
-cargarDatosDB();
+async function _init() {
+  await cargarDatosDB();
+  var sb = window.__damuSupabase;
+  if (!sb) return;
+  var sesRes = await sb.auth.getSession();
+  var uid    = sesRes.data && sesRes.data.session ? sesRes.data.session.user.id : null;
+  if (uid) cargarKPIsEmpresa(sb, uid);
+}
+_init();
 </script>
 </body>
 </html>
