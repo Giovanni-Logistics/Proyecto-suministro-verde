@@ -252,6 +252,19 @@ var COLORES = {
 
 var html5QrcodeScanner = null;
 
+// Centros de valorización por categoría REP (coordenadas Santiago RM)
+var _centros = {
+  envases:    { nombre: 'Centro REP Envases — San Bernardo',  label: 'Centro Envases',    lat: -33.5949, lng: -70.6987 },
+  neumaticos: { nombre: 'Centro REP Neumáticos — Pudahuel',   label: 'Centro Neumáticos', lat: -33.4474, lng: -70.8255 },
+  pilas:      { nombre: 'Centro REP Pilas/Bat. — Quilicura',  label: 'Centro Pilas/Bat.', lat: -33.3581, lng: -70.7341 },
+  raee:       { nombre: 'Centro REP RAEE — Maipú',            label: 'Centro RAEE',       lat: -33.5171, lng: -70.7614 },
+  aceites:    { nombre: 'Centro REP Aceites — Til-Til',       label: 'Centro Aceites',    lat: -33.0816, lng: -70.9256 },
+};
+
+var _catLabelScan = {
+  envases: 'Envases', neumaticos: 'Neumáticos', pilas: 'Pilas/Bat.', raee: 'RAEE', aceites: 'Aceites',
+};
+
 // ═══════════════════════════════════════════════════════════════════
 // INICIALIZAR ESCÁNER (DOMContentLoaded)
 // ═══════════════════════════════════════════════════════════════════
