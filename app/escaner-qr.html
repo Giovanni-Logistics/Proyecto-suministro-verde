@@ -294,41 +294,54 @@ function iniciarEscaner() {
 // CALLBACK — QR detectado
 // ═══════════════════════════════════════════════════════════════════
 function onScanSuccess(decodedText) {
-  // Detener escáner
   try { html5QrcodeScanner.clear(); } catch(e) {}
 
-  // Detectar categoría REP desde el texto del QR
-  var categoria = detectarCategoria(decodedText);
-  var icono     = ICONOS[categoria] || '📦';
+  // Intentar parsear QR estructurado de Damu
+  var damuQR = null;
+  try {
+    var parsed = JSON.parse(decodedText);
+    if (parsed && parsed.tipo === 'damu_acopio') damuQR = parsed;
+  } catch(e) {}
 
-  // Simular peso de la carga (50–550 kg con algo de variabilidad)
-  var kgs = 50 + Math.floor(Math.abs(hashTexto(decodedText) + Date.now()) % 501);
+  var categoria    = damuQR ? (damuQR.categoria || 'envases') : detectarCategoria(decodedText);
+  var kgs          = damuQR ? Number(damuQR.kg  || 0) : (50 + Math.floor(Math.abs(hashTexto(decodedText) + Date.now()) % 501));
+  var puntoId      = damuQR ? (damuQR.punto_acopio_id || null) : null;
+  var acopioNombre = damuQR ? (damuQR.nombre    || 'Punto de acopio') : 'Lectura QR externa';
+  var empresaId    = damuQR ? (damuQR.empresa_id || null) : null;
+  var icono        = ICONOS[categoria] || '📦';
 
-  // Construir registro
   var ahora = new Date();
   var carga = {
-    id:        'QR-' + Date.now(),
-    qrContent: decodedText,
-    categoria: categoria,
-    kgs:       kgs,
-    ts:        Date.now(),
-    fecha:     ahora.toLocaleDateString('es-CL'),
-    hora:      ahora.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
+    id:              'QR-' + Date.now(),
+    qrContent:       decodedText,
+    categoria:       categoria,
+    nombre:          acopioNombre,
+    punto_acopio_id: puntoId,
+    empresa_id:      empresaId,
+    kgs:             kgs,
+    ts:              Date.now(),
+    fecha:           ahora.toLocaleDateString('es-CL'),
+    hora:            ahora.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
   };
 
-  // Persistir en Supabase (async, no bloquea el modal)
-  _guardarCargaDB(carga);
+  // 3 escrituras DB: viajes_operativos + puntos_acopio + flota_vehiculos
+  _procesarCargaDB(carga);
 
-  // Mostrar modal
+  // Reset alerta capacidad y mostrar modal
+  var capWarn = document.getElementById('modal-cap-warning');
+  if (capWarn) capWarn.classList.add('hidden');
+
   document.getElementById('modal-icono').textContent      = icono;
-  document.getElementById('modal-categoria').textContent  = categoria;
+  document.getElementById('modal-categoria').textContent  = _catLabelScan[categoria] || categoria;
   document.getElementById('modal-kgs').textContent        = kgs.toLocaleString('es-CL') + ' kg';
-  document.getElementById('modal-id').textContent        = carga.id;
-  document.getElementById('modal-qr-content').textContent = decodedText;
+  document.getElementById('modal-id').textContent         = damuQR ? acopioNombre : carga.id;
   document.getElementById('modal-hora').textContent       = carga.fecha + ' · ' + carga.hora;
+  document.getElementById('modal-qr-content').textContent = damuQR
+    ? (puntoId ? puntoId.slice(0, 8) + '… · ' + (_catLabelScan[categoria] || categoria) + ' · ' + kgs + ' kg'
+               : (_catLabelScan[categoria] || categoria) + ' · ' + kgs + ' kg')
+    : decodedText;
   document.getElementById('success-modal').classList.remove('hidden');
 
-  // Actualizar historial y stats
   renderHistorial();
 }
 
