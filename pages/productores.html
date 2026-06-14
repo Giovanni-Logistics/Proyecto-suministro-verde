@@ -173,6 +173,52 @@
     }
     .info-box.verde { background:var(--verde-bg); border-color:var(--borde); color:#1a4a2e; }
 
+    /* ── TOAST DEMO ── */
+    .toast-demo {
+      position: fixed;
+      bottom: 1.6rem;
+      right: 1.6rem;
+      background: #fff;
+      border: 1px solid var(--borde);
+      border-left: 4px solid var(--verde);
+      border-radius: 12px;
+      padding: 1rem 1.4rem 1rem 1.1rem;
+      box-shadow: 0 8px 28px rgba(0,0,0,.13);
+      max-width: 360px;
+      font-size: .83rem;
+      color: #333;
+      line-height: 1.55;
+      z-index: 9999;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity .28s ease, transform .28s ease;
+      pointer-events: none;
+    }
+    .toast-demo.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    .toast-demo strong {
+      display: block;
+      color: var(--verde);
+      font-size: .88rem;
+      margin-bottom: .3rem;
+    }
+    .toast-close {
+      position: absolute;
+      top: .5rem;
+      right: .65rem;
+      background: none;
+      border: none;
+      font-size: .95rem;
+      cursor: pointer;
+      color: #aaa;
+      line-height: 1;
+      padding: 0;
+    }
+    .toast-close:hover { color: #555; }
+
     /* ── FOOTER ── */
     footer {
       background:var(--gris-os); color:#8abeaa;
