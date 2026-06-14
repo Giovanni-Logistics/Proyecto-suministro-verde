@@ -690,6 +690,360 @@ async function _guardarViajeDB(datos) {
     console.warn('[Damu] Error guardando viaje:', error.message);
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAPA OPERATIVO — Capa de inteligencia sobre la red de acopios REP
+// ═══════════════════════════════════════════════════════════════════════════
+var _acopiosData       = [];   // puntos_acopio desde Supabase
+var _flotaData         = [];   // flota_vehiculos desde Supabase
+var _marcadoresAcopio  = [];
+var _marcadoresFlota   = [];
+
+window._acopiosData = _acopiosData; // expuesto para acceso desde popups inline
+
+// ── Carga paralela de puntos de acopio + flota ─────────────────────────────
+async function cargarMapaOperativo() {
+  var sb = window.__damuSupabase;
+  if (!sb) return;
+
+  _setBtnRefresh(true);
+
+  try {
+    var sesRes = await sb.auth.getSession();
+    var uid    = sesRes.data && sesRes.data.session ? sesRes.data.session.user.id : null;
+
+    var results = await Promise.all([
+      sb.from('puntos_acopio').select('*').eq('activo', true),
+      uid
+        ? sb.from('flota_vehiculos').select('*').eq('user_id', uid).eq('activo', true)
+        : Promise.resolve({ data: [] }),
+      uid
+        ? sb.from('viajes_operativos')
+            .select('cargas_qr_kg')
+            .eq('user_id', uid)
+            .order('created_at', { ascending: false })
+            .limit(200)
+        : Promise.resolve({ data: [] }),
+    ]);
+
+    var acopiosRes = results[0];
+    var flotaRes   = results[1];
+    var viajesRes  = results[2];
+
+    if (acopiosRes.error) throw acopiosRes.error;
+
+    _acopiosData = acopiosRes.data || [];
+    _flotaData   = flotaRes.data   || [];
+    window._acopiosData = _acopiosData; // sincronizar referencia global
+
+    var totalCargasKg = (viajesRes.data || []).reduce(function (a, v) {
+      return a + (v.cargas_qr_kg || 0);
+    }, 0);
+
+    _pintarAcopios(_acopiosData);
+    _pintarFlota(_flotaData, totalCargasKg);
+    _verificarCriticos(_acopiosData);
+    _actualizarEstadoBar(_acopiosData, _flotaData);
+
+  } catch (err) {
+    console.error('[Damu] Error cargando Mapa Operativo:', err);
+    var elS = document.getElementById('status-acopios');
+    if (elS) { elS.textContent = '⚠ Error al cargar puntos de acopio'; elS.classList.add('text-red-400'); }
+  } finally {
+    _setBtnRefresh(false);
+  }
+}
+
+function _setBtnRefresh(loading) {
+  var btn   = document.getElementById('btn-refresh-mapa');
+  var badge = document.getElementById('mapa-loading-badge');
+  if (!btn) return;
+  btn.disabled = loading;
+  if (loading) {
+    btn.classList.add('opacity-50');
+    if (badge) badge.classList.remove('hidden');
+  } else {
+    btn.classList.remove('opacity-50');
+    if (badge) badge.classList.add('hidden');
+  }
+}
+
+// ── Helpers de estado visual ────────────────────────────────────────────────
+function _pctLlenado(p) {
+  return p.capacidad_total_kg > 0
+    ? (p.carga_actual_kg / p.capacidad_total_kg) * 100
+    : 0;
+}
+
+function _colorAcopio(pct) {
+  if (pct >= 80) return '#e74c3c';
+  if (pct >= 50) return '#f59e0b';
+  return '#2ecc71';
+}
+
+function _estadoLabel(pct) {
+  if (pct >= 80) return 'CRÍTICO';
+  if (pct >= 50) return 'MEDIO';
+  return 'LIBRE';
+}
+
+// ── Pintar marcadores de puntos de acopio ──────────────────────────────────
+function _pintarAcopios(acopios) {
+  _marcadoresAcopio.forEach(function (m) { m.remove(); });
+  _marcadoresAcopio = [];
+
+  var catLabel = {
+    envases: 'Envases', neumaticos: 'Neumáticos',
+    pilas: 'Pilas/Bat.', raee: 'RAEE', aceites: 'Aceites',
+  };
+
+  acopios.forEach(function (p) {
+    var pct     = _pctLlenado(p);
+    var color   = _colorAcopio(pct);
+    var critico = pct >= 80;
+    var sz      = critico ? 20 : 14;
+    var borde   = critico ? 3 : 2;
+
+    var icon = L.divIcon({
+      className: '',
+      html: '<div style="'
+        + 'width:'  + sz + 'px;height:' + sz + 'px;border-radius:50%;'
+        + 'background:' + color + ';'
+        + 'border:' + borde + 'px solid #fff;'
+        + 'box-shadow:0 2px 8px rgba(0,0,0,.3)'
+        + (critico ? ',0 0 0 5px rgba(231,76,60,.2);animation:pulse-acopio 1.8s ease-in-out infinite' : '')
+        + ';cursor:pointer"></div>',
+      iconSize:   [sz, sz],
+      iconAnchor: [sz / 2, sz / 2],
+    });
+
+    var popupHtml =
+      '<div style="min-width:215px;font-family:\'Segoe UI\',sans-serif;font-size:13px;">'
+      + '<p style="font-weight:800;margin:0 0 2px;color:#0f172a">' + p.nombre + '</p>'
+      + '<p style="font-size:11px;color:#94a3b8;margin:0 0 10px">' + (catLabel[p.categoria] || p.categoria) + '</p>'
+      + '<div style="background:#f8fafc;border-radius:8px;padding:9px 10px;margin-bottom:10px">'
+      + '<div style="font-size:10px;color:#94a3b8;margin-bottom:5px">Capacidad ocupada</div>'
+      + '<div style="background:#e2e8f0;border-radius:4px;height:8px;overflow:hidden;margin-bottom:5px">'
+      + '<div style="background:' + color + ';width:' + Math.min(pct, 100).toFixed(0) + '%;height:100%;border-radius:4px"></div>'
+      + '</div>'
+      + '<span style="font-weight:800;font-size:13px;color:' + color + '">'
+      + pct.toFixed(0) + '% — ' + _estadoLabel(pct)
+      + ' · ' + p.carga_actual_kg.toFixed(0) + ' / ' + p.capacidad_total_kg + ' kg'
+      + '</span></div>'
+      + (critico
+        ? '<button onclick="autoRellenarRuta(window._acopiosData.find(function(x){return x.id===\''
+          + p.id
+          + '\';}))" '
+          + 'style="width:100%;background:#e74c3c;color:#fff;border:none;padding:8px;border-radius:8px;'
+          + 'font-size:12px;font-weight:700;cursor:pointer" '
+          + 'onmouseover="this.style.background=\'#c0392b\'" onmouseout="this.style.background=\'#e74c3c\'">'
+          + '🚨 Iniciar retiro urgente</button>'
+        : '<p style="font-size:11px;color:#94a3b8;margin:0">Sin urgencia de retiro inmediato</p>')
+      + '</div>';
+
+    var marker = L.marker([p.lat, p.lng], { icon: icon, title: p.nombre })
+      .bindPopup(popupHtml, { maxWidth: 250, className: 'damu-popup' })
+      .addTo(_map);
+
+    _marcadoresAcopio.push(marker);
+  });
+}
+
+// ── Pintar marcadores de flota ──────────────────────────────────────────────
+function _pintarFlota(flota, totalCargasKg) {
+  _marcadoresFlota.forEach(function (m) { m.remove(); });
+  _marcadoresFlota = [];
+
+  flota.forEach(function (v) {
+    if (!v.lat || !v.lng) return;
+    var pct = v.capacidad_kg > 0 ? (v.carga_actual_kg / v.capacidad_kg) * 100 : 0;
+
+    var icon = L.divIcon({
+      className: '',
+      html: '<div style="font-size:22px;line-height:1;filter:drop-shadow(0 2px 5px rgba(0,0,0,.5));cursor:pointer">🚛</div>',
+      iconSize:   [26, 24],
+      iconAnchor: [13, 12],
+    });
+
+    var popupHtml =
+      '<div style="min-width:215px;font-family:\'Segoe UI\',sans-serif;font-size:13px;">'
+      + '<p style="font-weight:800;margin:0 0 2px;color:#0f172a">🚛 ' + v.patente + '</p>'
+      + '<p style="font-size:11px;color:#94a3b8;margin:0 0 10px">'
+      + (v.conductor || 'Sin conductor') + ' · ' + (v.tipo || 'Camión') + '</p>'
+      + '<div style="font-size:12px;color:#475569;line-height:1.85">'
+      + '⚖️ Carga: <strong>' + (v.carga_actual_kg || 0).toFixed(0) + ' kg</strong>'
+      + ' / ' + (v.capacidad_kg || 5000) + ' kg (' + pct.toFixed(0) + '%)<br>'
+      + (v.destino ? '📍 Destino: <strong>' + v.destino + '</strong><br>' : '')
+      + '<span style="display:inline-block;margin-top:6px;padding-top:6px;border-top:1px solid #e2e8f0;'
+      + 'color:#2980b9;font-weight:700">'
+      + '📊 Carga acumulada: ' + (totalCargasKg / 1000).toFixed(3) + ' t'
+      + '</span></div></div>';
+
+    var marker = L.marker([v.lat, v.lng], { icon: icon, title: v.patente })
+      .bindPopup(popupHtml, { maxWidth: 250, className: 'damu-popup' })
+      .addTo(_map);
+
+    _marcadoresFlota.push(marker);
+  });
+}
+
+// ── Detectar y mostrar alerta de acopios críticos ──────────────────────────
+function _verificarCriticos(acopios) {
+  var criticos = acopios.filter(function (p) { return _pctLlenado(p) >= 80; });
+  var alertBar = document.getElementById('alert-crit');
+  var alertMsg = document.getElementById('alert-crit-msg');
+  var btnOpt   = document.getElementById('btn-optimizar-ruta');
+
+  if (criticos.length > 0) {
+    var nombresCortos = criticos
+      .slice(0, 3)
+      .map(function (p) { return p.nombre.split('—')[0].trim(); });
+    alertMsg.textContent = criticos.length + ' punto(s) en estado CRÍTICO: '
+      + nombresCortos.join(', ')
+      + (criticos.length > 3 ? ' y ' + (criticos.length - 3) + ' más.' : '.');
+    alertBar.classList.remove('hidden');
+    if (btnOpt) btnOpt.classList.remove('hidden');
+  } else {
+    alertBar.classList.add('hidden');
+    if (btnOpt) btnOpt.classList.add('hidden');
+  }
+}
+
+// ── Actualizar barra de estado bajo el mapa ────────────────────────────────
+function _actualizarEstadoBar(acopios, flota) {
+  var criticos = acopios.filter(function (p) { return _pctLlenado(p) >= 80; }).length;
+
+  var elA = document.getElementById('status-acopios');
+  var elC = document.getElementById('status-criticos');
+  var elF = document.getElementById('status-flota');
+
+  if (elA) {
+    elA.innerHTML = '📍 ' + acopios.length + ' puntos de acopio cargados';
+    elA.classList.remove('text-slate-400');
+    elA.classList.add(acopios.length > 0 ? 'text-emerald-600' : 'text-slate-400');
+  }
+  if (elC) {
+    elC.textContent = criticos > 0
+      ? '🔴 ' + criticos + ' crítico(s) — retiro urgente'
+      : '🟢 Ningún punto crítico';
+    elC.className = 'text-xs font-semibold ' + (criticos > 0 ? 'text-red-500' : 'text-emerald-600');
+    elC.classList.remove('hidden');
+  }
+  if (elF && flota.length > 0) {
+    elF.textContent = '🚛 ' + flota.length + ' vehículo(s) en red';
+    elF.classList.remove('hidden');
+  }
+}
+
+// ── Auto-relleno de destino desde popup del acopio ─────────────────────────
+// Llamado por el botón "Iniciar retiro urgente" dentro del popup Leaflet
+function autoRellenarRuta(punto) {
+  if (!punto) return;
+  _map.closePopup();
+
+  // 1. Rellenar campo destino con el nombre del acopio
+  var destInput = document.getElementById('map-dest');
+  if (destInput) {
+    destInput.value = punto.nombre;
+    // Flash rojo temporal para indicar auto-relleno
+    destInput.style.borderColor = '#e74c3c';
+    destInput.style.boxShadow   = '0 0 0 3px rgba(231,76,60,.2)';
+    setTimeout(function () {
+      destInput.style.borderColor = '';
+      destInput.style.boxShadow   = '';
+    }, 2000);
+  }
+
+  // 2. Smooth scroll al formulario de ruta (con offset para el nav sticky)
+  var seccion = document.getElementById('mapa-controles');
+  if (seccion) {
+    var top = seccion.getBoundingClientRect().top + window.scrollY - 80;
+    window.scrollTo({ top: top, behavior: 'smooth' });
+  }
+
+  // 3. Si ya hay un origen, inyectar el acopio directamente al routing
+  //    como destino final (sin geocodificación) usando sus coordenadas reales
+  var originVal = (document.getElementById('map-origin') || {}).value || '';
+  if (originVal.trim()) {
+    var wps = _routingControl.getWaypoints().filter(function (w) { return w.latLng; });
+    if (wps.length >= 1) {
+      wps[wps.length - 1] = L.Routing.waypoint(L.latLng(punto.lat, punto.lng), punto.nombre);
+    } else {
+      wps.push(L.Routing.waypoint(L.latLng(punto.lat, punto.lng), punto.nombre));
+    }
+    _routingControl.setWaypoints(wps);
+  }
+}
+
+// ── Botón "Optimizar Recolección" ──────────────────────────────────────────
+// Genera una ruta automática pasando por todos los acopios críticos (>80%)
+// ordenados de mayor a menor llenado. Usa coordenadas directas (sin Nominatim).
+async function optimizarRecoleccion() {
+  var criticos = _acopiosData
+    .filter(function (p) { return _pctLlenado(p) >= 80; })
+    .sort(function (a, b) { return _pctLlenado(b) - _pctLlenado(a); });
+
+  if (criticos.length === 0) {
+    alert('No hay puntos de acopio en estado crítico en este momento.');
+    return;
+  }
+
+  var btn = document.getElementById('btn-optimizar-ruta');
+  var btnAlerta = document.querySelector('#alert-crit button');
+  [btn, btnAlerta].forEach(function (b) {
+    if (b) { b.textContent = '⟳ Calculando...'; b.disabled = true; }
+  });
+
+  try {
+    // Intentar geolocalización del usuario como punto de origen
+    var origenLL = await new Promise(function (resolve) {
+      if (!navigator.geolocation) { resolve(null); return; }
+      navigator.geolocation.getCurrentPosition(
+        function (pos) { resolve(L.latLng(pos.coords.latitude, pos.coords.longitude)); },
+        function ()    { resolve(null); },
+        { timeout: 4000, maximumAge: 60000 }
+      );
+    });
+
+    // Sin geoloc: aproximar con posición desplazada del primer acopio crítico
+    if (!origenLL) {
+      origenLL = L.latLng(criticos[0].lat - 0.015, criticos[0].lng - 0.015);
+    }
+
+    // Waypoints: posición actual → todos los críticos ordenados por llenado
+    var waypoints = [L.Routing.waypoint(origenLL, 'Mi posición')].concat(
+      criticos.map(function (p) {
+        return L.Routing.waypoint(L.latLng(p.lat, p.lng), p.nombre);
+      })
+    );
+
+    // Pasar directamente al control OSRM (sin geocodificación de texto)
+    _routingControl.setWaypoints(waypoints);
+
+    // Actualizar campo destino visualmente
+    var destInput = document.getElementById('map-dest');
+    if (destInput) {
+      destInput.value = criticos
+        .map(function (p) { return p.nombre.split('—')[0].trim(); })
+        .join(' → ');
+    }
+
+    // Hacer zoom al bounding box de los acopios críticos
+    var bounds = L.latLngBounds(criticos.map(function (p) { return [p.lat, p.lng]; }));
+    _map.fitBounds(bounds.pad(0.25));
+
+  } catch (err) {
+    console.error('[Damu] Error en Optimizar Recolección:', err);
+    alert('Error calculando la ruta optimizada. Intenta nuevamente.');
+  } finally {
+    [btn, btnAlerta].forEach(function (b) {
+      if (b) {
+        b.textContent = b === btn ? '🚨 Optimizar Recolección' : 'Optimizar ruta ahora →';
+        b.disabled = false;
+      }
+    });
+  }
+}
 </script>
 
 </body>
