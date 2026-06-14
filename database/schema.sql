@@ -217,3 +217,194 @@ INSERT INTO public.puntos_acopio
   ('Peñalolén — Punto Reciclaje',    -33.4724, -70.5311, 'pilas',        800,  432),  -- 54% MEDIO
   ('San Bernardo — Acopio REP',       -33.5986, -70.7061, 'envases',    2500, 1000),  -- 40% LIBRE
   ('Quilicura — Centro Valorización', -33.3622, -70.7397, 'raee',       1800,  450);  -- 25% LIBRE
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- MODELO RELACIONAL — Empresa ↔ Transportista
+-- ════════════════════════════════════════════════════════════════════════════
+-- Propósito: desacoplar el filtro user_id individual y habilitar que
+-- productor y transportista compartan datos dentro de la misma empresa.
+--
+-- Flujo de datos con empresa_id:
+--   Transportista registra viaje → viajes_operativos.empresa_id = su empresa
+--   Productor ve viajes de todos sus transportistas vía viajes_select_empresa
+--   Transportista ve declaraciones REP del productor vía certs_select_empresa_member
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- ── 14. Tabla empresas ────────────────────────────────────────────────────
+--    Una empresa por productor (MVP). El productor es la entidad legal REP.
+CREATE TABLE IF NOT EXISTS public.empresas (
+  id                uuid        NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  nombre            text        NOT NULL,
+  rut               text,
+  user_id_productor uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  activo            boolean     NOT NULL DEFAULT true,
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id_productor)
+);
+
+-- ── 15. Tabla transportistas_empresa ──────────────────────────────────────
+--    Vínculo N:M entre transportistas (user_id) y empresa.
+--    El productor crea filas aquí para invitar a sus transportistas.
+CREATE TABLE IF NOT EXISTS public.transportistas_empresa (
+  id         uuid        NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  empresa_id uuid        NOT NULL REFERENCES public.empresas(id)  ON DELETE CASCADE,
+  user_id    uuid        NOT NULL REFERENCES auth.users(id)       ON DELETE CASCADE,
+  activo     boolean     NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (empresa_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_te_empresa ON public.transportistas_empresa (empresa_id, activo);
+CREATE INDEX IF NOT EXISTS idx_te_user    ON public.transportistas_empresa (user_id,    activo);
+
+-- ── 16. empresa_id en tablas operativas ───────────────────────────────────
+--    Nullable para compatibilidad: datos existentes (sin empresa) siguen
+--    siendo visibles vía las políticas "own" originales.
+ALTER TABLE public.certificados_rep  ADD COLUMN IF NOT EXISTS empresa_id uuid REFERENCES public.empresas(id);
+ALTER TABLE public.viajes_operativos ADD COLUMN IF NOT EXISTS empresa_id uuid REFERENCES public.empresas(id);
+ALTER TABLE public.flota_vehiculos   ADD COLUMN IF NOT EXISTS empresa_id uuid REFERENCES public.empresas(id);
+
+CREATE INDEX IF NOT EXISTS idx_viajes_empresa ON public.viajes_operativos (empresa_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_certs_empresa  ON public.certificados_rep  (empresa_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_flota_empresa  ON public.flota_vehiculos   (empresa_id, activo);
+
+-- ── 17. RLS — empresas ────────────────────────────────────────────────────
+ALTER TABLE public.empresas ENABLE ROW LEVEL SECURITY;
+
+-- Productor gestiona su propia empresa
+CREATE POLICY "empresa_select_own"
+  ON public.empresas FOR SELECT
+  USING (user_id_productor = auth.uid());
+
+CREATE POLICY "empresa_insert_own"
+  ON public.empresas FOR INSERT
+  WITH CHECK (user_id_productor = auth.uid());
+
+CREATE POLICY "empresa_update_own"
+  ON public.empresas FOR UPDATE
+  USING (user_id_productor = auth.uid());
+
+-- Transportista vinculado puede leer datos de la empresa (nombre, etc.)
+CREATE POLICY "empresa_select_transportista"
+  ON public.empresas FOR SELECT
+  USING (
+    id IN (
+      SELECT empresa_id FROM public.transportistas_empresa
+      WHERE user_id = auth.uid() AND activo = true
+    )
+  );
+
+-- ── 18. RLS — transportistas_empresa ──────────────────────────────────────
+ALTER TABLE public.transportistas_empresa ENABLE ROW LEVEL SECURITY;
+
+-- Productor gestiona los vínculos de su empresa
+CREATE POLICY "te_select_productor"
+  ON public.transportistas_empresa FOR SELECT
+  USING (
+    empresa_id IN (
+      SELECT id FROM public.empresas WHERE user_id_productor = auth.uid()
+    )
+  );
+
+CREATE POLICY "te_insert_productor"
+  ON public.transportistas_empresa FOR INSERT
+  WITH CHECK (
+    empresa_id IN (
+      SELECT id FROM public.empresas WHERE user_id_productor = auth.uid()
+    )
+  );
+
+CREATE POLICY "te_delete_productor"
+  ON public.transportistas_empresa FOR DELETE
+  USING (
+    empresa_id IN (
+      SELECT id FROM public.empresas WHERE user_id_productor = auth.uid()
+    )
+  );
+
+-- Transportista ve su propio vínculo
+CREATE POLICY "te_select_self"
+  ON public.transportistas_empresa FOR SELECT
+  USING (user_id = auth.uid());
+
+-- ── 19. RLS adicionales — viajes_operativos a nivel empresa ──────────────
+--    NOTA: las políticas "viajes_select_own" e "viajes_insert_own" originales
+--    NO se modifican. PostgreSQL usa OR entre múltiples políticas SELECT.
+
+-- Productor ve todos los viajes de su empresa (empresa_id asignado)
+CREATE POLICY "viajes_select_empresa"
+  ON public.viajes_operativos FOR SELECT
+  USING (
+    empresa_id IS NOT NULL
+    AND empresa_id IN (
+      SELECT id FROM public.empresas WHERE user_id_productor = auth.uid()
+    )
+  );
+
+-- Transportistas de la misma empresa se ven entre sí
+CREATE POLICY "viajes_select_empresa_member"
+  ON public.viajes_operativos FOR SELECT
+  USING (
+    empresa_id IS NOT NULL
+    AND empresa_id IN (
+      SELECT empresa_id FROM public.transportistas_empresa
+      WHERE user_id = auth.uid() AND activo = true
+    )
+  );
+
+-- Transportista puede insertar viajes vinculados a su empresa
+CREATE POLICY "viajes_insert_empresa"
+  ON public.viajes_operativos FOR INSERT
+  WITH CHECK (
+    empresa_id IS NULL
+    OR empresa_id IN (
+      SELECT empresa_id FROM public.transportistas_empresa
+      WHERE user_id = auth.uid() AND activo = true
+    )
+  );
+
+-- ── 20. RLS adicionales — certificados_rep a nivel empresa ────────────────
+
+-- Productor ve todos los certificados de su empresa
+CREATE POLICY "certs_select_empresa"
+  ON public.certificados_rep FOR SELECT
+  USING (
+    empresa_id IS NOT NULL
+    AND empresa_id IN (
+      SELECT id FROM public.empresas WHERE user_id_productor = auth.uid()
+    )
+  );
+
+-- Transportistas vinculados pueden leer las declaraciones REP de su empresa
+CREATE POLICY "certs_select_empresa_member"
+  ON public.certificados_rep FOR SELECT
+  USING (
+    empresa_id IS NOT NULL
+    AND empresa_id IN (
+      SELECT empresa_id FROM public.transportistas_empresa
+      WHERE user_id = auth.uid() AND activo = true
+    )
+  );
+
+-- ── 21. RLS adicionales — flota_vehiculos a nivel empresa ─────────────────
+
+-- Productor ve la flota de todos sus transportistas
+CREATE POLICY "flota_select_empresa"
+  ON public.flota_vehiculos FOR SELECT
+  USING (
+    empresa_id IS NOT NULL
+    AND empresa_id IN (
+      SELECT id FROM public.empresas WHERE user_id_productor = auth.uid()
+    )
+  );
+
+-- Transportistas de la misma empresa ven la flota entre sí
+CREATE POLICY "flota_select_empresa_member"
+  ON public.flota_vehiculos FOR SELECT
+  USING (
+    empresa_id IS NOT NULL
+    AND empresa_id IN (
+      SELECT empresa_id FROM public.transportistas_empresa
+      WHERE user_id = auth.uid() AND activo = true
+    )
+  );
