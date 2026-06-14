@@ -395,7 +395,7 @@ async function cargarKPIsEmpresa(sb, uid) {
     } else {
       var tRes = await sb.from('transportistas_empresa')
         .select('empresa_id, empresas(nombre)')
-        .eq('user_id', uid).eq('activo', true).maybeSingle();
+        .eq('user_id_transportista', uid).eq('activo', true).maybeSingle();
       if (tRes.data) {
         empresaId     = tRes.data.empresa_id;
         empresaNombre = tRes.data.empresas && tRes.data.empresas.nombre;
