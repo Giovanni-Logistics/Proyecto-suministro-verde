@@ -388,89 +388,7 @@
     <!-- ── Tarjetas informativas ── -->
     <p class="tms-section-title">Funcionalidades incluidas</p>
 
-    <!-- TAB: KPIs -->
-  <div id="tab-kpis" style="display:none">
-    <div class="section-header">
-      <h2>📊 Mis KPIs operativos</h2>
-      <p>Indicadores de rendimiento de tu flota en la red Damu SGC. Se actualizan tras cada viaje completado.</p>
-    </div>
-
-    <div class="info-box">
-      ℹ️ Conecta tu cuenta de operador para visualizar tus métricas reales. Los valores mostrados son ejemplos de referencia.
-    </div>
-
-    <div class="kpi-grid">
-      <div class="kpi-card">
-        <div class="kpi-icon">🛣️</div>
-        <div class="kpi-val">—</div>
-        <div class="kpi-lbl">Rutas completadas</div>
-        <div class="kpi-sub">Este mes</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-icon">⚖️</div>
-        <div class="kpi-val">—</div>
-        <div class="kpi-lbl">Toneladas recolectadas</div>
-        <div class="kpi-sub">Acumulado mensual</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-icon">🎯</div>
-        <div class="kpi-val">—</div>
-        <div class="kpi-lbl">Precisión de escaneo</div>
-        <div class="kpi-sub">% QR exitosos</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-icon">🛣️</div>
-        <div class="kpi-val">—</div>
-        <div class="kpi-lbl">Km totales registrados</div>
-        <div class="kpi-sub">Acumulado histórico</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-icon">⏱️</div>
-        <div class="kpi-val">—</div>
-        <div class="kpi-lbl">Tiempo promedio por ruta</div>
-        <div class="kpi-sub">Minutos</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-icon">💰</div>
-        <div class="kpi-val">—</div>
-        <div class="kpi-lbl">Rentabilidad por viaje</div>
-        <div class="kpi-sub">CLP estimado</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- TAB: QR -->
-  <div id="tab-qr" style="display:none">
-    <div class="section-header">
-      <h2>📷 Escaneo QR de carga</h2>
-      <p>Registra cada retiro escaneando el código QR del punto de acopio para generar el Eco-Ticket de trazabilidad.</p>
-    </div>
-
-    <div class="qr-wrap">
-      <div class="qr-area" onclick="simularScan()">
-        <div class="qr-icon">📷</div>
-        <p>Toca para activar el escáner</p>
-        <p style="font-size:.75rem;color:#aaa">o simula un escaneo de prueba</p>
-      </div>
-      <button class="btn-scan" onclick="simularScan()">Simular escaneo QR</button>
-      <div class="scan-result" id="scan-result" style="display:none">
-        <div class="scan-row"><span>Punto de acopio</span><span id="sr-punto">—</span></div>
-        <div class="scan-row"><span>Categoría REP</span><span id="sr-cat">—</span></div>
-        <div class="scan-row"><span>Peso registrado</span><span id="sr-peso">—</span></div>
-        <div class="scan-row"><span>Vehículo asignado</span><span id="sr-vehiculo">—</span></div>
-        <div class="scan-row"><span>Hora de retiro</span><span id="sr-hora">—</span></div>
-        <div class="scan-row"><span>Estado Eco-Ticket</span><span id="sr-estado">—</span></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- TAB: TMS -->
-  <div id="tab-tms" style="display:none">
-    <div class="section-header">
-      <h2>🗺️ Mapa de Ruta — Registro de Viajes</h2>
-      <p>Visualiza los puntos de acopio activos en tu zona, registra tus recorridos y lleva el control básico de tu flota en la red Damu SGC.</p>
-    </div>
-
+    <!-- Tarjetas explicativas (fluyen desde el mapa hacia abajo) -->
     <div class="tms-grid">
       <div class="tms-card">
         <div class="tms-icon">🗺️</div>
@@ -545,6 +463,82 @@
         </select>
       </div>
       <button class="btn-tms" onclick="enviarSolicitud()">Enviar solicitud</button>
+    </div>
+  </div><!-- /tab-mapa-op -->
+
+  <!-- TAB: KPIs -->
+  <div id="tab-kpis" style="display:none">
+    <div class="section-header">
+      <h2>📊 Mis KPIs operativos</h2>
+      <p>Indicadores de rendimiento de tu flota en la red Damu SGC. Se actualizan tras cada viaje completado.</p>
+    </div>
+
+    <div class="info-box">
+      ℹ️ Conecta tu cuenta de operador para visualizar tus métricas reales. Los valores mostrados son ejemplos de referencia.
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-icon">🛣️</div>
+        <div class="kpi-val">—</div>
+        <div class="kpi-lbl">Rutas completadas</div>
+        <div class="kpi-sub">Este mes</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">⚖️</div>
+        <div class="kpi-val">—</div>
+        <div class="kpi-lbl">Toneladas recolectadas</div>
+        <div class="kpi-sub">Acumulado mensual</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">🎯</div>
+        <div class="kpi-val">—</div>
+        <div class="kpi-lbl">Precisión de escaneo</div>
+        <div class="kpi-sub">% QR exitosos</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">🛣️</div>
+        <div class="kpi-val">—</div>
+        <div class="kpi-lbl">Km totales registrados</div>
+        <div class="kpi-sub">Acumulado histórico</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">⏱️</div>
+        <div class="kpi-val">—</div>
+        <div class="kpi-lbl">Tiempo promedio por ruta</div>
+        <div class="kpi-sub">Minutos</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">💰</div>
+        <div class="kpi-val">—</div>
+        <div class="kpi-lbl">Rentabilidad por viaje</div>
+        <div class="kpi-sub">CLP estimado</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: QR -->
+  <div id="tab-qr" style="display:none">
+    <div class="section-header">
+      <h2>📷 Escaneo QR de carga</h2>
+      <p>Registra cada retiro escaneando el código QR del punto de acopio para generar el Eco-Ticket de trazabilidad.</p>
+    </div>
+
+    <div class="qr-wrap">
+      <div class="qr-area" onclick="simularScan()">
+        <div class="qr-icon">📷</div>
+        <p>Toca para activar el escáner</p>
+        <p style="font-size:.75rem;color:#aaa">o simula un escaneo de prueba</p>
+      </div>
+      <button class="btn-scan" onclick="simularScan()">Simular escaneo QR</button>
+      <div class="scan-result" id="scan-result" style="display:none">
+        <div class="scan-row"><span>Punto de acopio</span><span id="sr-punto">—</span></div>
+        <div class="scan-row"><span>Categoría REP</span><span id="sr-cat">—</span></div>
+        <div class="scan-row"><span>Peso registrado</span><span id="sr-peso">—</span></div>
+        <div class="scan-row"><span>Vehículo asignado</span><span id="sr-vehiculo">—</span></div>
+        <div class="scan-row"><span>Hora de retiro</span><span id="sr-hora">—</span></div>
+        <div class="scan-row"><span>Estado Eco-Ticket</span><span id="sr-estado">—</span></div>
+      </div>
     </div>
   </div>
 
