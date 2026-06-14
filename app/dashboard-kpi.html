@@ -420,6 +420,143 @@ async function cargarDatosDB() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// MI EMPRESA (TRANSPORTISTA) — join flow + estado de vínculo
+// ═══════════════════════════════════════════════════════════════════════
+
+async function cargarEmpresaTMS() {
+  var perfil = localStorage.getItem('damu_role') || '';
+  if (perfil !== 'transportista') return;
+
+  var sec = document.getElementById('empresa-tms-section');
+  if (sec) sec.classList.remove('hidden');
+
+  var empresaId     = localStorage.getItem('damu_empresa_id');
+  var empresaNombre = localStorage.getItem('damu_empresa_nombre');
+
+  if (empresaId) {
+    _mostrarEmpresaVinculada(empresaNombre, empresaId);
+    return;
+  }
+
+  // Sin empresa en cache → consultar Supabase
+  var sb = window.__damuSupabase;
+  if (!sb) { _mostrarFormJoin(); return; }
+
+  try {
+    var sesRes = await sb.auth.getSession();
+    if (!sesRes.data || !sesRes.data.session) { _mostrarFormJoin(); return; }
+    var uid = sesRes.data.session.user.id;
+
+    var te = await sb.from('transportistas_empresa')
+      .select('empresa_id, empresas(nombre)')
+      .eq('user_id_transportista', uid)
+      .eq('activo', true)
+      .maybeSingle();
+
+    if (te.data) {
+      var nombre = (te.data.empresas && te.data.empresas.nombre) || '';
+      localStorage.setItem('damu_empresa_id',     te.data.empresa_id);
+      localStorage.setItem('damu_empresa_nombre', nombre);
+      _mostrarEmpresaVinculada(nombre, te.data.empresa_id);
+    } else {
+      _mostrarFormJoin();
+    }
+  } catch (_) {
+    _mostrarFormJoin();
+  }
+}
+
+function _mostrarEmpresaVinculada(nombre, id) {
+  var joinCard = document.getElementById('empresa-join-card');
+  var infoCard = document.getElementById('empresa-info-card');
+  var nomEl    = document.getElementById('empresa-info-nombre');
+  var idEl     = document.getElementById('empresa-info-id');
+  if (joinCard) joinCard.classList.add('hidden');
+  if (infoCard) infoCard.classList.remove('hidden');
+  if (nomEl)    nomEl.textContent = nombre || 'Empresa vinculada';
+  if (idEl)     idEl.textContent  = 'ID: ' + (id || '').slice(0, 16) + '…';
+}
+
+function _mostrarFormJoin() {
+  var joinCard = document.getElementById('empresa-join-card');
+  if (joinCard) joinCard.classList.remove('hidden');
+}
+
+async function unirseEmpresa() {
+  var codigoInput = document.getElementById('input-codigo-empresa');
+  var msgEl       = document.getElementById('empresa-join-msg');
+  var codigo      = (codigoInput ? codigoInput.value.trim().toUpperCase() : '');
+
+  if (!codigo || codigo.length !== 8) {
+    _setJoinMsg('err', 'El código debe tener exactamente 8 caracteres.');
+    return;
+  }
+
+  var sb = window.__damuSupabase;
+  if (!sb) { _setJoinMsg('err', 'Error de conexión con Supabase.'); return; }
+
+  var btn = document.querySelector('#empresa-join-card button');
+  if (btn) { btn.disabled = true; btn.textContent = 'Buscando…'; }
+
+  try {
+    var sesRes = await sb.auth.getSession();
+    if (!sesRes.data || !sesRes.data.session) {
+      _setJoinMsg('err', 'Sesión no activa. Vuelve a iniciar sesión.');
+      return;
+    }
+    var uid = sesRes.data.session.user.id;
+
+    // 1. Buscar empresa por código
+    var empRes = await sb.from('empresas')
+      .select('id, nombre')
+      .eq('codigo_invitacion', codigo)
+      .eq('activo', true)
+      .maybeSingle();
+
+    if (!empRes.data) {
+      _setJoinMsg('err', 'Código no encontrado. Verifica con tu productor REP.');
+      return;
+    }
+
+    var empresa = empRes.data;
+
+    // 2. Insertar vínculo (ON CONFLICT → ya existe)
+    var insRes = await sb.from('transportistas_empresa').insert({
+      user_id_transportista: uid,
+      empresa_id:            empresa.id,
+    }).select('id').single();
+
+    if (insRes.error && insRes.error.code !== '23505') {
+      throw insRes.error;
+    }
+
+    // 3. Cachear en localStorage
+    localStorage.setItem('damu_empresa_id',     empresa.id);
+    localStorage.setItem('damu_empresa_nombre', empresa.nombre);
+
+    _setJoinMsg('ok', '¡Te uniste a ' + empresa.nombre + '!');
+    setTimeout(function () {
+      _mostrarEmpresaVinculada(empresa.nombre, empresa.id);
+      cargarKPIsEmpresa(sb, uid);
+    }, 900);
+
+  } catch (err) {
+    _setJoinMsg('err', err.message || 'Error al procesar la solicitud.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Unirse'; }
+  }
+}
+
+function _setJoinMsg(tipo, txt) {
+  var el = document.getElementById('empresa-join-msg');
+  if (!el) return;
+  el.textContent = txt;
+  el.className   = 'text-xs mt-2.5 font-semibold '
+    + (tipo === 'ok' ? 'text-emerald-600' : 'text-red-600');
+  el.classList.remove('hidden');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // KPIs DE EMPRESA — agrega viajes + certs por empresa_id
 // ═══════════════════════════════════════════════════════════════════════
 async function cargarKPIsEmpresa(sb, uid) {
