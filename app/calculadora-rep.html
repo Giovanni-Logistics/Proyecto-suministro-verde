@@ -748,11 +748,32 @@ async function cargarCertificados() {
       return;
     }
     _sessionUser = sesRes.data.session.user;
+    var _uid = _sessionUser.id;
+
+    // Intentar resolver empresa_id (productor). Silencioso si tabla no existe aún.
+    var _empresaId = null;
+    try {
+      var _eRes = await sb.from('empresas').select('id').eq('user_id_productor', _uid).maybeSingle();
+      if (_eRes.data) { _empresaId = _eRes.data.id; }
+    } catch (_) {}
+
+    // Si hay empresa → viajes de toda la empresa; si no → solo propios
+    var _viajesQ = _empresaId
+      ? sb.from('viajes_operativos')
+          .select('id, origen, destino, distancia_km, costo_diesel, cargas_qr_kg, created_at')
+          .eq('empresa_id', _empresaId)
+          .order('created_at', { ascending: false })
+      : sb.from('viajes_operativos')
+          .select('id, origen, destino, distancia_km, costo_diesel, cargas_qr_kg, created_at')
+          .order('created_at', { ascending: false });
+
+    if (_empresaId) {
+      var _tag = document.getElementById('cert-empresa-tag');
+      if (_tag) _tag.classList.remove('hidden');
+    }
 
     var results = await Promise.all([
-      sb.from('viajes_operativos')
-        .select('id, origen, destino, distancia_km, costo_diesel, cargas_qr_kg, created_at')
-        .order('created_at', { ascending: false }),
+      _viajesQ,
       sb.from('certificados_rep')
         .select('id, categoria, toneladas_declaradas, meta_valorizacion_porcentaje, riesgo_multa_estimado, created_at')
         .order('created_at', { ascending: false }),
