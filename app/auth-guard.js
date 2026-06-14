@@ -100,14 +100,52 @@
       return '<a href="' + archivo + '" class="' + cls + '">' + icono + ' ' + etiqueta + '</a>';
     }
 
-    // ── Herramientas según perfil ────────────────────────────────
+    // ── Ítems del menú desplegable "Herramientas" ───────────────
+    var clsDropBase = 'flex items-center gap-2 px-4 py-2.5 text-sm no-underline transition-colors ';
+    function dropItem(archivo, icono, etiqueta) {
+      var cls = clsDropBase + (esActivo(archivo)
+        ? 'text-emerald-400 bg-slate-700/60 font-semibold'
+        : 'text-slate-300 hover:text-white hover:bg-slate-700/80');
+      return '<a href="' + archivo + '" class="' + cls + '">' + icono + ' ' + etiqueta + '</a>';
+    }
+
+    // Mapa de Ruta aparece para ambos roles; Escanear QR solo para transportista
+    var itemsDrop = dropItem('simulador-ruta.html', '🗺️', 'Mapa de Ruta');
+    if (perfil !== 'productor') {
+      itemsDrop += dropItem('escaner-qr.html', '📷', 'Escanear QR');
+    }
+
+    var hayHerramientaActiva = esActivo('simulador-ruta.html') || esActivo('escaner-qr.html');
+    var clsDropBtn = 'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border-0 cursor-pointer transition-colors '
+      + (hayHerramientaActiva
+          ? 'text-emerald-400 bg-slate-700/60 font-semibold'
+          : 'bg-transparent text-slate-300 hover:text-white hover:bg-slate-700');
+
+    // Dropdown "Herramientas": onmouseenter/leave en el div padre para
+    // que la transición de botón → panel no dispare el cierre prematuramente
+    var dropdown =
+      '<div class="relative flex-shrink-0"'
+      + ' onmouseenter="this.lastElementChild.classList.remove(\'hidden\')"'
+      + ' onmouseleave="this.lastElementChild.classList.add(\'hidden\')">'
+        + '<button type="button" class="' + clsDropBtn + '">'
+          + '🛠️ Herramientas'
+          + '<svg class="w-3 h-3 ml-0.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">'
+            + '<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>'
+          + '</svg>'
+        + '</button>'
+        + '<div class="hidden absolute top-full left-0 mt-1 w-52 bg-slate-800 border border-slate-700/80 rounded-xl shadow-2xl z-[200] py-1 overflow-hidden">'
+          + itemsDrop
+        + '</div>'
+      + '</div>';
+
+    // ── Nav final según perfil ────────────────────────────────────
     var enlaces = '';
     if (perfil === 'productor') {
-      enlaces = enlace('calculadora-rep.html', '🧾', 'Calculadora REP');
+      // Productora: Calculadora REP + dropdown Herramientas (Mapa de Ruta)
+      enlaces = enlace('calculadora-rep.html', '🧾', 'Calculadora REP') + dropdown;
     } else {
-      enlaces = enlace('dashboard-kpi.html',  '📊', 'Dashboard KPI')
-              + enlace('simulador-ruta.html',  '🗺️', 'Simulador de Ruta')
-              + enlace('escaner-qr.html',      '📷', 'Escanear QR');
+      // Transportista: Dashboard KPI + dropdown Herramientas (Mapa de Ruta + Escanear QR)
+      enlaces = enlace('dashboard-kpi.html', '📊', 'Dashboard KPI') + dropdown;
     }
 
     // ── Badge de perfil ──────────────────────────────────────────
