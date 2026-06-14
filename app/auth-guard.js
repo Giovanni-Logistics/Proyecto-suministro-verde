@@ -35,13 +35,14 @@
       return;
     }
 
-    // Sesión válida: extraer perfil desde metadata Supabase o localStorage
+    // Sesión válida: el rol elegido en el login (localStorage) tiene prioridad
+    // sobre el metadata del signup, para soportar usuarios con doble perfil.
     var user   = session.user;
     var meta   = (user && user.user_metadata) ? user.user_metadata : {};
-    var perfil = meta.role
-              || meta.perfil
-              || localStorage.getItem('damu_role')
+    var perfil = localStorage.getItem('damu_role')
               || localStorage.getItem('damu_perfil')
+              || meta.role
+              || meta.perfil
               || 'productor';
 
     // Persistir perfil y datos de sesión
