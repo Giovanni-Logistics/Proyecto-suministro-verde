@@ -823,7 +823,7 @@ function _renderTablaFlota(flota) {
         + '</div>'
         + '<span class="text-xs font-bold w-8 text-right flex-shrink-0" style="color:' + color + '">' + pct.toFixed(0) + '%</span>'
         + '</div></td>'
-      + '<td class="py-2.5 px-3 text-xs text-slate-500">' + (v.destino || '—') + '</td>'
+      + '<td class="py-2.5 px-3 text-xs text-slate-500">' + (v.destino && _centros[v.destino] ? _centros[v.destino].label : (v.destino || '—')) + '</td>'
       + '</tr>';
   }).join('');
 
