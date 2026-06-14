@@ -556,48 +556,27 @@
 </footer>
 
 <script>
+  // ── Navegación por tabs ──────────────────────────────────────────
   function showTab(id, el) {
-    ['mapa','kpis','qr','tms'].forEach(t => {
-      document.getElementById('tab-'+t).style.display = t===id ? 'block' : 'none';
+    ['mapa-op', 'kpis', 'qr'].forEach(function (t) {
+      var tab = document.getElementById('tab-' + t);
+      if (tab) tab.style.display = (t === id) ? 'block' : 'none';
     });
-    document.querySelectorAll('.tab-nav a').forEach(a => a.classList.remove('active'));
+    document.querySelectorAll('.tab-nav a').forEach(function (a) { a.classList.remove('active'); });
     if (el) el.classList.add('active');
   }
 
-  function filtrarPuntos(estado, el) {
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    el.classList.add('active');
-    document.querySelectorAll('.punto').forEach(p => {
-      p.style.display = (estado === 'todos' || p.dataset.estado === estado) ? 'block' : 'none';
-    });
-  }
-
-  function selPunto(el) {
-    const nombre = el.dataset.nombre || 'Punto seleccionado';
-    const estado = el.dataset.estado;
-    const msgs = {
-      lleno: 'Capacidad llena — retiro urgente disponible.',
-      medio: 'Capacidad media — retiro disponible.',
-      libre: 'Punto disponible — sin retiro urgente.',
-    };
-    alert(nombre + '\n' + (msgs[estado] || ''));
-  }
-
-  function iniciarRuta(punto) {
-    alert('Ruta iniciada. Escanea el QR al retirar la carga.\nDestino: ' + punto);
-  }
-
-  const puntos  = ['Maipú Centro','Pudahuel Norte','Ñuñoa Industrial','La Florida Sur','San Bernardo','Peñalolén'];
-  const cats    = ['Envases','Neumáticos','Pilas','RAEE','Aceites'];
-  const vehs    = ['Camión D-42','Camión D-17','Furgón D-08'];
+  // ── Simulador QR ────────────────────────────────────────────────
+  var _puntos = ['Maipú Centro','Pudahuel Norte','Ñuñoa Industrial','La Florida Sur','San Bernardo','Peñalolén'];
+  var _cats   = ['Envases','Neumáticos','Pilas','RAEE','Aceites'];
+  var _vehs   = ['Camión D-42','Camión D-17','Furgón D-08'];
 
   function simularScan() {
-    const p = puntos[Math.floor(Math.random()*puntos.length)];
-    const c = cats[Math.floor(Math.random()*cats.length)];
-    const kg = (Math.random()*4+0.5).toFixed(2);
-    const v  = vehs[Math.floor(Math.random()*vehs.length)];
-    const h  = new Date().toLocaleTimeString('es-CL', {hour:'2-digit', minute:'2-digit'});
-
+    var p  = _puntos[Math.floor(Math.random() * _puntos.length)];
+    var c  = _cats[Math.floor(Math.random() * _cats.length)];
+    var kg = (Math.random() * 4 + 0.5).toFixed(2);
+    var v  = _vehs[Math.floor(Math.random() * _vehs.length)];
+    var h  = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
     document.getElementById('sr-punto').textContent    = p;
     document.getElementById('sr-cat').textContent      = c;
     document.getElementById('sr-peso').textContent     = kg + ' t';
@@ -610,6 +589,54 @@
   function enviarSolicitud() {
     alert('Solicitud enviada. El equipo Damu te contactará en 24 horas.');
   }
+
+  // ── Leaflet — Mapa Operativo Teaser ─────────────────────────────
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!window.L) return;
+
+    var map = L.map('mapDemo', {
+      scrollWheelZoom: false,
+      dragging:        false,
+      zoomControl:     false,
+      doubleClickZoom: false,
+      keyboard:        false,
+      touchZoom:       false,
+    }).setView([-33.4489, -70.6693], 12); // Santiago de Chile
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
+    }).addTo(map);
+
+    // Puntos de acopio simulados (RM)
+    var acopios = [
+      { lat: -33.5108, lng: -70.7581, label: '📦 Maipú Centro — Envases · Lleno',     color: '#e74c3c' },
+      { lat: -33.4071, lng: -70.7450, label: '🔋 Pudahuel Norte — RAEE · Medio',       color: '#f39c12' },
+      { lat: -33.4563, lng: -70.5990, label: '🛢️ Ñuñoa Industrial — Aceites · Libre', color: '#2ecc71' },
+      { lat: -33.5173, lng: -70.5991, label: '🛞 La Florida Sur — Neumáticos · Lleno', color: '#e74c3c' },
+    ];
+
+    // Polilínea de ruta simulada
+    var coords = acopios.map(function (p) { return [p.lat, p.lng]; });
+    L.polyline(coords, {
+      color:     '#2980b9',
+      weight:    3.5,
+      opacity:   0.9,
+      dashArray: '10 6',
+    }).addTo(map);
+
+    // Marcadores circulares personalizados
+    acopios.forEach(function (p) {
+      var icon = L.divIcon({
+        className: '',
+        html: '<div style="width:15px;height:15px;border-radius:50%;background:' + p.color
+            + ';border:2.5px solid #fff;box-shadow:0 2px 7px rgba(0,0,0,.4);"></div>',
+        iconSize:   [15, 15],
+        iconAnchor: [7.5, 7.5],
+      });
+      L.marker([p.lat, p.lng], { icon: icon, interactive: false }).addTo(map);
+    });
+  });
 </script>
 </body>
 </html>
