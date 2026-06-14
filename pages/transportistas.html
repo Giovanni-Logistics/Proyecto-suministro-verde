@@ -364,119 +364,31 @@
 <!-- ── CONTENIDO ── -->
 <div class="content">
 
-  <!-- TAB: MAPA -->
-  <div id="tab-mapa">
+  <!-- TAB: MAPA OPERATIVO (unificado) -->
+  <div id="tab-mapa-op">
     <div class="section-header">
-      <h2>📍 Mapa de Acopio</h2>
-      <p>Puntos de recolección activos en tu zona con estado de capacidad en tiempo real.</p>
+      <h2>🗺️ Mapa Operativo</h2>
+      <p>Puntos de acopio activos en tu zona con estado de capacidad y rutas de recolección REP.</p>
     </div>
 
-    <div class="mapa-wrap">
-      <div class="mapa-header">
-        <h3>Región Metropolitana — Puntos activos</h3>
-        <div class="filter-btns">
-          <button class="filter-btn active" onclick="filtrarPuntos('todos',this)">Todos</button>
-          <button class="filter-btn" onclick="filtrarPuntos('lleno',this)">🔴 Capacidad llena</button>
-          <button class="filter-btn" onclick="filtrarPuntos('medio',this)">🟡 Capacidad media</button>
-          <button class="filter-btn" onclick="filtrarPuntos('libre',this)">🟢 Disponible</button>
+    <!-- ── SaaS Teaser: mapa Leaflet real con overlay CTA ── -->
+    <div class="map-teaser-wrap">
+      <div id="mapDemo"></div>
+      <div class="map-overlay">
+        <div class="map-overlay-glass">
+          <div class="map-badge-live">Vista previa interactiva</div>
+          <div class="teaser-icon">🗺️</div>
+          <h3>Visualiza y organiza tus rutas de recolección</h3>
+          <p>Mapa interactivo con puntos de acopio activos, estado de capacidad, Eco-Tickets pendientes y rutas optimizadas en tiempo real.</p>
+          <a href="../auth/portal.html" class="btn-cta-mapa">🚀 Inicia sesión para optimizar tus rutas</a>
         </div>
       </div>
-
-      <div class="mapa-canvas" id="mapa-canvas">
-        <!-- Calles simuladas -->
-        <svg class="mapa-svg" viewBox="0 0 800 300" preserveAspectRatio="none">
-          <rect width="800" height="300" fill="#e8f0f8"/>
-          <!-- calles horizontales -->
-          <line x1="0" y1="60"  x2="800" y2="60"  stroke="#c8d8e8" stroke-width="6"/>
-          <line x1="0" y1="150" x2="800" y2="150" stroke="#c8d8e8" stroke-width="8"/>
-          <line x1="0" y1="240" x2="800" y2="240" stroke="#c8d8e8" stroke-width="5"/>
-          <!-- calles verticales -->
-          <line x1="150" y1="0" x2="150" y2="300" stroke="#c8d8e8" stroke-width="5"/>
-          <line x1="350" y1="0" x2="350" y2="300" stroke="#c8d8e8" stroke-width="8"/>
-          <line x1="600" y1="0" x2="600" y2="300" stroke="#c8d8e8" stroke-width="5"/>
-        </svg>
-
-        <!-- Puntos de acopio -->
-        <div class="punto lleno" style="left:19%;top:55%"
-             data-estado="lleno" data-nombre="Punto Maipú Centro"
-             onclick="selPunto(this)" title="Maipú Centro"></div>
-        <div class="punto-label" style="left:19%;top:55%">Maipú Centro · Lleno · Envases</div>
-
-        <div class="punto medio" style="left:44%;top:25%"
-             data-estado="medio" data-nombre="Punto Pudahuel Norte"
-             onclick="selPunto(this)" title="Pudahuel Norte"></div>
-        <div class="punto-label" style="left:44%;top:25%">Pudahuel Norte · Medio · RAEE</div>
-
-        <div class="punto libre" style="left:75%;top:50%"
-             data-estado="libre" data-nombre="Punto Ñuñoa Industrial"
-             onclick="selPunto(this)" title="Ñuñoa Industrial"></div>
-        <div class="punto-label" style="left:75%;top:50%">Ñuñoa Industrial · Libre · Aceites</div>
-
-        <div class="punto lleno" style="left:55%;top:78%"
-             data-estado="lleno" data-nombre="Punto La Florida Sur"
-             onclick="selPunto(this)" title="La Florida Sur"></div>
-        <div class="punto-label" style="left:55%;top:78%">La Florida Sur · Lleno · Neumáticos</div>
-
-        <div class="punto libre" style="left:30%;top:80%"
-             data-estado="libre" data-nombre="Punto San Bernardo"
-             onclick="selPunto(this)" title="San Bernardo"></div>
-        <div class="punto-label" style="left:30%;top:80%">San Bernardo · Libre · Envases</div>
-
-        <div class="punto medio" style="left:85%;top:22%"
-             data-estado="medio" data-nombre="Punto Peñalolén"
-             onclick="selPunto(this)" title="Peñalolén"></div>
-        <div class="punto-label" style="left:85%;top:22%">Peñalolén · Medio · Pilas</div>
-      </div>
-
-      <div class="mapa-leyenda">
-        <span><span class="dot lleno"></span> Capacidad llena</span>
-        <span><span class="dot medio"></span> Capacidad media</span>
-        <span><span class="dot libre"></span> Disponible</span>
-      </div>
     </div>
 
-    <div class="section-header" style="margin-top:1.5rem">
-      <h2>🛣️ Rutas sugeridas para hoy</h2>
-    </div>
-    <div style="background:#fff;border:1px solid #d0e4f0;border-radius:12px;overflow:hidden;margin-bottom:2rem">
-      <table class="rutas-table">
-        <thead>
-          <tr>
-            <th>Punto de acopio</th>
-            <th>Categoría</th>
-            <th>Estado</th>
-            <th>Peso est.</th>
-            <th>Acción</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Maipú Centro</td>
-            <td>Envases</td>
-            <td><span class="badge-ruta lleno">Lleno</span></td>
-            <td>3.2 t</td>
-            <td><button class="ruta-btn" onclick="iniciarRuta('Maipú Centro')">Iniciar ruta</button></td>
-          </tr>
-          <tr>
-            <td>La Florida Sur</td>
-            <td>Neumáticos</td>
-            <td><span class="badge-ruta lleno">Lleno</span></td>
-            <td>2.8 t</td>
-            <td><button class="ruta-btn" onclick="iniciarRuta('La Florida Sur')">Iniciar ruta</button></td>
-          </tr>
-          <tr>
-            <td>Ñuñoa Industrial</td>
-            <td>Aceites</td>
-            <td><span class="badge-ruta libre">Libre</span></td>
-            <td>1.1 t</td>
-            <td><button class="ruta-btn" onclick="iniciarRuta('Ñuñoa Industrial')">Ver detalles</button></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+    <!-- ── Tarjetas informativas ── -->
+    <p class="tms-section-title">Funcionalidades incluidas</p>
 
-  <!-- TAB: KPIs -->
+    <!-- TAB: KPIs -->
   <div id="tab-kpis" style="display:none">
     <div class="section-header">
       <h2>📊 Mis KPIs operativos</h2>
