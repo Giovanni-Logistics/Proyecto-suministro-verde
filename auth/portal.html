@@ -395,6 +395,57 @@ async function doRegistro(email, pwd) {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Cachea empresa_id, nombre y codigo_invitacion en localStorage
+// para que las páginas de app/ los lean sin consultas extra al cargar.
+async function _cachearEmpresaLogin(user, role) {
+  try {
+    if (role === 'productor') {
+      // Buscar empresa del productor; si no existe (trigger falló), crearla
+      var res = await supabase
+        .from('empresas')
+        .select('id, nombre, codigo_invitacion')
+        .eq('user_id_productor', user.id)
+        .maybeSingle();
+
+      if (!res.data) {
+        // Belt-and-suspenders: el trigger debió haberla creado, pero por si acaso
+        var ins = await supabase
+          .from('empresas')
+          .insert({ nombre: (user.email || '').split('@')[0], user_id_productor: user.id })
+          .select('id, nombre, codigo_invitacion')
+          .single();
+        res = ins;
+      }
+
+      if (res.data) {
+        localStorage.setItem('damu_empresa_id',           res.data.id);
+        localStorage.setItem('damu_empresa_nombre',       res.data.nombre || '');
+        localStorage.setItem('damu_codigo_invitacion',    res.data.codigo_invitacion || '');
+      }
+
+    } else if (role === 'transportista') {
+      var te = await supabase
+        .from('transportistas_empresa')
+        .select('empresa_id, empresas(nombre)')
+        .eq('user_id_transportista', user.id)
+        .eq('activo', true)
+        .maybeSingle();
+
+      if (te.data) {
+        localStorage.setItem('damu_empresa_id',     te.data.empresa_id);
+        localStorage.setItem('damu_empresa_nombre', (te.data.empresas && te.data.empresas.nombre) || '');
+      } else {
+        // Sin empresa aún → limpiar por si quedó info de sesión anterior
+        localStorage.removeItem('damu_empresa_id');
+        localStorage.removeItem('damu_empresa_nombre');
+      }
+    }
+  } catch (e) {
+    console.warn('[Damu] _cachearEmpresaLogin:', e.message || e);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
 function persistirSesion(user, role) {
   localStorage.setItem('damu_role',    role);
   localStorage.setItem('damu_perfil',  role); // backward compat con auth-guard.js
