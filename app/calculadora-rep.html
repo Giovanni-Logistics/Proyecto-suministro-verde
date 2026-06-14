@@ -148,6 +148,139 @@
   </div>
 </main>
 
+<!-- ══════════════════════════════ MIS CERTIFICADOS ══════════════════════════════ -->
+<section class="max-w-5xl mx-auto w-full px-4 pb-10">
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+
+    <div class="bg-gradient-to-r from-slate-800 to-slate-700 px-5 py-4 flex items-center justify-between">
+      <div>
+        <h2 class="text-white font-bold text-sm">📄 Mis Certificados</h2>
+        <p class="text-slate-300 text-xs mt-0.5">Generados con tus datos reales registrados en la plataforma</p>
+      </div>
+      <button onclick="cargarCertificados()"
+        class="text-slate-300 hover:text-white border border-slate-600 hover:border-slate-400 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        Actualizar
+      </button>
+    </div>
+
+    <div class="p-5">
+
+      <!-- Cargando -->
+      <div id="certs-loading" class="py-8 text-center">
+        <div class="inline-flex items-center gap-2 text-slate-400 text-sm">
+          <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+          Consultando datos en Supabase...
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div id="certs-error" class="hidden py-6 text-center">
+        <p class="text-red-600 text-sm font-bold mb-1">❌ Error de conexión</p>
+        <p id="certs-error-msg" class="text-red-500 text-xs mb-3">No se pudo conectar con la base de datos.</p>
+        <button onclick="cargarCertificados()" class="text-xs text-red-600 underline cursor-pointer">Reintentar</button>
+      </div>
+
+      <!-- Contenido -->
+      <div id="certs-content" class="hidden space-y-3">
+
+        <!-- Notificación inline -->
+        <div id="cert-notif" class="hidden text-xs px-4 py-3 rounded-xl border font-medium"></div>
+
+        <!-- ── Certificado de Trazabilidad ── -->
+        <div class="cert-row-wrap flex flex-wrap items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-4">
+          <div class="flex items-center gap-3 flex-1 min-w-0">
+            <span class="text-2xl flex-shrink-0">📄</span>
+            <div>
+              <p class="text-sm font-bold text-slate-700">Certificado de Trazabilidad</p>
+              <p class="text-xs text-slate-500 mt-0.5">Historial completo de retiros y cargas QR registrados en la plataforma</p>
+              <p class="cert-no-data hidden text-xs text-amber-600 mt-1 font-semibold"></p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <span class="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-0.5 rounded-full">Disponible</span>
+            <button id="btn-cert-trazabilidad" onclick="generarCertTrazabilidad()"
+              class="bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors inline-flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              </svg>
+              Generar PDF
+            </button>
+          </div>
+        </div>
+
+        <!-- ── Reporte Meta Anual REP ── -->
+        <div class="cert-row-wrap flex flex-wrap items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-4">
+          <div class="flex items-center gap-3 flex-1 min-w-0">
+            <span class="text-2xl flex-shrink-0">✅</span>
+            <div>
+              <p class="text-sm font-bold text-slate-700">Reporte de Meta Anual REP</p>
+              <p class="text-xs text-slate-500 mt-0.5">Cumplimiento de metas y estimación de riesgo Art. 48 según tus cálculos</p>
+              <p class="cert-no-data hidden text-xs text-amber-600 mt-1 font-semibold"></p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <span class="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-0.5 rounded-full">Disponible</span>
+            <button id="btn-cert-meta" onclick="generarCertMetaAnual()"
+              class="bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors inline-flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              </svg>
+              Generar PDF
+            </button>
+          </div>
+        </div>
+
+        <!-- ── CO₂e Mitigado ── -->
+        <div class="cert-row-wrap flex flex-wrap items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-4">
+          <div class="flex items-center gap-3 flex-1 min-w-0">
+            <span class="text-2xl flex-shrink-0">🌿</span>
+            <div>
+              <p class="text-sm font-bold text-slate-700">Certificado de CO₂e Mitigado</p>
+              <p class="text-xs text-slate-500 mt-0.5">Toneladas de CO₂ equivalente evitadas acumuladas en toda tu operación</p>
+              <p class="cert-no-data hidden text-xs text-amber-600 mt-1 font-semibold"></p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <span class="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-0.5 rounded-full">Disponible</span>
+            <button id="btn-cert-co2" onclick="generarCertCO2()"
+              class="bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors inline-flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              </svg>
+              Generar PDF
+            </button>
+          </div>
+        </div>
+
+        <!-- ── Declaración SMA — En desarrollo ── -->
+        <div class="flex flex-wrap items-center justify-between gap-3 border border-dashed border-slate-200 rounded-xl px-4 py-4 opacity-50">
+          <div class="flex items-center gap-3 flex-1 min-w-0">
+            <span class="text-2xl flex-shrink-0">📋</span>
+            <div>
+              <p class="text-sm font-bold text-slate-500">Declaración para el SMA</p>
+              <p class="text-xs text-slate-400 mt-0.5">Documento formal para la Superintendencia del Medio Ambiente</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <span class="bg-slate-200 text-slate-500 text-xs font-bold px-2.5 py-0.5 rounded-full">En desarrollo</span>
+            <button disabled tabindex="-1"
+              class="bg-slate-200 text-slate-400 text-xs font-bold px-4 py-2 rounded-lg cursor-not-allowed inline-flex items-center gap-1.5">
+              Próximamente
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ══════════════════════════════ FOOTER ══════════════════════════════ -->
 <footer class="bg-slate-900 text-slate-400 text-xs py-5 border-t border-slate-800 mt-auto">
   <div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-3">
