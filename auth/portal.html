@@ -354,9 +354,8 @@ async function doLogin(email, pwd) {
     return;
   }
 
-  // Recuperar rol desde metadatos de Supabase (fuente de verdad)
-  var role = (data.user.user_metadata && data.user.user_metadata.role)
-          || selectedRole;
+  // El rol lo determina la selección activa en el login, no el metadata del signup
+  var role = selectedRole;
 
   persistirSesion(data.user, role);
   setMsg('ok', '✓ Acceso concedido. Redirigiendo a tu plataforma…');
