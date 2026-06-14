@@ -359,6 +359,7 @@ async function doLogin(email, pwd) {
 
   persistirSesion(data.user, role);
   setMsg('ok', '✓ Acceso concedido. Redirigiendo a tu plataforma…');
+  await _cachearEmpresaLogin(data.user, role).catch(function() {});
   setTimeout(function () { redirigir(role); }, 900);
 }
 
