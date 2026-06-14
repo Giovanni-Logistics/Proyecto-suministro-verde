@@ -726,6 +726,109 @@ async function _guardarViajeDB(datos) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// TABLAS DE RED — Lista tabular de acopios y flota (bajo el mapa)
+// ═══════════════════════════════════════════════════════════════════════════
+
+var _catLabel = { envases:'Envases', neumaticos:'Neumáticos', pilas:'Pilas/Bat.', raee:'RAEE', aceites:'Aceites' };
+var _tipoLabel = { camion:'Camión', furgon:'Furgón', camion_mayor:'Camión Mayor' };
+
+function _renderTablaAcopios(acopios) {
+  var wrap  = document.getElementById('tabla-acopios-wrap');
+  var badge = document.getElementById('badge-total-acopios');
+  if (!wrap) return;
+  if (badge) badge.textContent = acopios.length + ' punto' + (acopios.length !== 1 ? 's' : '');
+
+  if (acopios.length === 0) {
+    wrap.innerHTML = '<p class="text-slate-400 text-sm text-center py-4">Sin puntos de acopio en la red.</p>';
+    return;
+  }
+
+  var rows = acopios
+    .slice().sort(function (a, b) { return _pctLlenado(b) - _pctLlenado(a); })
+    .map(function (p) {
+      var pct   = _pctLlenado(p);
+      var color = _colorAcopio(pct);
+      var est   = _estadoLabel(pct);
+      var cls   = pct >= 80 ? 'bg-red-100 text-red-700 border-red-200'
+                : pct >= 50 ? 'bg-amber-100 text-amber-700 border-amber-200'
+                            : 'bg-emerald-100 text-emerald-700 border-emerald-200';
+      var accion = pct >= 80
+        ? '<button onclick="autoRellenarRuta(window._acopiosData.find(function(x){return x.id===\''
+          + p.id + '\'}))" '
+          + 'class="text-xs bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 rounded-lg transition-colors font-semibold">Retirar</button>'
+        : '<span class="text-xs text-slate-300">—</span>';
+      return '<tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/70 transition-colors">'
+        + '<td class="py-2.5 px-3 text-sm font-semibold text-slate-800 max-w-[200px] truncate">' + p.nombre + '</td>'
+        + '<td class="py-2.5 px-3 text-xs text-slate-500">' + (_catLabel[p.categoria] || p.categoria) + '</td>'
+        + '<td class="py-2.5 px-3 min-w-[100px]">'
+          + '<div class="flex items-center gap-2">'
+          + '<div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">'
+          + '<div class="h-full rounded-full transition-all" style="width:' + Math.min(pct, 100).toFixed(0) + '%;background:' + color + '"></div>'
+          + '</div>'
+          + '<span class="text-xs font-bold w-8 text-right flex-shrink-0" style="color:' + color + '">' + pct.toFixed(0) + '%</span>'
+          + '</div></td>'
+        + '<td class="py-2.5 px-3"><span class="text-xs font-bold px-2 py-0.5 rounded-full border ' + cls + '">' + est + '</span></td>'
+        + '<td class="py-2.5 px-3 text-xs text-slate-400 tabular-nums">'
+          + p.carga_actual_kg.toFixed(0) + ' / ' + p.capacidad_total_kg + ' kg</td>'
+        + '<td class="py-2.5 px-3">' + accion + '</td>'
+        + '</tr>';
+    }).join('');
+
+  wrap.innerHTML = '<div class="overflow-x-auto -mx-1">'
+    + '<table class="w-full text-left min-w-[560px]"><thead>'
+    + '<tr class="border-b border-slate-200">'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Punto de Acopio</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Cat.</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide w-32">Ocupación</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Estado</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Carga / Cap.</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Acción</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
+function _renderTablaFlota(flota) {
+  var wrap  = document.getElementById('tabla-flota-wrap');
+  var badge = document.getElementById('badge-total-flota');
+  if (!wrap) return;
+  if (badge) badge.textContent = flota.length + ' vehículo' + (flota.length !== 1 ? 's' : '');
+
+  if (flota.length === 0) {
+    wrap.innerHTML = '<p class="text-slate-400 text-sm text-center py-6">'
+      + 'No tienes vehículos registrados.<br>'
+      + '<span class="text-xs text-slate-300">Los vehículos se agregan desde tu perfil de transportista.</span></p>';
+    return;
+  }
+
+  var rows = flota.map(function (v) {
+    var pct   = v.capacidad_kg > 0 ? (v.carga_actual_kg / v.capacidad_kg) * 100 : 0;
+    var color = _colorAcopio(pct);
+    return '<tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/70 transition-colors">'
+      + '<td class="py-2.5 px-3 text-sm font-bold text-slate-800">🚛 ' + v.patente + '</td>'
+      + '<td class="py-2.5 px-3 text-xs text-slate-600">' + (v.conductor || '—') + '</td>'
+      + '<td class="py-2.5 px-3 text-xs text-slate-500">' + (_tipoLabel[v.tipo] || v.tipo || '—') + '</td>'
+      + '<td class="py-2.5 px-3 min-w-[90px]">'
+        + '<div class="flex items-center gap-2">'
+        + '<div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">'
+        + '<div class="h-full rounded-full" style="width:' + Math.min(pct, 100).toFixed(0) + '%;background:' + color + '"></div>'
+        + '</div>'
+        + '<span class="text-xs font-bold w-8 text-right flex-shrink-0" style="color:' + color + '">' + pct.toFixed(0) + '%</span>'
+        + '</div></td>'
+      + '<td class="py-2.5 px-3 text-xs text-slate-500">' + (v.destino || '—') + '</td>'
+      + '</tr>';
+  }).join('');
+
+  wrap.innerHTML = '<div class="overflow-x-auto -mx-1">'
+    + '<table class="w-full text-left min-w-[460px]"><thead>'
+    + '<tr class="border-b border-slate-200">'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Patente</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Conductor</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Tipo</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide w-28">Carga</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Destino</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MAPA OPERATIVO — Capa de inteligencia sobre la red de acopios REP
 // ═══════════════════════════════════════════════════════════════════════════
 var _acopiosData       = [];   // puntos_acopio desde Supabase
@@ -778,6 +881,8 @@ async function cargarMapaOperativo() {
     _pintarFlota(_flotaData, totalCargasKg);
     _verificarCriticos(_acopiosData);
     _actualizarEstadoBar(_acopiosData, _flotaData);
+    _renderTablaAcopios(_acopiosData);
+    _renderTablaFlota(_flotaData);
 
   } catch (err) {
     console.error('[Damu] Error cargando Mapa Operativo:', err);
