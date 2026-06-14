@@ -246,6 +246,26 @@
     </div>
   </div>
 
+  <!-- ─── RUTAS SUGERIDAS ─────────────────────────────────────── -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-slate-700 to-slate-600 px-5 py-3.5 flex items-center justify-between">
+      <div>
+        <h2 class="text-white font-bold text-sm">🧠 Rutas Sugeridas</h2>
+        <p class="text-slate-400 text-xs mt-0.5">Asignación óptima: vehículo → acopios prioritarios → centro de valorización</p>
+      </div>
+      <button id="btn-calcular-rutas" onclick="calcularRutasSugeridas()"
+        class="text-slate-300 hover:text-white border border-slate-600 hover:border-slate-400 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        Recalcular
+      </button>
+    </div>
+    <div id="rutas-sugeridas-wrap" class="p-5">
+      <p class="text-slate-400 text-sm text-center py-4">Cargando mapa operativo…</p>
+    </div>
+  </div>
+
   <!-- ─── VARIABLES OPERATIVAS PRO ─────────────────────────────── -->
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
     <div class="bg-gradient-to-r from-emerald-700 to-emerald-600 px-5 py-4">
@@ -889,6 +909,24 @@ async function cargarMapaOperativo() {
 
     _pintarAcopios(_acopiosData);
     _pintarFlota(_flotaData, totalCargasKg);
+
+    // Auto-ruta si un vehículo tiene destino seteado por un escaneo reciente
+    if (!_autoRouted) {
+      var vConDestino = _flotaData.find(function(v) {
+        return v.destino && v.lat && v.lng && _centros[v.destino];
+      });
+      if (vConDestino) {
+        _autoRouted = true;
+        var _centroAuto = _centros[vConDestino.destino];
+        _routingControl.setWaypoints([
+          L.Routing.waypoint(L.latLng(vConDestino.lat, vConDestino.lng), '🚛 ' + vConDestino.patente),
+          L.Routing.waypoint(L.latLng(_centroAuto.lat, _centroAuto.lng), _centroAuto.nombre),
+        ]);
+        var _destEl = document.getElementById('map-dest');
+        if (_destEl) _destEl.value = _centroAuto.nombre;
+      }
+    }
+
     _verificarCriticos(_acopiosData);
     _actualizarEstadoBar(_acopiosData, _flotaData);
     _renderTablaAcopios(_acopiosData);
