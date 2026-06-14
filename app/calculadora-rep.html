@@ -763,8 +763,52 @@ var _datosCerts  = [];
 var _sessionUser = null;
 
 window.addEventListener('DOMContentLoaded', function () {
+  _cargarBannerEmpresa();
   cargarCertificados();
 });
+
+// ── Banner "Mi Empresa" para productor ───────────────────────────
+function _cargarBannerEmpresa() {
+  var rol = localStorage.getItem('damu_role') || '';
+  if (rol !== 'productor') return;
+
+  var nombre  = localStorage.getItem('damu_empresa_nombre') || '';
+  var codigo  = localStorage.getItem('damu_codigo_invitacion') || '';
+
+  if (!nombre && !codigo) return; // sin datos en cache → no mostrar
+
+  var banner  = document.getElementById('empresa-prod-banner');
+  var nomEl   = document.getElementById('prod-empresa-nombre');
+  var codEl   = document.getElementById('prod-codigo-invitacion');
+
+  if (banner) banner.classList.remove('hidden');
+  if (nomEl && nombre) nomEl.textContent = nombre;
+  if (codEl && codigo) codEl.textContent  = codigo;
+}
+
+function _copiarCodigo() {
+  var codigo = (document.getElementById('prod-codigo-invitacion') || {}).textContent || '';
+  if (!codigo.trim() || codigo === '——————') return;
+  navigator.clipboard.writeText(codigo.trim()).then(function () {
+    var icono = document.getElementById('icono-copiar');
+    if (icono) {
+      icono.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>';
+      setTimeout(function () {
+        icono.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>';
+      }, 1500);
+    }
+  }).catch(function () {
+    // Fallback si clipboard API no disponible
+    var codEl = document.getElementById('prod-codigo-invitacion');
+    if (codEl) {
+      var sel = window.getSelection();
+      var range = document.createRange();
+      range.selectNodeContents(codEl);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  });
+}
 
 // ── Carga de datos reales desde Supabase ─────────────────────────
 async function cargarCertificados() {
