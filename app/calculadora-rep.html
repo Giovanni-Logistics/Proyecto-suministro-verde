@@ -192,6 +192,19 @@
         <!-- Notificación inline -->
         <div id="cert-notif" class="hidden text-xs px-4 py-3 rounded-xl border font-medium"></div>
 
+        <!-- ══ Subsección: Logística de la empresa ══ -->
+        <div class="flex items-start gap-2 py-2 border-b border-slate-200">
+          <div>
+            <p class="text-xs font-black text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+              <span>📦</span> Logística de tu empresa — Solo lectura
+            </p>
+            <p class="text-xs text-slate-400 mt-0.5">
+              Datos operativos consolidados: viajes, cargas QR y huella de carbono
+              <span id="cert-empresa-tag" class="hidden ml-1 bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold px-1.5 py-0.5 rounded-full">Visión empresa</span>
+            </p>
+          </div>
+        </div>
+
         <!-- ── Certificado de Trazabilidad ── -->
         <div class="cert-row-wrap flex flex-wrap items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-4">
           <div class="flex items-center gap-3 flex-1 min-w-0">
@@ -214,28 +227,6 @@
           </div>
         </div>
 
-        <!-- ── Reporte Meta Anual REP ── -->
-        <div class="cert-row-wrap flex flex-wrap items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-4">
-          <div class="flex items-center gap-3 flex-1 min-w-0">
-            <span class="text-2xl flex-shrink-0">✅</span>
-            <div>
-              <p class="text-sm font-bold text-slate-700">Reporte de Meta Anual REP</p>
-              <p class="text-xs text-slate-500 mt-0.5">Cumplimiento de metas y estimación de riesgo Art. 48 según tus cálculos</p>
-              <p class="cert-no-data hidden text-xs text-amber-600 mt-1 font-semibold"></p>
-            </div>
-          </div>
-          <div class="flex items-center gap-2 flex-shrink-0">
-            <span class="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-0.5 rounded-full">Disponible</span>
-            <button id="btn-cert-meta" onclick="generarCertMetaAnual()"
-              class="bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors inline-flex items-center gap-1.5">
-              <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-              </svg>
-              Generar PDF
-            </button>
-          </div>
-        </div>
-
         <!-- ── CO₂e Mitigado ── -->
         <div class="cert-row-wrap flex flex-wrap items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-4">
           <div class="flex items-center gap-3 flex-1 min-w-0">
@@ -249,6 +240,38 @@
           <div class="flex items-center gap-2 flex-shrink-0">
             <span class="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-0.5 rounded-full">Disponible</span>
             <button id="btn-cert-co2" onclick="generarCertCO2()"
+              class="bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors inline-flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              </svg>
+              Generar PDF
+            </button>
+          </div>
+        </div>
+
+        <!-- ══ Subsección: Declaración REP del productor ══ -->
+        <div class="flex items-start gap-2 pt-3 pb-2 border-b border-slate-200">
+          <div>
+            <p class="text-xs font-black text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+              <span>📋</span> Declaración REP del productor
+            </p>
+            <p class="text-xs text-slate-400 mt-0.5">Documentos firmados por la empresa productora ante el SMA · Decreto 12 Ley 20.920</p>
+          </div>
+        </div>
+
+        <!-- ── Reporte Meta Anual REP ── -->
+        <div class="cert-row-wrap flex flex-wrap items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-4">
+          <div class="flex items-center gap-3 flex-1 min-w-0">
+            <span class="text-2xl flex-shrink-0">✅</span>
+            <div>
+              <p class="text-sm font-bold text-slate-700">Reporte de Meta Anual REP</p>
+              <p class="text-xs text-slate-500 mt-0.5">Cumplimiento de metas y estimación de riesgo Art. 48 según tus cálculos</p>
+              <p class="cert-no-data hidden text-xs text-amber-600 mt-1 font-semibold"></p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <span class="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-0.5 rounded-full">Disponible</span>
+            <button id="btn-cert-meta" onclick="generarCertMetaAnual()"
               class="bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors inline-flex items-center gap-1.5">
               <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
