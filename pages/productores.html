@@ -443,7 +443,7 @@
           <p>Documento estructurado listo para presentar ante la Superintendencia del Medio Ambiente.</p>
         </div>
         <span class="cert-status pend">En desarrollo</span>
-        <button class="cert-dl" style="opacity:.5;cursor:default;">Próximamente</button>
+        <button class="cert-dl" disabled style="opacity:.45;cursor:not-allowed;pointer-events:none;" tabindex="-1">Próximamente</button>
       </div>
     </div>
   </div>
@@ -481,6 +481,55 @@
   const regionMult = { rm:1, v:1.08, viii:1.12, otro:1.2 };
 
   function fmt(n) { return '$' + Math.round(n).toLocaleString('es-CL') + ' CLP'; }
+
+  // ── Simulación de descarga de certificado ───────────────────────
+  function simularPDF(btn) {
+    if (btn.disabled) return;
+
+    var textoOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Generando...';
+    btn.style.opacity = '0.6';
+
+    setTimeout(function () {
+      btn.textContent = textoOriginal;
+      btn.style.opacity = '';
+      btn.disabled = false;
+      mostrarToastDemo();
+    }, 1500);
+  }
+
+  function mostrarToastDemo() {
+    var existente = document.getElementById('toast-demo-cert');
+    if (existente) existente.remove();
+
+    var toast = document.createElement('div');
+    toast.id = 'toast-demo-cert';
+    toast.className = 'toast-demo';
+    toast.innerHTML =
+      '<button class="toast-close" onclick="cerrarToast()" aria-label="Cerrar">✕</button>'
+      + '<strong>🧪 Modo Demostración</strong>'
+      + 'En la versión oficial de Damu SGC, este certificado se genera automáticamente con los datos reales de tus retiros.';
+
+    document.body.appendChild(toast);
+
+    // Forzar reflow antes de agregar .visible para que la transición CSS funcione
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        toast.classList.add('visible');
+      });
+    });
+
+    // Auto-cierre a los 6 segundos
+    setTimeout(function () { cerrarToast(); }, 6000);
+  }
+
+  function cerrarToast() {
+    var toast = document.getElementById('toast-demo-cert');
+    if (!toast) return;
+    toast.classList.remove('visible');
+    setTimeout(function () { toast.remove(); }, 300);
+  }
 
   function calcTicket() {
     const cat  = document.getElementById('et-categoria').value;
