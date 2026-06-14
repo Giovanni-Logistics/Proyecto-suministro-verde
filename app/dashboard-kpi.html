@@ -669,6 +669,7 @@ async function cargarKPIsEmpresa(sb, uid) {
 // ── Cargar al iniciar ──────────────────────────────────────────
 // __damuSupabase está disponible de forma síncrona desde auth-guard.js
 async function _init() {
+  cargarEmpresaTMS(); // no-op silencioso si rol es productor
   await cargarDatosDB();
   var sb = window.__damuSupabase;
   if (!sb) return;
