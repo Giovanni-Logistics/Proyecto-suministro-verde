@@ -156,7 +156,7 @@ async function cargarHistorial() {
       .select('id, categoria, toneladas, costo_estimado, meta_valorizacion_porcentaje, riesgo_multa_estimado, created_at')
       .order('created_at', { ascending: false })
       .limit(100);
-    if (empresaId) qProd = qProd.eq('empresa_id', empresaId);
+    if (empresaId) qProd = qProd.or('empresa_id.eq.' + empresaId + ',user_id.eq.' + uid);
     else           qProd = qProd.eq('user_id', uid);
     if (desde) qProd = qProd.gte('created_at', desde + 'T00:00:00');
     if (hasta) qProd = qProd.lte('created_at', hasta + 'T23:59:59');
@@ -164,9 +164,16 @@ async function cargarHistorial() {
 
     var [rutasRes, prodRes] = await Promise.all([qRutas, qProd]);
 
-    renderTablaRutas(rutasRes.data || []);
-    renderTablaProduccion(prodRes.data || []);
-    renderTotales(rutasRes.data || [], prodRes.data || []);
+    if (rutasRes.error) setWrapError('wrap-rutas', rutasRes.error.message);
+    else renderTablaRutas(rutasRes.data || []);
+
+    if (prodRes.error) setWrapError('wrap-produccion', prodRes.error.message);
+    else renderTablaProduccion(prodRes.data || []);
+
+    renderTotales(
+      rutasRes.error ? [] : (rutasRes.data || []),
+      prodRes.error  ? [] : (prodRes.data  || [])
+    );
 
   } catch (err) {
     setWrapError('wrap-rutas',     'Error al cargar rutas: ' + err.message);
