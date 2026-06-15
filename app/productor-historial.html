@@ -146,7 +146,7 @@ async function cargarHistorial() {
       .select('id, origen, destino, distancia_km, costo_diesel, cargas_qr_kg, created_at')
       .order('created_at', { ascending: false })
       .limit(100);
-    if (empresaId) qRutas = qRutas.eq('empresa_id', empresaId);
+    if (empresaId) qRutas = qRutas.or('empresa_id.eq.' + empresaId + ',user_id.eq.' + uid);
     else           qRutas = qRutas.eq('user_id', uid);
     if (desde) qRutas = qRutas.gte('created_at', desde + 'T00:00:00');
     if (hasta) qRutas = qRutas.lte('created_at', hasta + 'T23:59:59');
