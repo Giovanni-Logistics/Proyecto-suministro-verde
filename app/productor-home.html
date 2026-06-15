@@ -1146,45 +1146,68 @@ function recalc() {
 // ═══════════════════════════ GUARDAR PRODUCCIÓN → produccion_rep ═══════════════════════════
 async function guardarProduccion() {
   var saved = _lastCalcResult;
-  if (!saved || !saved.tons) { _setGuardarMsg('warn', '⚠️ Primero completa el cálculo.'); return; }
+  if (!saved) { _setGuardarMsg('warn', '⚠️ Primero ingresa toneladas y presiona Tab o clic fuera del campo para calcular.'); return; }
+  if (!saved.tons || saved.tons <= 0) { _setGuardarMsg('warn', '⚠️ Ingresa un valor de toneladas mayor a 0.'); return; }
+
   var sb  = window.__damuSupabase;
   var btn = document.getElementById('btn-guardar');
   var txt = document.getElementById('btn-guardar-txt');
-  if (!sb) { _setGuardarMsg('err', '❌ Error de conexión.'); return; }
+  if (!sb) { _setGuardarMsg('err', '❌ Error: cliente Supabase no disponible. Recarga la página.'); return; }
+
   btn.disabled = true; txt.textContent = 'Guardando…';
   try {
     var sesRes = await sb.auth.getSession();
-    if (!sesRes.data || !sesRes.data.session) { _setGuardarMsg('err', '❌ Sesión no activa.'); return; }
+    if (!sesRes.data || !sesRes.data.session) {
+      _setGuardarMsg('err', '❌ Sesión expirada. Recarga la página e inicia sesión nuevamente.');
+      return;
+    }
     var uid = sesRes.data.session.user.id;
-    var empresaId = localStorage.getItem('damu_empresa_id');
+
+    // Intentar obtener empresa_id (opcional — no bloquea el guardado)
+    var empresaId = localStorage.getItem('damu_empresa_id') || null;
     if (!empresaId) {
-      console.log('[empresa-lookup] uid:', uid);
-      var eRes = await sb.from('empresas').select('id').eq('user_id_productor', uid).maybeSingle();
-      console.log('[empresa-lookup] result:', eRes);
-      if (eRes.data) { empresaId = eRes.data.id; localStorage.setItem('damu_empresa_id', empresaId); }
+      try {
+        var eRes = await sb.from('empresas').select('id').eq('user_id_productor', uid).maybeSingle();
+        if (eRes.data && eRes.data.id) {
+          empresaId = eRes.data.id;
+          localStorage.setItem('damu_empresa_id', empresaId);
+        }
+      } catch(_) {}
     }
     if (!empresaId) {
-      var empR = await sb.from('empresas')
-        .upsert({ nombre: sesRes.data.session.user.email || uid, user_id_productor: uid },
-                { onConflict: 'user_id_productor', ignoreDuplicates: false })
-        .select('id').single();
-      if (empR.error) console.warn('[empresa-upsert error]', empR.error.message);
-      else if (empR.data) { empresaId = empR.data.id; localStorage.setItem('damu_empresa_id', empR.data.id); }
+      try {
+        var empR = await sb.from('empresas')
+          .upsert({ nombre: sesRes.data.session.user.email || uid, user_id_productor: uid },
+                  { onConflict: 'user_id_productor', ignoreDuplicates: false })
+          .select('id').single();
+        if (empR.data && empR.data.id) {
+          empresaId = empR.data.id;
+          localStorage.setItem('damu_empresa_id', empR.data.id);
+        }
+      } catch(_) {}
     }
-    // empresa_id es opcional: la política RLS produccion_insert_own solo exige user_id = auth.uid()
-    var { error } = await sb.from('produccion_rep').insert({
+
+    // INSERT — empresa_id es opcional, user_id es suficiente para la política RLS
+    var insRes = await sb.from('produccion_rep').insert({
       user_id:                      uid,
       empresa_id:                   empresaId || null,
-      categoria:                    saved.cat,
+      categoria:                    saved.cat   || 'envases',
       toneladas:                    saved.tons,
       costo_estimado:               Math.round(saved.costoTotal || 0),
-      meta_valorizacion_porcentaje: saved.meta || 0,
+      meta_valorizacion_porcentaje: saved.meta  || 0,
       riesgo_multa_estimado:        saved.multa || 0,
     });
-    if (error) throw error;
-    _setGuardarMsg('ok', '✓ Producción registrada. Aparece en tu Historial.');
+
+    if (insRes.error) {
+      console.error('[guardarProduccion] error:', insRes.error);
+      throw new Error(insRes.error.message + ' (code: ' + insRes.error.code + ')');
+    }
+
+    _setGuardarMsg('ok', '✓ Producción guardada correctamente. Ve al Historial para verla.');
+    _lastCalcResult = null; // reset para evitar doble guardado accidental
   } catch (err) {
-    _setGuardarMsg('err', '❌ No se pudo guardar: ' + err.message);
+    console.error('[guardarProduccion] catch:', err);
+    _setGuardarMsg('err', '❌ Error al guardar: ' + (err.message || JSON.stringify(err)));
   } finally {
     btn.disabled = false; txt.textContent = 'Guardar producción';
   }
