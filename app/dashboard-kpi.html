@@ -246,14 +246,8 @@
 // RLS filtra automáticamente solo los registros del usuario actual
 // ═══════════════════════════════════════════════════════════════════
 
-// Tarifas REP (mismas que calculadora-rep.html para reconstruir OPEX)
-var tarifas = {
-  envases:    { reco:18000, trans:12000, val:22000, co2:0.8  },
-  neumaticos: { reco:25000, trans:18000, val:30000, co2:1.4  },
-  pilas:      { reco:35000, trans:20000, val:45000, co2:0.4  },
-  raee:       { reco:40000, trans:25000, val:50000, co2:1.1  },
-  aceites:    { reco:22000, trans:15000, val:28000, co2:0.9  },
-};
+// Tarifas REP desde constantes-rep.js (fuente única de verdad)
+var tarifas = DAMU.tarifas;
 
 function fmt(n) {
   return '$' + Math.round(n).toLocaleString('es-CL') + ' CLP';
