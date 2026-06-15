@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Historial — Productor REP · Damu SGC</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="constantes-rep.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth-guard.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
+
+<nav id="app-nav" class="bg-slate-900 sticky top-0 z-50 h-16 shadow-xl"></nav>
+
+<header class="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 text-white py-7 px-8">
+  <div class="max-w-5xl mx-auto">
+    <span class="inline-block bg-white/10 border border-white/20 text-emerald-200 text-xs font-bold px-3 py-1 rounded-full mb-3">📋 Historial de Registros</span>
+    <h1 class="text-2xl md:text-3xl font-black leading-tight mb-1">Historial</h1>
+    <p class="text-slate-300 text-sm">Consulta tus rutas guardadas y registros de producción REP.</p>
+  </div>
+</header>
+
+<main class="max-w-5xl mx-auto w-full px-4 py-8 flex-1 space-y-8">
+
+  <!-- Filtros -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+    <h2 class="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">🔍 Filtros</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div>
+        <label class="block text-xs font-bold text-slate-500 mb-1.5">Desde</label>
+        <input type="date" id="f-desde"
+          class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"/>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-500 mb-1.5">Hasta</label>
+        <input type="date" id="f-hasta"
+          class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"/>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-500 mb-1.5">Categoría REP</label>
+        <select id="f-cat"
+          class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+          <option value="">Todas las categorías</option>
+          <option value="envases">📦 Envases y embalajes</option>
+          <option value="neumaticos">🛞 Neumáticos</option>
+          <option value="pilas">🔋 Pilas y baterías</option>
+          <option value="raee">🖥️ RAEE</option>
+          <option value="aceites">🛢️ Aceites lubricantes</option>
+        </select>
+      </div>
+      <div class="flex items-end">
+        <button onclick="cargarHistorial()"
+          class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-colors">
+          Actualizar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rutas guardadas -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-slate-800 to-slate-700 px-5 py-4 flex items-center justify-between">
+      <div>
+        <h2 class="text-white font-bold text-sm flex items-center gap-2">🗺️ Rutas Guardadas</h2>
+        <p class="text-slate-400 text-xs mt-0.5">Rutas de recolección registradas desde el Mapa</p>
+      </div>
+      <span id="badge-rutas" class="text-xs bg-white/10 text-slate-300 border border-white/10 px-2.5 py-1 rounded-full">—</span>
+    </div>
+    <div id="wrap-rutas" class="p-5">
+      <div class="py-8 text-center text-slate-400 text-sm flex items-center justify-center gap-2">
+        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        Cargando rutas...
+      </div>
+    </div>
+  </div>
+
+  <!-- Producción REP -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-emerald-800 to-emerald-700 px-5 py-4 flex items-center justify-between">
+      <div>
+        <h2 class="text-white font-bold text-sm flex items-center gap-2">🧾 Producción REP Registrada</h2>
+        <p class="text-emerald-300 text-xs mt-0.5">Cálculos guardados desde la Calculadora REP</p>
+      </div>
+      <span id="badge-produccion" class="text-xs bg-white/10 text-emerald-200 border border-white/10 px-2.5 py-1 rounded-full">—</span>
+    </div>
+    <div id="wrap-produccion" class="p-5">
+      <div class="py-8 text-center text-slate-400 text-sm flex items-center justify-center gap-2">
+        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        Cargando producción...
+      </div>
+    </div>
+  </div>
+
+  <!-- Totales -->
+  <div id="totales-section" class="hidden">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="totales-grid"></div>
+  </div>
+
+</main>
+
+<footer class="bg-slate-900 text-slate-400 text-xs py-5 border-t border-slate-800 mt-auto">
+  <div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-3">
+    <p><strong class="text-white">Damu SGC</strong> — Trazabilidad Ley REP · Chile</p>
+    <p class="text-slate-600">© 2026 Damu SGC</p>
+  </div>
+</footer>
+
+<script>
+var CAT_LABEL = { envases:'📦 Envases', neumaticos:'🛞 Neumáticos', pilas:'🔋 Pilas/Bat.', raee:'🖥️ RAEE', aceites:'🛢️ Aceites' };
+
+function clp(n) { return '$' + Math.round(n).toLocaleString('es-CL') + ' CLP'; }
+
+function fmtFecha(iso) {
+  return new Date(iso).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function getFilters() {
+  var desde = document.getElementById('f-desde').value;
+  var hasta = document.getElementById('f-hasta').value;
+  var cat   = document.getElementById('f-cat').value;
+  return { desde, hasta, cat };
+}
+
+async function cargarHistorial() {
+  var sb = window.__damuSupabase;
+  if (!sb) return;
+
+  setWrapLoading('wrap-rutas',     'Cargando rutas...');
+  setWrapLoading('wrap-produccion','Cargando producción...');
+
+  try {
+    var sesRes    = await sb.auth.getSession();
+    var uid       = sesRes.data.session.user.id;
+    var empresaId = localStorage.getItem('damu_empresa_id');
+
+    if (!empresaId) {
+      var eRes = await sb.from('empresas').select('id').eq('user_id_productor', uid).maybeSingle();
+      if (eRes.data) { empresaId = eRes.data.id; localStorage.setItem('damu_empresa_id', empresaId); }
+    }
+
+    var { desde, hasta, cat } = getFilters();
+
+    // Query rutas
+    var qRutas = sb.from('viajes_operativos')
+      .select('id, origen, destino, distancia_km, costo_diesel, cargas_qr_kg, created_at')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (empresaId) qRutas = qRutas.eq('empresa_id', empresaId);
+    else           qRutas = qRutas.eq('user_id', uid);
+    if (desde) qRutas = qRutas.gte('created_at', desde + 'T00:00:00');
+    if (hasta) qRutas = qRutas.lte('created_at', hasta + 'T23:59:59');
+
+    // Query producción
+    var qProd = sb.from('produccion_rep')
+      .select('id, categoria, toneladas, costo_estimado, meta_valorizacion_porcentaje, riesgo_multa_estimado, created_at')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (empresaId) qProd = qProd.eq('empresa_id', empresaId);
+    else           qProd = qProd.eq('user_id', uid);
+    if (desde) qProd = qProd.gte('created_at', desde + 'T00:00:00');
+    if (hasta) qProd = qProd.lte('created_at', hasta + 'T23:59:59');
+    if (cat)   qProd = qProd.eq('categoria', cat);
+
+    var [rutasRes, prodRes] = await Promise.all([qRutas, qProd]);
+
+    renderTablaRutas(rutasRes.data || []);
+    renderTablaProduccion(prodRes.data || []);
+    renderTotales(rutasRes.data || [], prodRes.data || []);
+
+  } catch (err) {
+    setWrapError('wrap-rutas',     'Error al cargar rutas: ' + err.message);
+    setWrapError('wrap-produccion','Error al cargar producción: ' + err.message);
+  }
+}
+
+function renderTablaRutas(rutas) {
+  var wrap  = document.getElementById('wrap-rutas');
+  var badge = document.getElementById('badge-rutas');
+  if (badge) badge.textContent = rutas.length + ' registro' + (rutas.length !== 1 ? 's' : '');
+
+  if (rutas.length === 0) {
+    wrap.innerHTML = '<div class="py-10 text-center"><div class="text-4xl mb-3">🗺️</div><p class="text-slate-500 text-sm font-semibold">Sin rutas guardadas</p><p class="text-slate-400 text-xs mt-1">Guarda rutas desde la sección <a href="productor-home.html" class="text-emerald-600 underline">Inicio → Mapa</a>.</p></div>';
+    return;
+  }
+
+  var rows = rutas.map(function(r) {
+    var distancia = r.distancia_km > 0 ? r.distancia_km.toFixed(1) + ' km' : '—';
+    var costo     = r.costo_diesel > 0 ? clp(r.costo_diesel) : '—';
+    var qr        = r.cargas_qr_kg > 0 ? r.cargas_qr_kg.toFixed(0) + ' kg' : '—';
+    return '<tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors">'
+      + '<td class="py-2.5 px-3 text-xs text-slate-500 whitespace-nowrap">' + fmtFecha(r.created_at) + '</td>'
+      + '<td class="py-2.5 px-3 text-sm text-slate-700 max-w-[180px] truncate">' + (r.origen || '—') + '</td>'
+      + '<td class="py-2.5 px-3 text-sm text-slate-700 max-w-[180px] truncate">' + (r.destino || '—') + '</td>'
+      + '<td class="py-2.5 px-3 text-sm font-semibold text-emerald-700 text-right tabular-nums">' + distancia + '</td>'
+      + '<td class="py-2.5 px-3 text-sm text-slate-600 text-right tabular-nums">' + costo + '</td>'
+      + '<td class="py-2.5 px-3 text-xs text-blue-600 text-right">' + qr + '</td>'
+      + '</tr>';
+  }).join('');
+
+  wrap.innerHTML = '<div class="overflow-x-auto -mx-1"><table class="w-full text-left min-w-[580px]">'
+    + '<thead><tr class="border-b border-slate-200"><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Fecha</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Origen</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Destino</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Distancia</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Costo Diésel</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">QR kg</th></tr></thead>'
+    + '<tbody>' + rows + '</tbody></table></div>';
+}
+
+function renderTablaProduccion(prod) {
+  var wrap  = document.getElementById('wrap-produccion');
+  var badge = document.getElementById('badge-produccion');
+  if (badge) badge.textContent = prod.length + ' registro' + (prod.length !== 1 ? 's' : '');
+
+  if (prod.length === 0) {
+    wrap.innerHTML = '<div class="py-10 text-center"><div class="text-4xl mb-3">🧾</div><p class="text-slate-500 text-sm font-semibold">Sin producción registrada</p><p class="text-slate-400 text-xs mt-1">Guarda cálculos desde la sección <a href="productor-home.html" class="text-emerald-600 underline">Inicio → Calculadora REP</a>.</p></div>';
+    return;
+  }
+
+  var rows = prod.map(function(p) {
+    var cumple  = (p.riesgo_multa_estimado || 0) === 0;
+    var multa   = cumple ? '<span class="text-emerald-600 font-bold">Sin riesgo</span>' : '<span class="text-red-600 font-bold">' + clp(p.riesgo_multa_estimado) + '</span>';
+    return '<tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors">'
+      + '<td class="py-2.5 px-3 text-xs text-slate-500 whitespace-nowrap">' + fmtFecha(p.created_at) + '</td>'
+      + '<td class="py-2.5 px-3 text-sm text-slate-700">' + (CAT_LABEL[p.categoria] || p.categoria) + '</td>'
+      + '<td class="py-2.5 px-3 text-sm font-black text-emerald-700 text-right tabular-nums">' + parseFloat(p.toneladas).toFixed(2) + ' t</td>'
+      + '<td class="py-2.5 px-3 text-sm text-slate-600 text-right tabular-nums">' + parseFloat(p.meta_valorizacion_porcentaje).toFixed(0) + '%</td>'
+      + '<td class="py-2.5 px-3 text-sm text-slate-600 text-right tabular-nums">' + clp(p.costo_estimado || 0) + '</td>'
+      + '<td class="py-2.5 px-3 text-sm text-right">' + multa + '</td>'
+      + '</tr>';
+  }).join('');
+
+  wrap.innerHTML = '<div class="overflow-x-auto -mx-1"><table class="w-full text-left min-w-[620px]">'
+    + '<thead><tr class="border-b border-slate-200"><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Fecha</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Categoría</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Toneladas</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Meta %</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Costo Est.</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Multa Est.</th></tr></thead>'
+    + '<tbody>' + rows + '</tbody></table></div>';
+}
+
+function renderTotales(rutas, prod) {
+  var totalKm   = rutas.reduce(function(a,r){return a+(r.distancia_km||0);},0);
+  var totalCost = rutas.reduce(function(a,r){return a+(r.costo_diesel||0);},0);
+  var totalTons = prod.reduce(function(a,p){return a+parseFloat(p.toneladas||0);},0);
+  var totalMulta= prod.reduce(function(a,p){return a+(p.riesgo_multa_estimado||0);},0);
+
+  var sec  = document.getElementById('totales-section');
+  var grid = document.getElementById('totales-grid');
+  if (!sec || !grid) return;
+
+  grid.innerHTML = [
+    { icon:'📏', lbl:'Km totales',    val: totalKm.toFixed(1) + ' km',    col:'text-slate-700' },
+    { icon:'⛽', lbl:'Costo diésel',  val: clp(totalCost),                 col:'text-red-500'   },
+    { icon:'⚖️', lbl:'Tons. REP',    val: totalTons.toFixed(2) + ' t',    col:'text-emerald-700'},
+    { icon:'⚖️', lbl:'Multa total',  val: totalMulta > 0 ? clp(totalMulta) : 'Sin riesgo', col: totalMulta > 0 ? 'text-red-600' : 'text-emerald-600' },
+  ].map(function(k) {
+    return '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-center"><div class="text-2xl mb-1">' + k.icon + '</div><div class="text-sm font-black ' + k.col + '">' + k.val + '</div><div class="text-xs text-slate-500 mt-0.5">' + k.lbl + '</div></div>';
+  }).join('');
+
+  sec.classList.remove('hidden');
+}
+
+function setWrapLoading(id, txt) {
+  document.getElementById(id).innerHTML = '<div class="py-8 text-center text-slate-400 text-sm flex items-center justify-center gap-2"><svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>' + txt + '</div>';
+}
+
+function setWrapError(id, msg) {
+  document.getElementById(id).innerHTML = '<div class="py-6 text-center"><p class="text-red-600 text-sm font-bold">❌ ' + msg + '</p><button onclick="cargarHistorial()" class="text-xs text-red-600 underline mt-2 cursor-pointer">Reintentar</button></div>';
+}
+
+// Inicializar: últimos 90 días por defecto
+window.addEventListener('DOMContentLoaded', function () {
+  var hoy   = new Date();
+  var hace90 = new Date(hoy.getTime() - 90 * 24 * 60 * 60 * 1000);
+  document.getElementById('f-hasta').value = hoy.toISOString().slice(0, 10);
+  document.getElementById('f-desde').value = hace90.toISOString().slice(0, 10);
+  cargarHistorial();
+});
+</script>
+</body>
+</html>
