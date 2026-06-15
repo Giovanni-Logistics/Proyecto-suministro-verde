@@ -313,12 +313,12 @@ function _renderRed(acopios) {
   var wrap = document.getElementById('red-wrap');
   if (!wrap) return;
 
-  var criticos = acopios.filter(function(a) { return (a.carga_actual_kg / (a.capacidad_kg || 1)) >= 0.80; });
+  var criticos = acopios.filter(function(a) { return (a.carga_actual_kg / (a.capacidad_total_kg || 1)) >= 0.80; });
   var medios   = acopios.filter(function(a) {
-    var p = a.carga_actual_kg / (a.capacidad_kg || 1);
+    var p = a.carga_actual_kg / (a.capacidad_total_kg || 1);
     return p >= 0.50 && p < 0.80;
   });
-  var libres   = acopios.filter(function(a) { return (a.carga_actual_kg / (a.capacidad_kg || 1)) < 0.50; });
+  var libres   = acopios.filter(function(a) { return (a.carga_actual_kg / (a.capacidad_total_kg || 1)) < 0.50; });
 
   if (!acopios.length) {
     wrap.innerHTML = '<p class="text-slate-400 text-sm text-center py-4 col-span-3">Sin puntos de acopio vinculados a tu empresa.</p>';
@@ -336,7 +336,7 @@ function _renderRed(acopios) {
 function _redCard(icono, titulo, items, cls) {
   var lista = items.length
     ? items.map(function(a) {
-        var pct = ((a.carga_actual_kg / (a.capacidad_kg || 1)) * 100).toFixed(0);
+        var pct = ((a.carga_actual_kg / (a.capacidad_total_kg || 1)) * 100).toFixed(0);
         return '<li class="text-xs leading-relaxed">' + a.nombre + ' <span class="font-bold">(' + pct + '%)</span></li>';
       }).join('')
     : '<li class="text-xs text-slate-400 italic">Ninguno</li>';
@@ -448,7 +448,7 @@ async function cargarDashboard(sb, uid, empresaId) {
         label: 'Puntos de acopio',
         value: acopios.length,
         color: 'text-blue-600',
-        sub: acopios.filter(function(a) { return (a.carga_actual_kg / (a.capacidad_kg||1)) >= 0.8; }).length + ' en estado CRÍTICO',
+        sub: acopios.filter(function(a) { return (a.carga_actual_kg / (a.capacidad_total_kg||1)) >= 0.8; }).length + ' en estado CRÍTICO',
       },
       {
         label: 'Categorías activas',
