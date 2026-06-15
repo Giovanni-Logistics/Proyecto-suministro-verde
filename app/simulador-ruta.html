@@ -408,14 +408,8 @@ var _routeCalculated  = false;
 var _timerGuardarViaje = null;
 var _autoRouted        = false;
 
-// Centros de valorización por categoría REP — mismos que en escaner-qr.html
-var _centros = {
-  envases:    { nombre: 'Centro REP Envases — San Bernardo',  label: 'Centro Envases',    lat: -33.5949, lng: -70.6987 },
-  neumaticos: { nombre: 'Centro REP Neumáticos — Pudahuel',   label: 'Centro Neumáticos', lat: -33.4474, lng: -70.8255 },
-  pilas:      { nombre: 'Centro REP Pilas/Bat. — Quilicura',  label: 'Centro Pilas/Bat.', lat: -33.3581, lng: -70.7341 },
-  raee:       { nombre: 'Centro REP RAEE — Maipú',            label: 'Centro RAEE',       lat: -33.5171, lng: -70.7614 },
-  aceites:    { nombre: 'Centro REP Aceites — Til-Til',       label: 'Centro Aceites',    lat: -33.0816, lng: -70.9256 },
-};
+// Centros de valorización — centralizado en constantes-rep.js
+var _centros = DAMU.centros;
 
 // Colores y etiquetas para marcadores A…F
 var STOP_COLORS = ['#059669','#2980b9','#f59e0b','#8e44ad','#e74c3c','#1abc9c'];
