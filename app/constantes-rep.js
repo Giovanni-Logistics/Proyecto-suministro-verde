@@ -3,12 +3,13 @@
 window.DAMU = {
 
   // Tarifas por categoría REP (CLP/tonelada) y factor CO₂e (t CO₂e por t recolectada)
+  // precioMercado = precio de venta estimado del material recuperado (CLP/t)
   tarifas: {
-    envases:    { reco: 18000, trans: 12000, val: 22000, co2: 0.8  },
-    neumaticos: { reco: 25000, trans: 18000, val: 30000, co2: 1.4  },
-    pilas:      { reco: 35000, trans: 20000, val: 45000, co2: 0.4  },
-    raee:       { reco: 40000, trans: 25000, val: 50000, co2: 1.1  },
-    aceites:    { reco: 22000, trans: 15000, val: 28000, co2: 0.9  },
+    envases:    { reco: 18000, trans: 12000, val: 22000, co2: 0.8, precioMercado: 120000 },
+    neumaticos: { reco: 25000, trans: 18000, val: 30000, co2: 1.4, precioMercado:  30000 },
+    pilas:      { reco: 35000, trans: 20000, val: 45000, co2: 0.4, precioMercado: 180000 },
+    raee:       { reco: 40000, trans: 25000, val: 50000, co2: 1.1, precioMercado: 120000 },
+    aceites:    { reco: 22000, trans: 15000, val: 28000, co2: 0.9, precioMercado:  40000 },
   },
 
   // Parámetros logísticos por defecto
