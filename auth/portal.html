@@ -229,6 +229,8 @@ window.addEventListener('DOMContentLoaded', function () {
 
 // ─────────────────────────────────────────────────────────────────
 async function checkSession() {
+  // ?action=login indica intención explícita de mostrar el formulario (cambio de rol, logout, etc.)
+  if (new URLSearchParams(window.location.search).get('action') === 'login') return;
   try {
     // getUser() valida el JWT contra el servidor, a diferencia de getSession() que solo
     // lee el localStorage. Esto detecta tokens revocados o expirados y evita el loop:
