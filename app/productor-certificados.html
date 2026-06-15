@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Certificados REP — Damu SGC</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="constantes-rep.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth-guard.js"></script>
+  <style>.bar-fill { transition: width 0.6s ease; }</style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
+
+<nav id="app-nav" class="bg-slate-900 sticky top-0 z-50 h-16 shadow-xl"></nav>
+
+<header class="bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-700 text-white py-7 px-8">
+  <div class="max-w-5xl mx-auto">
+    <span class="inline-block bg-white/15 border border-white/25 text-emerald-100 text-xs font-bold px-3 py-1 rounded-full mb-3">📄 Certificados REP</span>
+    <h1 class="text-2xl md:text-3xl font-black leading-tight mb-1">Certificados REP</h1>
+    <p class="text-emerald-200 text-sm">Genera certificados PDF a partir de tus registros de producción. Selecciona un período, revisa el resumen y genera el documento oficial.</p>
+  </div>
+</header>
+
+<main class="max-w-5xl mx-auto w-full px-4 py-8 flex-1 space-y-8">
+
+  <!-- Paso 1: Selección de período -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-slate-800 to-slate-700 px-5 py-4">
+      <h2 class="text-white font-bold text-sm flex items-center gap-2">① Selecciona el período</h2>
+      <p class="text-slate-400 text-xs mt-0.5">Los registros de producción se agrupan por categoría para el certificado.</p>
+    </div>
+    <div class="p-5">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1.5">Desde</label>
+          <input type="date" id="p-desde"
+            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"/>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1.5">Hasta</label>
+          <input type="date" id="p-hasta"
+            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"/>
+        </div>
+        <div class="flex items-end">
+          <button onclick="cargarProduccionPeriodo()"
+            class="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-colors">
+            Cargar registros
+          </button>
+        </div>
+      </div>
+
+      <div id="produccion-periodo-wrap">
+        <div class="py-8 text-center text-slate-400 text-sm">Selecciona un período y haz clic en "Cargar registros".</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Paso 2: Resumen + generar certificado -->
+  <div id="paso2" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-emerald-800 to-emerald-700 px-5 py-4">
+      <h2 class="text-white font-bold text-sm flex items-center gap-2">② Resumen y generación del certificado</h2>
+      <p class="text-emerald-300 text-xs mt-0.5">Revisa el agregado del período y elige la categoría para el certificado.</p>
+    </div>
+    <div class="p-5 space-y-5">
+
+      <!-- Grid resumen -->
+      <div id="resumen-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+
+      <!-- Selector de categoría -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1.5">Categoría del certificado</label>
+          <select id="cert-cat"
+            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+            <option value="">Todas (resumen agregado)</option>
+            <option value="envases">📦 Envases y embalajes</option>
+            <option value="neumaticos">🛞 Neumáticos</option>
+            <option value="pilas">🔋 Pilas y baterías</option>
+            <option value="raee">🖥️ RAEE</option>
+            <option value="aceites">🛢️ Aceites lubricantes</option>
+          </select>
+        </div>
+        <div class="flex items-end">
+          <div class="w-full space-y-2">
+            <div id="cert-msg" class="hidden text-xs px-3 py-2 rounded-lg border font-medium"></div>
+            <button id="btn-generar-cert" onclick="generarCertificado()"
+              class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              Registrar y Descargar PDF
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Historial de certificados -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-slate-700 to-slate-600 px-5 py-4 flex items-center justify-between">
+      <div>
+        <h2 class="text-white font-bold text-sm">📋 Certificados Emitidos</h2>
+        <p class="text-slate-400 text-xs mt-0.5">Historial de certificados REP generados en la plataforma</p>
+      </div>
+      <button onclick="cargarCertificadosEmitidos()"
+        class="text-slate-300 hover:text-white border border-slate-600 hover:border-slate-400 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+        Actualizar
+      </button>
+    </div>
+    <div id="wrap-certs-emitidos" class="p-5">
+      <div class="py-8 text-center text-slate-400 text-sm flex items-center justify-center gap-2">
+        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        Cargando certificados...
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer class="bg-slate-900 text-slate-400 text-xs py-5 border-t border-slate-800 mt-auto">
+  <div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-3">
+    <p><strong class="text-white">Damu SGC</strong> — Trazabilidad Ley REP · Chile</p>
+    <p class="text-slate-600">© 2026 Damu SGC</p>
+  </div>
+</footer>
+
+<script>
+var CAT_LABEL = { envases:'📦 Envases y embalajes', neumaticos:'🛞 Neumáticos', pilas:'🔋 Pilas y baterías', raee:'🖥️ RAEE', aceites:'🛢️ Aceites lubricantes' };
+var _produccionPeriodo = [];
+var _empresaId  = null;
+var _sessionUid = null;
+
+function clp(n) { return '$' + Math.round(Math.abs(n)).toLocaleString('es-CL') + ' CLP'; }
+function fmtFecha(iso) { return new Date(iso).toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit', year:'numeric' }); }
+
+async function _resolverEmpresa() {
+  var sb = window.__damuSupabase;
+  var sesRes = await sb.auth.getSession();
+  _sessionUid = sesRes.data.session.user.id;
+  _empresaId  = localStorage.getItem('damu_empresa_id');
+  if (!_empresaId) {
+    var eRes = await sb.from('empresas').select('id,nombre').eq('user_id_productor', _sessionUid).maybeSingle();
+    if (eRes.data) {
+      _empresaId = eRes.data.id;
+      localStorage.setItem('damu_empresa_id', _empresaId);
+      if (eRes.data.nombre) localStorage.setItem('damu_empresa_nombre', eRes.data.nombre);
+    }
+  }
+  return _empresaId;
+}
+
+async function cargarProduccionPeriodo() {
+  var sb    = window.__damuSupabase;
+  var desde = document.getElementById('p-desde').value;
+  var hasta = document.getElementById('p-hasta').value;
+  var wrap  = document.getElementById('produccion-periodo-wrap');
+
+  if (!desde || !hasta) { wrap.innerHTML = '<p class="text-amber-600 text-sm py-4 text-center">⚠️ Selecciona fecha desde y hasta.</p>'; return; }
+  wrap.innerHTML = '<div class="py-6 text-center text-slate-400 text-sm flex items-center justify-center gap-2"><svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Cargando...</div>';
+
+  try {
+    await _resolverEmpresa();
+    var q = sb.from('produccion_rep')
+      .select('id, categoria, toneladas, costo_estimado, meta_valorizacion_porcentaje, riesgo_multa_estimado, created_at')
+      .gte('created_at', desde + 'T00:00:00')
+      .lte('created_at', hasta + 'T23:59:59')
+      .order('created_at', { ascending: false });
+    if (_empresaId) q = q.eq('empresa_id', _empresaId);
+    else q = q.eq('user_id', _sessionUid);
+
+    var { data, error } = await q;
+    if (error) throw error;
+    _produccionPeriodo = data || [];
+    renderProduccionPeriodo(_produccionPeriodo);
+    renderResumen(_produccionPeriodo);
+    document.getElementById('paso2').classList.toggle('hidden', _produccionPeriodo.length === 0);
+  } catch (err) {
+    wrap.innerHTML = '<p class="text-red-600 text-sm py-4 text-center">❌ Error: ' + err.message + '</p>';
+  }
+}
+
+function renderProduccionPeriodo(prod) {
+  var wrap = document.getElementById('produccion-periodo-wrap');
+  if (prod.length === 0) {
+    wrap.innerHTML = '<div class="py-10 text-center"><div class="text-4xl mb-3">🧾</div><p class="text-slate-500 text-sm font-semibold">Sin registros en ese período</p><p class="text-slate-400 text-xs mt-1">Guarda producción desde <a href="productor-home.html" class="text-emerald-600 underline">Inicio → Calculadora REP</a>.</p></div>';
+    return;
+  }
+
+  // Agrupar por categoría
+  var grupos = {};
+  prod.forEach(function(p) {
+    if (!grupos[p.categoria]) grupos[p.categoria] = { registros: 0, tons: 0, costo: 0, multa: 0 };
+    grupos[p.categoria].registros++;
+    grupos[p.categoria].tons  += parseFloat(p.toneladas || 0);
+    grupos[p.categoria].costo += parseFloat(p.costo_estimado || 0);
+    grupos[p.categoria].multa += parseFloat(p.riesgo_multa_estimado || 0);
+  });
+
+  var rows = Object.keys(grupos).map(function(cat) {
+    var g = grupos[cat];
+    return '<tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors">'
+      + '<td class="py-2.5 px-3 text-sm text-slate-700">' + (CAT_LABEL[cat] || cat) + '</td>'
+      + '<td class="py-2.5 px-3 text-xs text-slate-400 text-center">' + g.registros + ' reg.</td>'
+      + '<td class="py-2.5 px-3 text-sm font-black text-emerald-700 text-right tabular-nums">' + g.tons.toFixed(2) + ' t</td>'
+      + '<td class="py-2.5 px-3 text-sm text-slate-600 text-right tabular-nums">' + clp(g.costo) + '</td>'
+      + '<td class="py-2.5 px-3 text-sm text-right">' + (g.multa > 0 ? '<span class="text-red-600 font-bold">' + clp(g.multa) + '</span>' : '<span class="text-emerald-600 font-semibold">Sin riesgo</span>') + '</td>'
+      + '</tr>';
+  }).join('');
+
+  wrap.innerHTML = '<div class="overflow-x-auto -mx-1"><table class="w-full text-left min-w-[520px]">'
+    + '<thead><tr class="border-b border-slate-200"><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Categoría</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-center">Registros</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Toneladas</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Costo Est.</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Multa Est.</th></tr></thead>'
+    + '<tbody>' + rows + '</tbody></table></div>'
+    + '<p class="text-xs text-slate-400 mt-3">' + prod.length + ' registros en el período seleccionado.</p>';
+}
+
+function renderResumen(prod) {
+  var totalTons  = prod.reduce(function(a,p){return a+parseFloat(p.toneladas||0);},0);
+  var totalCosto = prod.reduce(function(a,p){return a+parseFloat(p.costo_estimado||0);},0);
+  var totalMulta = prod.reduce(function(a,p){return a+parseFloat(p.riesgo_multa_estimado||0);},0);
+  var metaAvg    = prod.length > 0 ? prod.reduce(function(a,p){return a+parseFloat(p.meta_valorizacion_porcentaje||0);},0)/prod.length : 0;
+
+  document.getElementById('resumen-grid').innerHTML = [
+    { icon:'🧾', lbl:'Registros',         val: prod.length,                       col:'text-slate-700' },
+    { icon:'⚖️', lbl:'Toneladas totales', val: totalTons.toFixed(2) + ' t',       col:'text-emerald-700'},
+    { icon:'💸', lbl:'Costo estimado',    val: clp(totalCosto),                    col:'text-red-500'   },
+    { icon:'⚖️', lbl:'Multa estimada',   val: totalMulta > 0 ? clp(totalMulta) : 'Sin riesgo', col: totalMulta > 0 ? 'text-red-600' : 'text-emerald-600' },
+  ].map(function(k) {
+    return '<div class="bg-slate-50 rounded-2xl border border-slate-200 p-4 text-center"><div class="text-2xl mb-1">' + k.icon + '</div><div class="text-sm font-black ' + k.col + '">' + k.val + '</div><div class="text-xs text-slate-500 mt-0.5">' + k.lbl + '</div></div>';
+  }).join('');
+}
+
+async function generarCertificado() {
+  if (_produccionPeriodo.length === 0) { setCertMsg('warn', '⚠️ Carga registros de producción primero.'); return; }
+  var catFiltro = document.getElementById('cert-cat').value;
+  var prod = catFiltro ? _produccionPeriodo.filter(function(p){return p.categoria===catFiltro;}) : _produccionPeriodo;
+  if (prod.length === 0) { setCertMsg('warn', '⚠️ Sin registros para esa categoría en el período.'); return; }
+
+  var btn = document.getElementById('btn-generar-cert');
+  btn.disabled = true; btn.textContent = 'Generando…';
+  setCertMsg('', '');
+
+  try {
+    var sb        = window.__damuSupabase;
+    var desde     = document.getElementById('p-desde').value;
+    var hasta     = document.getElementById('p-hasta').value;
+    var totalTons = prod.reduce(function(a,p){return a+parseFloat(p.toneladas||0);},0);
+    var totalCost = prod.reduce(function(a,p){return a+parseFloat(p.costo_estimado||0);},0);
+    var totalMult = prod.reduce(function(a,p){return a+parseFloat(p.riesgo_multa_estimado||0);},0);
+    var metaAvg   = prod.reduce(function(a,p){return a+parseFloat(p.meta_valorizacion_porcentaje||0);},0) / prod.length;
+    var prodIds   = prod.map(function(p){return p.id;});
+    var catLabel  = catFiltro ? (CAT_LABEL[catFiltro] || catFiltro) : 'Todas las categorías';
+
+    // Guardar en certificados_rep
+    var { data: certData, error } = await sb.from('certificados_rep').insert({
+      user_id:                      _sessionUid,
+      empresa_id:                   _empresaId || null,
+      categoria:                    catFiltro || 'envases',
+      toneladas_declaradas:         totalTons,
+      meta_valorizacion_porcentaje: metaAvg,
+      riesgo_multa_estimado:        totalMult,
+      periodo_inicio:               desde,
+      periodo_fin:                  hasta,
+      produccion_ids:               prodIds,
+    }).select('id').single();
+
+    if (error) throw error;
+
+    // Generar PDF
+    _generarPDF({
+      docId:     'CERT-' + new Date().getFullYear() + '-' + String(Date.now()).slice(-6),
+      desde, hasta, catLabel,
+      totalTons, totalCost, totalMult, metaAvg,
+      nRegistros: prod.length,
+      cumple:    totalMult === 0,
+    });
+
+    setCertMsg('ok', '✓ Certificado guardado (ID: ' + certData.id.slice(-8) + ') y PDF descargado.');
+    cargarCertificadosEmitidos();
+  } catch (err) {
+    setCertMsg('err', '❌ Error al generar: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg> Registrar y Descargar PDF';
+  }
+}
+
+function setCertMsg(tipo, texto) {
+  var el = document.getElementById('cert-msg');
+  if (!el) return;
+  if (!tipo) { el.classList.add('hidden'); return; }
+  el.className = 'text-xs px-3 py-2 rounded-lg border font-medium '
+    + (tipo === 'ok'   ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+     : tipo === 'warn' ? 'bg-amber-50 border-amber-200 text-amber-700'
+                       : 'bg-red-50 border-red-200 text-red-700');
+  el.textContent = texto;
+  el.classList.remove('hidden');
+  if (tipo === 'ok') setTimeout(function(){ el.classList.add('hidden'); }, 10000);
+}
+
+function _generarPDF(d) {
+  var JSPDF = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf.jsPDF : window.jsPDF;
+  var doc = new JSPDF({ unit:'mm', format:'a4' });
+  var W = 210, M = 14, CW = W - M * 2;
+  var fecha = new Date().toLocaleDateString('es-CL', { year:'numeric', month:'long', day:'numeric' });
+
+  // Header
+  doc.setFillColor(15,23,42); doc.rect(0,0,W,40,'F');
+  doc.setFillColor(5,150,105); doc.circle(M+7,20,7,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(255,255,255);
+  doc.text('D',M+7,24.5,{align:'center'});
+  doc.setFontSize(12.5); doc.text('Damu SGC',M+18,17);
+  doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(148,163,184);
+  doc.text('Sistema de Gestion de Cumplimiento',M+18,23);
+  doc.setFontSize(7.5); doc.setTextColor(100,116,139);
+  doc.text('Trazabilidad Ley REP - Decreto 12 - Chile',M+18,29);
+  doc.setFillColor(5,150,105); doc.roundedRect(W-M-35,14,35,8,1.5,1.5,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(255,255,255);
+  doc.text('CERTIFICADO REP',W-M-17.5,19.3,{align:'center'});
+
+  // Título
+  var y = 50;
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(15,23,42);
+  doc.text('Certificado de Produccion REP',M,y); y+=6;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(71,85,105);
+  doc.text('Decreto N 12 - Ley 20.920 - Ministerio del Medio Ambiente de Chile',M,y); y+=4;
+  doc.setDrawColor(203,213,225); doc.setLineWidth(0.25); doc.line(M,y,W-M,y); y+=5;
+
+  // Metadatos
+  doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(100,116,139);
+  doc.text('N Documento:',M,y); doc.setFont('helvetica','bold'); doc.setTextColor(15,23,42);
+  doc.text(d.docId,M+26,y);
+  doc.setFont('helvetica','normal'); doc.setTextColor(100,116,139);
+  doc.text('Fecha:',W/2+5,y); doc.setFont('helvetica','bold'); doc.setTextColor(15,23,42);
+  doc.text(fecha,W-M,y,{align:'right'}); y+=5;
+  doc.setFont('helvetica','normal'); doc.setTextColor(100,116,139);
+  doc.text('Periodo:',M,y); doc.setFont('helvetica','bold'); doc.setTextColor(5,150,105);
+  doc.text(d.desde + '  al  ' + d.hasta,M+26,y); y+=10;
+
+  // Banner estado
+  if (d.cumple) { doc.setFillColor(220,252,231); doc.setDrawColor(134,239,172); }
+  else          { doc.setFillColor(254,226,226); doc.setDrawColor(252,165,165); }
+  doc.setLineWidth(0.3); doc.roundedRect(M,y,CW,12,2,2,'FD');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9.5);
+  doc.setTextColor(d.cumple?22:153, d.cumple?101:27, d.cumple?52:27);
+  doc.text(d.cumple ? 'ESTADO: SIN RIESGO - Cumplimiento REP verificado para el periodo'
+    : 'ESTADO: EN RIESGO - Multa estimada Art. 48: ' + clp(d.totalMult), W/2, y+7.5, {align:'center'});
+  y+=18;
+
+  function sec(txt) {
+    doc.setFillColor(241,245,249); doc.rect(M,y,CW,6.5,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(71,85,105);
+    doc.text(txt,M+3,y+4.5); y+=6.5;
+  }
+  var ri = 0;
+  function fila(lbl,val) {
+    if(ri%2===0){doc.setFillColor(248,250,252);doc.rect(M,y,CW,6,'F');}
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(100,116,139);
+    doc.text(lbl,M+3,y+4.2);
+    doc.setFont('helvetica','bold'); doc.setTextColor(15,23,42);
+    doc.text(String(val),W-M-2,y+4.2,{align:'right'});
+    ri++; y+=6;
+  }
+
+  sec('1. DECLARACION REP DEL PRODUCTOR');
+  fila('Categoria de producto REP', d.catLabel);
+  fila('Periodo evaluado', d.desde + ' al ' + d.hasta);
+  fila('Numero de registros de produccion', d.nRegistros + ' registro(s)');
+  fila('Toneladas totales declaradas', d.totalTons.toFixed(2) + ' t');
+  fila('Meta de valorizacion promedio', d.metaAvg.toFixed(1) + '%');
+  y+=3;
+
+  sec('2. EVALUACION DE CUMPLIMIENTO - DECRETO N 12');
+  fila('Meta legal minima (~20% declarado)', (d.totalTons*0.20).toFixed(2) + ' t');
+  fila('Estado de cumplimiento', d.cumple ? 'CUMPLE' : 'EN RIESGO');
+  fila('Multa estimada Art. 48 (Ley 20.920)', d.totalMult===0 ? '$0 CLP (sin riesgo)' : clp(d.totalMult));
+  y+=3;
+
+  sec('3. PROYECCION DE COSTOS OPERATIVOS');
+  fila('Costo estimado de operacion REP del periodo', clp(d.totalCost));
+  y+=3;
+
+  // Nota legal
+  if(y<243) {
+    doc.setFillColor(248,250,252); doc.setDrawColor(226,232,240); doc.setLineWidth(0.25);
+    doc.roundedRect(M,y,CW,18,2,2,'FD');
+    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(71,85,105);
+    doc.text('NOTA LEGAL',M+4,y+5);
+    doc.setFont('helvetica','normal'); doc.setTextColor(100,116,139);
+    doc.text('Este documento fue generado automaticamente por la plataforma Damu SGC.',M+4,y+10);
+    doc.text('Los datos provienen de los registros de produccion REP del usuario autenticado.',M+4,y+14.5);
+  }
+
+  // Footer
+  doc.setDrawColor(203,213,225); doc.setLineWidth(0.25); doc.line(M,276,W-M,276);
+  doc.setFillColor(15,23,42); doc.rect(0,277,W,20,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(255,255,255);
+  doc.text('Damu SGC - Trazabilidad Ley REP - Chile',M,285);
+  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(148,163,184);
+  doc.text('Generado automaticamente - ' + fecha,M,290.5);
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(5,150,105);
+  doc.text(d.docId,W-M,285,{align:'right'});
+
+  doc.save('CertificadoREP_Damu_' + d.desde + '_' + d.hasta + '.pdf');
+}
+
+async function cargarCertificadosEmitidos() {
+  var sb   = window.__damuSupabase;
+  var wrap = document.getElementById('wrap-certs-emitidos');
+  wrap.innerHTML = '<div class="py-6 text-center text-slate-400 text-sm flex items-center justify-center gap-2"><svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Cargando...</div>';
+  try {
+    await _resolverEmpresa();
+    var q = sb.from('certificados_rep')
+      .select('id, categoria, toneladas_declaradas, meta_valorizacion_porcentaje, riesgo_multa_estimado, periodo_inicio, periodo_fin, created_at')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (_empresaId) q = q.eq('empresa_id', _empresaId);
+    else            q = q.eq('user_id', _sessionUid);
+
+    var { data, error } = await q;
+    if (error) throw error;
+    renderCertificadosEmitidos(data || []);
+  } catch (err) {
+    wrap.innerHTML = '<p class="text-red-600 text-sm py-4 text-center">❌ Error: ' + err.message + '</p>';
+  }
+}
+
+function renderCertificadosEmitidos(certs) {
+  var wrap = document.getElementById('wrap-certs-emitidos');
+  if (certs.length === 0) {
+    wrap.innerHTML = '<div class="py-10 text-center"><div class="text-4xl mb-3">📄</div><p class="text-slate-500 text-sm font-semibold">Sin certificados generados</p><p class="text-slate-400 text-xs mt-1">Genera tu primer certificado con el formulario de arriba.</p></div>';
+    return;
+  }
+  var rows = certs.map(function(c) {
+    var cumple = (c.riesgo_multa_estimado || 0) === 0;
+    var periodo = (c.periodo_inicio && c.periodo_fin) ? (c.periodo_inicio + ' → ' + c.periodo_fin) : '—';
+    return '<tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors">'
+      + '<td class="py-2.5 px-3 text-xs text-slate-500 whitespace-nowrap">' + fmtFecha(c.created_at) + '</td>'
+      + '<td class="py-2.5 px-3 text-sm text-slate-700">' + (CAT_LABEL[c.categoria] || c.categoria) + '</td>'
+      + '<td class="py-2.5 px-3 text-sm font-bold text-emerald-700 text-right tabular-nums">' + parseFloat(c.toneladas_declaradas||0).toFixed(2) + ' t</td>'
+      + '<td class="py-2.5 px-3 text-sm text-slate-600 text-right tabular-nums">' + parseFloat(c.meta_valorizacion_porcentaje||0).toFixed(0) + '%</td>'
+      + '<td class="py-2.5 px-3 text-sm text-right">' + (cumple ? '<span class="text-emerald-600 font-bold">Sin riesgo</span>' : '<span class="text-red-600 font-bold">' + clp(c.riesgo_multa_estimado) + '</span>') + '</td>'
+      + '<td class="py-2.5 px-3 text-xs text-slate-400">' + periodo + '</td>'
+      + '</tr>';
+  }).join('');
+  wrap.innerHTML = '<div class="overflow-x-auto -mx-1"><table class="w-full text-left min-w-[640px]"><thead><tr class="border-b border-slate-200"><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Emitido</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Categoría</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Toneladas</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Meta%</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Multa Est.</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Período</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
+window.addEventListener('DOMContentLoaded', function () {
+  var hoy    = new Date();
+  var inicio = new Date(hoy.getFullYear(), 0, 1); // 1 Ene año actual
+  document.getElementById('p-hasta').value = hoy.toISOString().slice(0,10);
+  document.getElementById('p-desde').value = inicio.toISOString().slice(0,10);
+  cargarCertificadosEmitidos();
+});
+</script>
+</body>
+</html>
