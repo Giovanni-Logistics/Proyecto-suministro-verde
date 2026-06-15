@@ -379,6 +379,7 @@ async function doLogin(email, pwd) {
   }
 
   var user = data.user;
+  console.log('[login] user_metadata:', user.user_metadata);
 
   // Consultar roles activos en perfiles para este usuario
   var rolesRes = await supabase
