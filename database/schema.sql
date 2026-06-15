@@ -463,3 +463,107 @@ DROP TRIGGER IF EXISTS trg_auto_empresa_productor ON auth.users;
 CREATE TRIGGER trg_auto_empresa_productor
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public._fn_auto_empresa_productor();
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- FASE 2 — Política UPDATE para puntos_acopio (escáner QR descuenta carga)
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- Permite al transportista vinculado actualizar la carga del punto de acopio
+-- al escanear un bulto. Solo afecta puntos sin empresa_id (red compartida) o
+-- puntos de la empresa a la que el transportista está vinculado.
+CREATE POLICY "acopio_update_linked_or_shared"
+  ON public.puntos_acopio FOR UPDATE
+  USING (
+    empresa_id IS NULL
+    OR empresa_id IN (
+      SELECT empresa_id FROM public.transportistas_empresa
+      WHERE user_id_transportista = auth.uid() AND activo = true
+    )
+  );
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- FASE 4 — Columna categoria + RPCs de agregación para dashboards
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- ── 25. Columna categoria en viajes_operativos ────────────────────────────
+ALTER TABLE public.viajes_operativos
+  ADD COLUMN IF NOT EXISTS categoria text
+  CHECK (categoria IN ('envases','neumaticos','pilas','raee','aceites'));
+
+CREATE INDEX IF NOT EXISTS idx_viajes_categoria ON public.viajes_operativos (empresa_id, categoria);
+
+-- Backfill: inferir categoría desde el nombre del centro destino (registros previos)
+UPDATE public.viajes_operativos SET categoria =
+  CASE
+    WHEN destino ILIKE '%Envases%'     THEN 'envases'
+    WHEN destino ILIKE '%Neumáticos%'  THEN 'neumaticos'
+    WHEN destino ILIKE '%Pilas%'       THEN 'pilas'
+    WHEN destino ILIKE '%RAEE%'        THEN 'raee'
+    WHEN destino ILIKE '%Aceites%'     THEN 'aceites'
+  END
+WHERE categoria IS NULL AND destino LIKE 'Centro REP%';
+
+-- ── 26. RPC: KPI empresa por semana × categoría ───────────────────────────
+CREATE OR REPLACE FUNCTION public.fn_kpi_empresa_temporal(
+  p_empresa_id uuid, p_semanas int DEFAULT 12
+)
+RETURNS TABLE(semana date, categoria text, total_kg numeric, total_km numeric, n_viajes bigint)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT date_trunc('week', created_at)::date AS semana,
+         COALESCE(categoria,'otros')           AS categoria,
+         COALESCE(SUM(cargas_qr_kg),0)        AS total_kg,
+         COALESCE(SUM(distancia_km),0)        AS total_km,
+         COUNT(*)                              AS n_viajes
+  FROM public.viajes_operativos
+  WHERE empresa_id = p_empresa_id
+    AND created_at >= NOW() - (p_semanas||' weeks')::interval
+  GROUP BY semana, COALESCE(categoria,'otros')
+  ORDER BY semana DESC;
+$$;
+
+-- ── 27. RPC: Resumen REP del productor por categoría ─────────────────────
+CREATE OR REPLACE FUNCTION public.fn_kpi_productor_rep(p_empresa_id uuid)
+RETURNS TABLE(categoria text, total_kg numeric, total_km numeric, n_viajes bigint, co2e_kg numeric)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT COALESCE(categoria,'otros')                             AS categoria,
+         COALESCE(SUM(cargas_qr_kg),0)                         AS total_kg,
+         COALESCE(SUM(distancia_km),0)                         AS total_km,
+         COUNT(*) FILTER (WHERE cargas_qr_kg > 0)              AS n_viajes,
+         ROUND(COALESCE(SUM(distancia_km),0)/12.0*2.68, 2)    AS co2e_kg
+  FROM public.viajes_operativos
+  WHERE empresa_id = p_empresa_id
+  GROUP BY COALESCE(categoria,'otros');
+$$;
+
+-- ── 28. RPC: KPI personal del transportista (totales de vida) ────────────
+CREATE OR REPLACE FUNCTION public.fn_kpi_transportista(p_user_id uuid)
+RETURNS TABLE(total_km numeric, total_kg numeric, total_costo numeric,
+              n_viajes bigint, n_escaneos bigint, kg_por_km numeric, co2e_kg numeric)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT COALESCE(SUM(distancia_km),0)  AS total_km,
+         COALESCE(SUM(cargas_qr_kg),0)  AS total_kg,
+         COALESCE(SUM(costo_diesel),0)  AS total_costo,
+         COUNT(*) FILTER (WHERE distancia_km > 0) AS n_viajes,
+         COUNT(*) FILTER (WHERE cargas_qr_kg > 0) AS n_escaneos,
+         CASE WHEN COALESCE(SUM(distancia_km),0) > 0
+           THEN ROUND(COALESCE(SUM(cargas_qr_kg),0)/SUM(distancia_km),1) ELSE 0
+         END AS kg_por_km,
+         ROUND(COALESCE(SUM(distancia_km),0)/12.0*2.68, 2) AS co2e_kg
+  FROM public.viajes_operativos WHERE user_id = p_user_id;
+$$;
+
+-- ── 29. RPC: Evolución semanal del transportista ──────────────────────────
+CREATE OR REPLACE FUNCTION public.fn_kpi_transportista_temporal(
+  p_user_id uuid, p_semanas int DEFAULT 12
+)
+RETURNS TABLE(semana date, total_kg numeric, total_km numeric, n_viajes bigint)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT date_trunc('week', created_at)::date AS semana,
+         COALESCE(SUM(cargas_qr_kg),0)       AS total_kg,
+         COALESCE(SUM(distancia_km),0)       AS total_km,
+         COUNT(*)                             AS n_viajes
+  FROM public.viajes_operativos
+  WHERE user_id = p_user_id
+    AND created_at >= NOW() - (p_semanas||' weeks')::interval
+  GROUP BY semana ORDER BY semana DESC;
+$$;
