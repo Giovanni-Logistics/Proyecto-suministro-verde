@@ -376,13 +376,37 @@ async function doLogin(email, pwd) {
     return;
   }
 
-  // El rol lo determina la selección activa en el login, no el metadata del signup
-  var role = selectedRole;
+  var user = data.user;
 
-  persistirSesion(data.user, role);
-  setMsg('ok', '✓ Acceso concedido. Redirigiendo a tu plataforma…');
-  await _cachearEmpresaLogin(data.user, role).catch(function() {});
-  setTimeout(function () { redirigir(role); }, 900);
+  // Consultar roles activos en perfiles para este usuario
+  var rolesRes = await supabase
+    .from('perfiles')
+    .select('rol')
+    .eq('user_id', user.id)
+    .eq('activo', true);
+  var roles = (rolesRes.data || []).map(function (r) { return r.rol; });
+
+  // Fallback: cuenta pre-migración sin filas en perfiles → usar selectedRole e insertar
+  if (roles.length === 0) {
+    roles = [selectedRole];
+    supabase.from('perfiles')
+      .upsert({ user_id: user.id, rol: selectedRole }, { onConflict: 'user_id,rol', ignoreDuplicates: true })
+      .then(function () {});
+  }
+
+  if (roles.length === 1) {
+    // Un solo rol: entrar directo sin preguntar
+    var role = roles[0];
+    persistirSesion(user, role);
+    setMsg('ok', '✓ Acceso concedido. Redirigiendo a tu plataforma…');
+    await _cachearEmpresaLogin(user, role).catch(function () {});
+    setTimeout(function () { redirigir(role); }, 900);
+  } else {
+    // Doble perfil: mostrar selector de módulo
+    setLoading(false);
+    setMsg('ok', '✓ Acceso concedido. Selecciona con qué módulo deseas ingresar.');
+    _mostrarSelectorRol(user);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────
