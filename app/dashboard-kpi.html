@@ -681,6 +681,81 @@ async function cargarKPIsEmpresa(sb, uid) {
   document.getElementById('kpi-empresa-section').classList.remove('hidden');
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// ESTADO DE LA RED REP — puntos críticos y cobertura de flota
+// ═══════════════════════════════════════════════════════════════════════
+async function cargarEstadoRed() {
+  var sb = window.__damuSupabase;
+  if (!sb) return;
+
+  try {
+    var results = await Promise.all([
+      sb.from('puntos_acopio').select('carga_actual_kg, capacidad_total_kg').eq('activo', true),
+      sb.from('flota_vehiculos').select('destino, carga_actual_kg, capacidad_kg').eq('activo', true),
+    ]);
+
+    var acopios = results[0].data || [];
+    var flota   = results[1].data || [];
+
+    if (acopios.length === 0) return;
+
+    var criticos = acopios.filter(function(p) {
+      return p.capacidad_total_kg > 0 && (p.carga_actual_kg / p.capacidad_total_kg) >= 0.8;
+    });
+    var kgPendiente = criticos.reduce(function(s, p) { return s + p.carga_actual_kg; }, 0);
+    var capTotalDisp = flota.reduce(function(s, v) {
+      return s + Math.max(0, (v.capacidad_kg || 0) - (v.carga_actual_kg || 0));
+    }, 0);
+    var vehConRuta = flota.filter(function(v) { return v.destino; }).length;
+    var cobertura  = capTotalDisp >= kgPendiente;
+
+    var kpis = [
+      {
+        icon: criticos.length > 0 ? '🔴' : '🟢',
+        lbl:  'Puntos críticos',
+        val:  criticos.length > 0 ? criticos.length + ' CRÍTICO' + (criticos.length !== 1 ? 'S' : '') : '0 críticos',
+        sub:  acopios.length + ' puntos en la red',
+        col:  criticos.length > 0 ? 'text-red-500' : 'text-emerald-600',
+      },
+      {
+        icon: '📦',
+        lbl:  'Carga pendiente',
+        val:  kgPendiente > 0 ? (kgPendiente / 1000).toFixed(2) + ' t' : '0 t',
+        sub:  'en puntos críticos',
+        col:  kgPendiente > 0 ? 'text-amber-500' : 'text-emerald-600',
+      },
+      {
+        icon: cobertura ? '✅' : '⚠',
+        lbl:  'Cobertura flota',
+        val:  cobertura ? 'Suficiente' : 'Insuficiente',
+        sub:  capTotalDisp.toLocaleString('es-CL') + ' kg disponibles',
+        col:  cobertura ? 'text-emerald-600' : 'text-red-500',
+      },
+      {
+        icon: '🚛',
+        lbl:  'Vehículos en ruta',
+        val:  vehConRuta + ' / ' + flota.length,
+        sub:  'con destino asignado',
+        col:  vehConRuta > 0 ? 'text-blue-600' : 'text-slate-400',
+      },
+    ];
+
+    document.getElementById('red-kpi-grid').innerHTML = kpis.map(function(k) {
+      return '<div class="bg-slate-50 rounded-xl border border-slate-200 p-4 text-center">'
+        + '<div class="text-2xl mb-1.5">' + k.icon + '</div>'
+        + '<div class="text-base font-black ' + k.col + '">' + k.val + '</div>'
+        + '<div class="text-xs font-semibold text-slate-700 mt-0.5">' + k.lbl + '</div>'
+        + '<div class="text-xs text-slate-400">' + k.sub + '</div>'
+        + '</div>';
+    }).join('');
+
+    document.getElementById('red-estado-section').classList.remove('hidden');
+
+  } catch(err) {
+    console.warn('[Damu] cargarEstadoRed:', err.message || err);
+  }
+}
+
 // ── Cargar al iniciar ──────────────────────────────────────────
 // __damuSupabase está disponible de forma síncrona desde auth-guard.js
 async function _init() {
@@ -691,6 +766,7 @@ async function _init() {
   var sesRes = await sb.auth.getSession();
   var uid    = sesRes.data && sesRes.data.session ? sesRes.data.session.user.id : null;
   if (uid) cargarKPIsEmpresa(sb, uid);
+  cargarEstadoRed(); // no-op silencioso si no hay acopios
 }
 _init();
 </script>
