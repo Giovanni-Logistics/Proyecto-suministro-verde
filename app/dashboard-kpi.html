@@ -224,6 +224,28 @@
     </div>
   </div>
 
+  <!-- ─── EVOLUCIÓN TEMPORAL DEL TRANSPORTISTA ────────────────── -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-slate-700 to-slate-600 px-5 py-3.5 flex items-center justify-between">
+      <div>
+        <h2 class="text-white font-bold text-sm">📈 Mi Evolución Operativa</h2>
+        <p class="text-slate-400 text-xs mt-0.5">kg recolectados y km recorridos por semana · últimas 12 semanas</p>
+      </div>
+      <div id="efic-badge" class="hidden bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-center">
+        <p class="text-slate-400 text-xs leading-none mb-0.5">Eficiencia real</p>
+        <p id="efic-val" class="text-white font-bold text-sm leading-none">— kg/km</p>
+      </div>
+    </div>
+    <div class="p-5">
+      <div id="tms-chart-empty" class="hidden py-10 text-center text-slate-400 text-sm">
+        <span class="text-3xl block mb-2">📭</span>
+        Sin viajes registrados en las últimas 12 semanas.<br/>
+        <span class="text-xs">Usa el Escanear QR y el Simulador de Ruta para generar datos.</span>
+      </div>
+      <canvas id="chart-tms-temporal" class="max-h-64"></canvas>
+    </div>
+  </div>
+
 </main>
 
 <!-- ══════════════════════════════ FOOTER ══════════════════════════════ -->
