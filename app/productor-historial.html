@@ -124,51 +124,55 @@ function getFilters() {
 
 async function cargarHistorial() {
   var sb = window.__damuSupabase;
-  if (!sb) return;
+  if (!sb) { setWrapError('wrap-rutas','Sin conexión Supabase'); setWrapError('wrap-produccion','Sin conexión Supabase'); return; }
 
   setWrapLoading('wrap-rutas',     'Cargando rutas...');
   setWrapLoading('wrap-produccion','Cargando producción...');
 
   try {
-    var sesRes    = await sb.auth.getSession();
-    var uid       = sesRes.data.session.user.id;
-    var empresaId = localStorage.getItem('damu_empresa_id');
-
-    if (!empresaId) {
-      var eRes = await sb.from('empresas').select('id').eq('user_id_productor', uid).maybeSingle();
-      if (eRes.data) { empresaId = eRes.data.id; localStorage.setItem('damu_empresa_id', empresaId); }
+    var sesRes = await sb.auth.getSession();
+    if (!sesRes.data || !sesRes.data.session) {
+      setWrapError('wrap-rutas','Sesión no activa — recarga la página.');
+      setWrapError('wrap-produccion','Sesión no activa — recarga la página.');
+      return;
     }
-
+    var uid = sesRes.data.session.user.id;
     var { desde, hasta, cat } = getFilters();
 
-    // Query rutas
+    // Rutas — filtro por user_id (evita recursión RLS en empresa)
     var qRutas = sb.from('viajes_operativos')
       .select('id, origen, destino, distancia_km, costo_diesel, cargas_qr_kg, created_at')
+      .eq('user_id', uid)
       .order('created_at', { ascending: false })
-      .limit(100);
-    if (empresaId) qRutas = qRutas.or('empresa_id.eq.' + empresaId + ',user_id.eq.' + uid);
-    else           qRutas = qRutas.eq('user_id', uid);
+      .limit(200);
     if (desde) qRutas = qRutas.gte('created_at', desde + 'T00:00:00');
     if (hasta) qRutas = qRutas.lte('created_at', hasta + 'T23:59:59');
 
-    // Query producción
+    // Producción — filtro por user_id
     var qProd = sb.from('produccion_rep')
       .select('id, categoria, toneladas, costo_estimado, meta_valorizacion_porcentaje, riesgo_multa_estimado, created_at')
+      .eq('user_id', uid)
       .order('created_at', { ascending: false })
-      .limit(100);
-    if (empresaId) qProd = qProd.or('empresa_id.eq.' + empresaId + ',user_id.eq.' + uid);
-    else           qProd = qProd.eq('user_id', uid);
+      .limit(200);
     if (desde) qProd = qProd.gte('created_at', desde + 'T00:00:00');
     if (hasta) qProd = qProd.lte('created_at', hasta + 'T23:59:59');
     if (cat)   qProd = qProd.eq('categoria', cat);
 
     var [rutasRes, prodRes] = await Promise.all([qRutas, qProd]);
 
-    if (rutasRes.error) setWrapError('wrap-rutas', rutasRes.error.message);
-    else renderTablaRutas(rutasRes.data || []);
+    if (rutasRes.error) {
+      console.error('[historial rutas]', rutasRes.error);
+      setWrapError('wrap-rutas', '❌ ' + rutasRes.error.message + ' (code: ' + rutasRes.error.code + ')');
+    } else {
+      renderTablaRutas(rutasRes.data || []);
+    }
 
-    if (prodRes.error) setWrapError('wrap-produccion', prodRes.error.message);
-    else renderTablaProduccion(prodRes.data || []);
+    if (prodRes.error) {
+      console.error('[historial produccion]', prodRes.error);
+      setWrapError('wrap-produccion', '❌ ' + prodRes.error.message + ' (code: ' + prodRes.error.code + ')');
+    } else {
+      renderTablaProduccion(prodRes.data || []);
+    }
 
     renderTotales(
       rutasRes.error ? [] : (rutasRes.data || []),
@@ -176,8 +180,9 @@ async function cargarHistorial() {
     );
 
   } catch (err) {
-    setWrapError('wrap-rutas',     'Error al cargar rutas: ' + err.message);
-    setWrapError('wrap-produccion','Error al cargar producción: ' + err.message);
+    console.error('[historial catch]', err);
+    setWrapError('wrap-rutas',     '❌ Error inesperado: ' + err.message);
+    setWrapError('wrap-produccion','❌ Error inesperado: ' + err.message);
   }
 }
 
@@ -195,18 +200,19 @@ function renderTablaRutas(rutas) {
     var distancia = r.distancia_km > 0 ? r.distancia_km.toFixed(1) + ' km' : '—';
     var costo     = r.costo_diesel > 0 ? clp(r.costo_diesel) : '—';
     var qr        = r.cargas_qr_kg > 0 ? r.cargas_qr_kg.toFixed(0) + ' kg' : '—';
-    return '<tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors">'
+    return '<tr id="ruta-row-' + r.id + '" class="border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors">'
       + '<td class="py-2.5 px-3 text-xs text-slate-500 whitespace-nowrap">' + fmtFecha(r.created_at) + '</td>'
       + '<td class="py-2.5 px-3 text-sm text-slate-700 max-w-[180px] truncate">' + (r.origen || '—') + '</td>'
       + '<td class="py-2.5 px-3 text-sm text-slate-700 max-w-[180px] truncate">' + (r.destino || '—') + '</td>'
       + '<td class="py-2.5 px-3 text-sm font-semibold text-emerald-700 text-right tabular-nums">' + distancia + '</td>'
       + '<td class="py-2.5 px-3 text-sm text-slate-600 text-right tabular-nums">' + costo + '</td>'
       + '<td class="py-2.5 px-3 text-xs text-blue-600 text-right">' + qr + '</td>'
+      + '<td class="py-2.5 px-3 text-right"><button onclick="eliminarRuta(\'' + r.id + '\')" title="Eliminar" class="text-slate-300 hover:text-red-500 transition-colors text-base leading-none">✕</button></td>'
       + '</tr>';
   }).join('');
 
   wrap.innerHTML = '<div class="overflow-x-auto -mx-1"><table class="w-full text-left min-w-[580px]">'
-    + '<thead><tr class="border-b border-slate-200"><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Fecha</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Origen</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Destino</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Distancia</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Costo Diésel</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">QR kg</th></tr></thead>'
+    + '<thead><tr class="border-b border-slate-200"><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Fecha</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Origen</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Destino</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Distancia</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Costo Diésel</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">QR kg</th><th class="py-2 px-3"></th></tr></thead>'
     + '<tbody>' + rows + '</tbody></table></div>';
 }
 
@@ -223,18 +229,19 @@ function renderTablaProduccion(prod) {
   var rows = prod.map(function(p) {
     var cumple  = (p.riesgo_multa_estimado || 0) === 0;
     var multa   = cumple ? '<span class="text-emerald-600 font-bold">Sin riesgo</span>' : '<span class="text-red-600 font-bold">' + clp(p.riesgo_multa_estimado) + '</span>';
-    return '<tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors">'
+    return '<tr id="prod-row-' + p.id + '" class="border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors">'
       + '<td class="py-2.5 px-3 text-xs text-slate-500 whitespace-nowrap">' + fmtFecha(p.created_at) + '</td>'
       + '<td class="py-2.5 px-3 text-sm text-slate-700">' + (CAT_LABEL[p.categoria] || p.categoria) + '</td>'
       + '<td class="py-2.5 px-3 text-sm font-black text-emerald-700 text-right tabular-nums">' + parseFloat(p.toneladas).toFixed(2) + ' t</td>'
       + '<td class="py-2.5 px-3 text-sm text-slate-600 text-right tabular-nums">' + parseFloat(p.meta_valorizacion_porcentaje).toFixed(0) + '%</td>'
       + '<td class="py-2.5 px-3 text-sm text-slate-600 text-right tabular-nums">' + clp(p.costo_estimado || 0) + '</td>'
       + '<td class="py-2.5 px-3 text-sm text-right">' + multa + '</td>'
+      + '<td class="py-2.5 px-3 text-right"><button onclick="eliminarProduccion(\'' + p.id + '\')" title="Eliminar" class="text-slate-300 hover:text-red-500 transition-colors text-base leading-none">✕</button></td>'
       + '</tr>';
   }).join('');
 
   wrap.innerHTML = '<div class="overflow-x-auto -mx-1"><table class="w-full text-left min-w-[620px]">'
-    + '<thead><tr class="border-b border-slate-200"><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Fecha</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Categoría</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Toneladas</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Meta %</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Costo Est.</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Multa Est.</th></tr></thead>'
+    + '<thead><tr class="border-b border-slate-200"><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Fecha</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Categoría</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Toneladas</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Meta %</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Costo Est.</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Multa Est.</th><th class="py-2 px-3"></th></tr></thead>'
     + '<tbody>' + rows + '</tbody></table></div>';
 }
 
@@ -266,6 +273,37 @@ function setWrapLoading(id, txt) {
 
 function setWrapError(id, msg) {
   document.getElementById(id).innerHTML = '<div class="py-6 text-center"><p class="text-red-600 text-sm font-bold">❌ ' + msg + '</p><button onclick="cargarHistorial()" class="text-xs text-red-600 underline mt-2 cursor-pointer">Reintentar</button></div>';
+}
+
+// ══════════════════════════ ELIMINAR ══════════════════════════
+async function eliminarRuta(id) {
+  if (!confirm('¿Eliminar esta ruta? Esta acción no se puede deshacer.')) return;
+  var sb = window.__damuSupabase;
+  var row = document.getElementById('ruta-row-' + id);
+  if (row) row.style.opacity = '0.4';
+  var { error } = await sb.from('viajes_operativos').delete().eq('id', id);
+  if (error) {
+    if (row) row.style.opacity = '1';
+    alert('Error al eliminar: ' + error.message);
+  } else {
+    if (row) row.remove();
+    cargarHistorial();
+  }
+}
+
+async function eliminarProduccion(id) {
+  if (!confirm('¿Eliminar este registro de producción? Esta acción no se puede deshacer.')) return;
+  var sb = window.__damuSupabase;
+  var row = document.getElementById('prod-row-' + id);
+  if (row) row.style.opacity = '0.4';
+  var { error } = await sb.from('produccion_rep').delete().eq('id', id);
+  if (error) {
+    if (row) row.style.opacity = '1';
+    alert('Error al eliminar: ' + error.message);
+  } else {
+    if (row) row.remove();
+    cargarHistorial();
+  }
 }
 
 // Inicializar: últimos 90 días por defecto
