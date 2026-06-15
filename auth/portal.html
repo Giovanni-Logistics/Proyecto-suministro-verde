@@ -414,12 +414,19 @@ async function doRegistro(email, pwd) {
   var result = await supabase.auth.signUp({
     email:    email,
     password: pwd,
-    options:  { data: { role: selectedRole } }, // rol en metadata Supabase
+    options:  { data: { role: selectedRole } },
   });
   var data  = result.data;
   var error = result.error;
 
   if (error) {
+    var errMsg = (error.message || '').toLowerCase();
+    // Supabase lanza este error cuando el email ya tiene una cuenta Auth.
+    // En lugar de mostrarlo como error, lo convertimos en flujo de "agregar rol".
+    if (errMsg.includes('user already') || errMsg.includes('already registered') || errMsg.includes('already been registered')) {
+      await _agregarRolExistente(email, pwd, selectedRole);
+      return;
+    }
     console.error('[Damu] Error en registro:', error);
     setMsg('err', traducirError(error));
     setLoading(false);
@@ -431,13 +438,88 @@ async function doRegistro(email, pwd) {
     setMsg('warn', '📧 Cuenta creada. Revisa tu correo ' + email + ' para confirmar el acceso.');
     setLoading(false);
   } else {
-    // Confirmación desactivada → redirigir automáticamente
     var role = selectedRole;
     persistirSesion(data.user, role);
     setMsg('ok', '✓ Cuenta creada exitosamente. Redirigiendo a tu plataforma…');
-    await _cachearEmpresaLogin(data.user, role).catch(function() {});
+    await _cachearEmpresaLogin(data.user, role).catch(function () {});
     setTimeout(function () { redirigir(role); }, 900);
   }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Flujo: el email ya tiene cuenta → agregar rol nuevo sin crear otro usuario
+// ─────────────────────────────────────────────────────────────────
+async function _agregarRolExistente(email, pwd, nuevoRol) {
+  // 1. Verificar credenciales iniciando sesión con la cuenta existente
+  var signInRes = await supabase.auth.signInWithPassword({ email: email, password: pwd });
+  if (signInRes.error) {
+    // Contraseña incorrecta: el email pertenece a otra persona o se equivocó de clave
+    setMsg('err', '⚠️ El correo ya está registrado con otra contraseña. Usa tus credenciales actuales para iniciar sesión.');
+    setLoading(false);
+    return;
+  }
+
+  var user = signInRes.data.user;
+  var uid  = user.id;
+
+  // 2. Consultar roles actuales
+  var rolesRes = await supabase
+    .from('perfiles').select('rol').eq('user_id', uid).eq('activo', true);
+  var roles = (rolesRes.data || []).map(function (r) { return r.rol; });
+
+  if (roles.includes(nuevoRol)) {
+    // Ya tiene ese rol — iniciar sesión directamente
+    var etiq = nuevoRol === 'productor' ? 'productora' : 'transportista';
+    setMsg('ok', '✓ Tu cuenta ya tiene el perfil de empresa ' + etiq + '. Iniciando sesión…');
+    persistirSesion(user, nuevoRol);
+    await _cachearEmpresaLogin(user, nuevoRol).catch(function () {});
+    setTimeout(function () { redirigir(nuevoRol); }, 1000);
+    return;
+  }
+
+  // 3. Agregar el nuevo rol (upsert con ON CONFLICT DO NOTHING — idempotente)
+  var insRes = await supabase
+    .from('perfiles')
+    .upsert({ user_id: uid, rol: nuevoRol }, { onConflict: 'user_id,rol', ignoreDuplicates: true });
+  if (insRes.error) {
+    console.warn('[Damu] _agregarRolExistente perfiles:', insRes.error.message);
+    // No es fatal — continuar de todas formas
+  }
+
+  // 4. Si el nuevo rol es productor, asegurar que la empresa existe
+  //    (_cachearEmpresaLogin crea la empresa si el trigger no la creó por ser un signup previo)
+  await _cachearEmpresaLogin(user, nuevoRol).catch(function () {});
+
+  var etiqNew = nuevoRol === 'productor' ? 'Empresa Productora' : 'Transportista';
+  setMsg('ok', '✓ Perfil de ' + etiqNew + ' agregado a tu cuenta. Redirigiendo…');
+  persistirSesion(user, nuevoRol);
+  setTimeout(function () { redirigir(nuevoRol); }, 1000);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Selector de módulo — usuario con ambos perfiles activos
+// ─────────────────────────────────────────────────────────────────
+var _userParaRol = null;
+
+function _mostrarSelectorRol(user) {
+  _userParaRol = user;
+  document.getElementById('form-auth').classList.add('hidden');
+  document.getElementById('selector-rol').classList.remove('hidden');
+}
+
+async function _elegirRol(rol) {
+  if (!_userParaRol) return;
+  var user = _userParaRol;
+
+  // Deshabilitar ambos botones mientras carga
+  ['btn-entrar-prod', 'btn-entrar-trans'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) { el.disabled = true; el.classList.add('opacity-50', 'cursor-not-allowed'); }
+  });
+
+  persistirSesion(user, rol);
+  await _cachearEmpresaLogin(user, rol).catch(function () {});
+  redirigir(rol);
 }
 
 // ─────────────────────────────────────────────────────────────────
