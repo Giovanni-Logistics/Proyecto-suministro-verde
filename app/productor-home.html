@@ -1158,8 +1158,18 @@ async function guardarProduccion() {
     var uid = sesRes.data.session.user.id;
     var empresaId = localStorage.getItem('damu_empresa_id');
     if (!empresaId) {
+      console.log('[empresa-lookup] uid:', uid);
       var eRes = await sb.from('empresas').select('id').eq('user_id_productor', uid).maybeSingle();
+      console.log('[empresa-lookup] result:', eRes);
       if (eRes.data) { empresaId = eRes.data.id; localStorage.setItem('damu_empresa_id', empresaId); }
+    }
+    if (!empresaId) {
+      var empR = await sb.from('empresas')
+        .upsert({ nombre: sesRes.data.session.user.email || uid, user_id_productor: uid },
+                { onConflict: 'user_id_productor', ignoreDuplicates: false })
+        .select('id').single();
+      console.log('[empresa-upsert]', empR);
+      if (empR.data) { empresaId = empR.data.id; localStorage.setItem('damu_empresa_id', empR.data.id); }
     }
     if (!empresaId) { _setGuardarMsg('warn', '⚠️ Tu cuenta no tiene empresa REP creada todavía.'); return; }
     var { error } = await sb.from('produccion_rep').insert({
