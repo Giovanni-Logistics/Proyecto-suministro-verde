@@ -491,10 +491,16 @@ window.addEventListener('DOMContentLoaded', function () {
     inyectarDistancia(distKm);
   });
 
-  // 5. Listener de error de ruteo
+  // 5. Listener de error de ruteo — banner inline, no alert()
   _routingControl.on('routingerror', function (e) {
-    alert('No se pudo calcular la ruta con OSRM.\n'
-      + (e.error && e.error.message ? e.error.message : 'Verifica los nombres de las localidades.'));
+    var msg = (e.error && e.error.message) ? e.error.message : 'Sin conexión con el servidor de rutas OSRM. Intenta más tarde.';
+    var banner = document.getElementById('osrm-error-banner');
+    var bannerMsg = document.getElementById('osrm-error-msg');
+    if (banner && bannerMsg) {
+      bannerMsg.textContent = msg;
+      banner.classList.remove('hidden');
+      setTimeout(function() { banner.classList.add('hidden'); }, 8000);
+    }
     document.getElementById('btn-calcular').disabled    = false;
     document.getElementById('btn-calcular').textContent = '🧭 Calcular Ruta';
   });
