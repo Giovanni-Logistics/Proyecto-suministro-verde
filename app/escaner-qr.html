@@ -406,38 +406,34 @@ async function _procesarCargaDB(carga) {
   });
   if (e1) console.warn('[Damu] viajes insert:', e1.message);
 
-  // ② Descontar carga del punto de acopio
+  // ② Descontar carga del punto de acopio — UPDATE atómico (sin race condition)
   if (carga.punto_acopio_id) {
-    var acopioRes = await sb.from('puntos_acopio')
-      .select('carga_actual_kg')
-      .eq('id', carga.punto_acopio_id)
-      .maybeSingle();
-    if (acopioRes.data) {
-      var nuevoAcopioKg = Math.max(0, (acopioRes.data.carga_actual_kg || 0) - (carga.kgs || 0));
-      var { error: e2 } = await sb.from('puntos_acopio')
-        .update({ carga_actual_kg: nuevoAcopioKg })
-        .eq('id', carga.punto_acopio_id);
-      if (e2) console.warn('[Damu] acopio update:', e2.message);
-    }
+    var { error: e2 } = await sb.rpc('descontar_carga_acopio', {
+      p_punto_id: carga.punto_acopio_id,
+      p_kg:       carga.kgs || 0,
+    });
+    if (e2) console.warn('[Damu] acopio update:', e2.message);
   }
 
-  // ③ Sumar carga al vehículo y marcar destino (clave de categoría para el mapa)
-  var flotaRes = await sb.from('flota_vehiculos')
-    .select('id, carga_actual_kg, capacidad_kg')
+  // ③ Sumar carga al vehículo — solo se lee el id (valor estable), el UPDATE es atómico
+  var flotaIdRes = await sb.from('flota_vehiculos')
+    .select('id')
     .eq('user_id', uid)
     .eq('activo', true)
     .limit(1)
     .maybeSingle();
 
-  if (flotaRes.data) {
-    var nuevaCargaVeh = (flotaRes.data.carga_actual_kg || 0) + (carga.kgs || 0);
-    if (nuevaCargaVeh > (flotaRes.data.capacidad_kg || 99999)) {
-      _mostrarAlertaCapacidad(flotaRes.data.capacidad_kg, nuevaCargaVeh);
+  if (flotaIdRes.data) {
+    var { data: flotaUpd, error: e3 } = await sb.rpc('sumar_carga_flota', {
+      p_vehiculo_id: flotaIdRes.data.id,
+      p_kg:          carga.kgs || 0,
+      p_destino:     carga.categoria || null,
+    });
+    if (e3) {
+      console.warn('[Damu] flota update:', e3.message);
+    } else if (flotaUpd && flotaUpd[0] && flotaUpd[0].nueva_carga_kg >= flotaUpd[0].capacidad_kg) {
+      _mostrarAlertaCapacidad(flotaUpd[0].capacidad_kg, flotaUpd[0].nueva_carga_kg);
     }
-    var { error: e3 } = await sb.from('flota_vehiculos')
-      .update({ carga_actual_kg: nuevaCargaVeh, destino: carga.categoria })
-      .eq('id', flotaRes.data.id);
-    if (e3) console.warn('[Damu] flota update:', e3.message);
   }
 
   renderHistorial();
