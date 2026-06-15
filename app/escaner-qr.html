@@ -91,7 +91,13 @@
         </div>
         <div class="p-4">
           <!-- Html5QrcodeScanner renderiza aquí -->
-          <div id="reader" class="w-full"></div>
+          <div id="reader" class="w-full">
+            <!-- Placeholder mientras carga o si hay error -->
+            <div id="reader-placeholder" class="py-8 text-center text-slate-400 text-sm">
+              <div class="text-3xl mb-2">📷</div>
+              <p>Iniciando cámara…</p>
+            </div>
+          </div>
         </div>
       </div>
 
