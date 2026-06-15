@@ -1309,6 +1309,89 @@ async function generarCertCO2() {
     _certBtnLoading('btn-cert-co2', false);
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// GUARDAR / REGISTRAR PRODUCCIÓN — vincula el cálculo a la empresa
+// ═══════════════════════════════════════════════════════════════════
+async function guardarProduccion() {
+  var saved = _lastCalcResult;
+  if (!saved || !saved.tons) {
+    _setGuardarMsg('warn', '⚠️ Primero completa el cálculo con los parámetros de producción.');
+    return;
+  }
+
+  var sb  = window.__damuSupabase;
+  var btn = document.getElementById('btn-guardar');
+  var txt = document.getElementById('btn-guardar-txt');
+
+  if (!sb) { _setGuardarMsg('err', '❌ Error de conexión. Recarga la página.'); return; }
+
+  if (btn) btn.disabled = true;
+  if (txt) txt.textContent = 'Guardando…';
+
+  try {
+    var sesRes = await sb.auth.getSession();
+    if (!sesRes.data || !sesRes.data.session) {
+      _setGuardarMsg('err', '❌ Sesión no activa. Vuelve a iniciar sesión.');
+      return;
+    }
+    var uid    = sesRes.data.session.user.id;
+    var perfil = localStorage.getItem('damu_role') || 'productor';
+
+    // Resolver empresa_id según el rol
+    var empresaId = null;
+    if (perfil === 'productor') {
+      var eRes = await sb.from('empresas').select('id').eq('user_id_productor', uid).maybeSingle();
+      if (eRes.data) empresaId = eRes.data.id;
+    } else {
+      var teRes = await sb.from('transportistas_empresa')
+        .select('empresa_id')
+        .eq('user_id_transportista', uid)
+        .eq('activo', true)
+        .maybeSingle();
+      if (teRes.data) empresaId = teRes.data.empresa_id;
+    }
+
+    if (!empresaId) {
+      _setGuardarMsg('warn', perfil === 'productor'
+        ? '⚠️ Tu cuenta no tiene una empresa REP creada todavía. Contacta al administrador de la plataforma.'
+        : '⚠️ No estás vinculado a ninguna empresa. Pide el código de invitación al productor e ingrésalo en tu perfil.');
+      return;
+    }
+
+    var { error } = await sb.from('certificados_rep').insert({
+      user_id:                      uid,
+      empresa_id:                   empresaId,
+      categoria:                    saved.cat,
+      toneladas_declaradas:         saved.tons,
+      meta_valorizacion_porcentaje: saved.meta || 0,
+      riesgo_multa_estimado:        saved.multa || 0,
+    });
+
+    if (error) throw error;
+
+    _setGuardarMsg('ok', '✓ Producción registrada. Ya aparece en el Dashboard REP de tu empresa.');
+    cargarCertificados(); // refresca "Mis Certificados" para habilitar los botones PDF
+  } catch (err) {
+    console.error('[Damu] guardarProduccion:', err);
+    _setGuardarMsg('err', '❌ No se pudo guardar: ' + (err.message || 'Error desconocido'));
+  } finally {
+    if (btn) btn.disabled = false;
+    if (txt) txt.textContent = 'Guardar producción';
+  }
+}
+
+function _setGuardarMsg(tipo, texto) {
+  var el = document.getElementById('guardar-msg');
+  if (!el) return;
+  el.className = 'mt-2.5 text-xs px-3 py-2 rounded-lg border font-medium '
+    + (tipo === 'ok'   ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+     : tipo === 'warn' ? 'bg-amber-50 border-amber-200 text-amber-700'
+                       : 'bg-red-50 border-red-200 text-red-700');
+  el.textContent = texto;
+  el.classList.remove('hidden');
+  if (tipo === 'ok') setTimeout(function () { el.classList.add('hidden'); }, 7000);
+}
 </script>
 </body>
 </html>
