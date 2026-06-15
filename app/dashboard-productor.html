@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard REP — Damu SGC</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="constantes-rep.js"></script>
+  <!-- Supabase JS v2 + Auth Guard — protección de acceso -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth-guard.js"></script>
+  <style>
+    .sem-verde    { background:#dcfce7; color:#16a34a; border-color:#86efac; }
+    .sem-amarillo { background:#fef9c3; color:#ca8a04; border-color:#fde047; }
+    .sem-rojo     { background:#fee2e2; color:#dc2626; border-color:#fca5a5; }
+    .sem-gris     { background:#f1f5f9; color:#64748b; border-color:#cbd5e1; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
+
+<!-- ══ NAV privado — renderizado por auth-guard.js ══ -->
+<nav id="app-nav" class="bg-slate-900 sticky top-0 z-50 h-16 shadow-xl"></nav>
+
+<!-- ══ HERO ══════════════════════════════════════════════════════════ -->
+<header class="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 text-white py-8 px-8">
+  <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <span class="inline-block bg-white/10 border border-white/20 text-emerald-200 text-xs font-bold px-3 py-1 rounded-full mb-3">📊 Dashboard REP — Productora</span>
+      <h1 class="text-2xl md:text-3xl font-black leading-tight mb-2">Panel de Desempeño REP</h1>
+      <p class="text-slate-400 text-sm max-w-xl">Valorización real vs meta, riesgo de multa, evolución temporal y estado de la red de acopio de tu empresa.</p>
+    </div>
+    <div id="empresa-hero-badge" class="hidden bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-right">
+      <p class="text-xs text-slate-400 mb-0.5">Empresa</p>
+      <p id="empresa-hero-nombre" class="text-white font-bold text-sm">—</p>
+    </div>
+  </div>
+</header>
+
+<!-- ══ MAIN ══════════════════════════════════════════════════════════ -->
+<main class="max-w-6xl mx-auto w-full px-4 py-8 flex-1 space-y-8">
+
+  <!-- Estado vacío -->
+  <div id="empty-state" class="hidden bg-blue-50 border border-blue-200 rounded-2xl p-6 flex items-start gap-4">
+    <span class="text-3xl flex-shrink-0">ℹ️</span>
+    <div>
+      <p class="font-bold text-blue-800 text-sm mb-1">Tu empresa aún no tiene datos de valorización registrados</p>
+      <p class="text-xs text-blue-600">Vincula transportistas, registra certificados REP y comienza a escanear bultos para ver el panel completo.</p>
+      <div class="flex gap-3 mt-3 flex-wrap">
+        <a href="calculadora-rep.html" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg no-underline font-semibold transition-colors">Ir a Calculadora REP →</a>
+        <a href="simulador-ruta.html" class="text-xs bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg no-underline font-semibold transition-colors">Ver Mapa de Ruta →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── KPI GRID ─────────────────────────────────────────────────── -->
+  <div>
+    <h2 class="text-lg font-black text-slate-700 mb-4">Métricas REP de la empresa</h2>
+    <div id="kpi-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <!-- generado por JS -->
+    </div>
+  </div>
+
+  <!-- ─── SEMÁFORO POR CATEGORÍA ─────────────────────────────────── -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-slate-700 to-slate-600 px-5 py-3.5">
+      <h2 class="text-white font-bold text-sm">🚦 Semáforo de Valorización por Categoría</h2>
+      <p class="text-slate-400 text-xs mt-0.5">% valorización real vs meta declarada · Decreto 12 Ley REP</p>
+    </div>
+    <div id="semaforo-wrap" class="p-5">
+      <p class="text-slate-400 text-sm text-center py-4">Cargando...</p>
+    </div>
+  </div>
+
+  <!-- ─── GRÁFICO TEMPORAL ────────────────────────────────────────── -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-slate-700 to-slate-600 px-5 py-3.5 flex items-center justify-between">
+      <div>
+        <h2 class="text-white font-bold text-sm">📈 Evolución de Recolección REP</h2>
+        <p class="text-slate-400 text-xs mt-0.5">kg recolectados por categoría · últimas 12 semanas</p>
+      </div>
+      <div class="flex gap-1.5">
+        <button onclick="_setMode('bar')"  id="btn-bar"  class="text-xs border border-slate-500 text-slate-300 hover:text-white px-2.5 py-1 rounded-lg transition-colors">Barras</button>
+        <button onclick="_setMode('line')" id="btn-line" class="text-xs border border-slate-500 text-slate-300 hover:text-white px-2.5 py-1 rounded-lg transition-colors">Líneas</button>
+      </div>
+    </div>
+    <div class="p-5">
+      <div id="chart-empty" class="hidden py-10 text-center text-slate-400 text-sm">
+        <span class="text-3xl block mb-2">📭</span>
+        Sin viajes registrados en las últimas 12 semanas.
+      </div>
+      <canvas id="chart-temporal" class="max-h-72"></canvas>
+    </div>
+  </div>
+
+  <!-- ─── RED DE ACOPIO DE LA EMPRESA ──────────────────────────── -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-slate-700 to-slate-600 px-5 py-3.5 flex items-center justify-between">
+      <h2 class="text-white font-bold text-sm">📍 Red de Acopio de la Empresa</h2>
+      <a href="simulador-ruta.html" class="text-slate-300 hover:text-white border border-slate-600 hover:border-slate-400 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors no-underline">Ver rutas →</a>
+    </div>
+    <div id="red-wrap" class="p-5">
+      <p class="text-slate-400 text-sm text-center py-4">Cargando...</p>
+    </div>
+  </div>
+
+</main>
+
+<!-- ══ FOOTER ══════════════════════════════════════════════════════════ -->
+<footer class="bg-slate-900 text-slate-400 text-xs py-5 border-t border-slate-800 mt-auto">
+  <div class="max-w-6xl mx-auto px-6 flex flex-wrap items-center justify-between gap-3">
+    <span class="font-bold text-slate-300">Damu SGC</span>
+    <span>Plataforma de cumplimiento Ley REP · Chile</span>
+    <span class="text-slate-600">© 2025 — Todos los derechos reservados</span>
+  </div>
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// DASHBOARD PRODUCTOR — Damu SGC FASE 4
+// ═══════════════════════════════════════════════════════════════════
+
+var _chartInstance  = null;
+var _temporalRows   = [];
+var _currentMode    = 'bar';
+
+// ── Utilidades ────────────────────────────────────────────────────
+function fmtKg(n) {
+  var v = Number(n) || 0;
+  return v >= 1000
+    ? (v / 1000).toLocaleString('es-CL', { maximumFractionDigits: 1 }) + ' t'
+    : v.toLocaleString('es-CL', { maximumFractionDigits: 0 }) + ' kg';
+}
+
+function fmtPct(n) {
+  return (Number(n) || 0).toLocaleString('es-CL', { maximumFractionDigits: 1 }) + '%';
+}
+
+function fmtClp(n) {
+  return '$' + Math.round(Number(n) || 0).toLocaleString('es-CL') + ' CLP';
+}
+
+// ── Skeleton card ─────────────────────────────────────────────────
+function _skeletonCard() {
+  return '<div class="bg-white rounded-2xl border border-slate-200 p-4 animate-pulse">' +
+    '<div class="h-3 bg-slate-200 rounded w-3/4 mb-3"></div>' +
+    '<div class="h-7 bg-slate-100 rounded w-1/2"></div>' +
+    '</div>';
+}
+
+// ── Render KPI Grid ───────────────────────────────────────────────
+function _renderKPIGrid(cards) {
+  var html = '';
+  cards.forEach(function(c) {
+    html +=
+      '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-col gap-1">' +
+        '<p class="text-xs text-slate-500 font-semibold leading-tight">' + c.label + '</p>' +
+        '<p class="text-2xl font-black ' + (c.color || 'text-slate-800') + ' leading-tight">' + c.value + '</p>' +
+        (c.sub ? '<p class="text-xs text-slate-400">' + c.sub + '</p>' : '') +
+      '</div>';
+  });
+  document.getElementById('kpi-grid').innerHTML = html;
+}
+
+// ── Render Semáforo ───────────────────────────────────────────────
+function _renderSemaforo(kpiPorCat, certs) {
+  var wrap = document.getElementById('semaforo-wrap');
+  if (!wrap) return;
+
+  var rows = '';
+  var hasDatos = false;
+
+  DAMU.categorias.forEach(function(cat) {
+    var realKg  = Number((kpiPorCat[cat] || {}).total_kg) || 0;
+    var cert    = certs[cat] || null;
+    var metaKg  = cert
+      ? (Number(cert.toneladas_declaradas) * 1000 * Number(cert.meta_valorizacion_porcentaje) / 100)
+      : 0;
+    var pct     = (metaKg > 0) ? Math.min(100, realKg / metaKg * 100) : 0;
+    var semCls, semLabel;
+
+    if (!cert) {
+      semCls   = 'sem-gris';
+      semLabel = 'Sin meta';
+    } else if (pct >= 80) {
+      semCls   = 'sem-verde';
+      semLabel = 'En meta';
+      hasDatos = true;
+    } else if (pct >= 40) {
+      semCls   = 'sem-amarillo';
+      semLabel = 'En riesgo';
+      hasDatos = true;
+    } else if (realKg > 0 || cert) {
+      semCls   = 'sem-rojo';
+      semLabel = 'Crítico';
+      hasDatos = true;
+    } else {
+      semCls   = 'sem-gris';
+      semLabel = 'Sin datos';
+    }
+
+    var barW = Math.min(100, pct).toFixed(1);
+    var barClr = pct >= 80 ? '#16a34a' : pct >= 40 ? '#ca8a04' : '#dc2626';
+
+    rows +=
+      '<div class="flex items-center gap-3 py-3 border-b border-slate-100 last:border-0">' +
+        '<span class="text-xl w-7 flex-shrink-0">' + DAMU.catIcono[cat] + '</span>' +
+        '<div class="w-24 flex-shrink-0">' +
+          '<p class="text-sm font-bold text-slate-700">' + DAMU.catLabel[cat] + '</p>' +
+          '<p class="text-xs text-slate-400">' + (cert ? 'meta: ' + fmtKg(metaKg) : 'No declarada') + '</p>' +
+        '</div>' +
+        '<div class="flex-1">' +
+          '<div class="h-2 bg-slate-100 rounded-full overflow-hidden">' +
+            '<div style="width:' + barW + '%;background:' + barClr + '" class="h-full rounded-full transition-all duration-700"></div>' +
+          '</div>' +
+          '<div class="flex justify-between mt-0.5">' +
+            '<span class="text-xs text-slate-500">' + fmtKg(realKg) + ' recolectados</span>' +
+            '<span class="text-xs font-bold ' + (pct >= 80 ? 'text-emerald-600' : pct >= 40 ? 'text-yellow-600' : 'text-red-500') + '">' + fmtPct(pct) + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<span class="text-xs font-bold px-2.5 py-1 rounded-full border ' + semCls + ' flex-shrink-0">' + semLabel + '</span>' +
+      '</div>';
+  });
+
+  wrap.innerHTML = rows || '<p class="text-slate-400 text-sm text-center py-4">Sin datos de certificados REP. Ve a <a href="calculadora-rep.html" class="text-blue-600 underline">Calculadora REP</a> para declarar tu meta.</p>';
+  return hasDatos;
+}
+
+// ── Build Chart Data ──────────────────────────────────────────────
+function _buildChartDatasets(rows) {
+  var semanas = [];
+  rows.forEach(function(r) { if (semanas.indexOf(r.semana) === -1) semanas.push(r.semana); });
+  semanas.sort();
+
+  var labels = semanas.map(function(s) {
+    var d = new Date(s);
+    return d.toLocaleDateString('es-CL', { day:'2-digit', month:'short' });
+  });
+
+  var datasets = DAMU.categorias.map(function(cat) {
+    return {
+      label: DAMU.catLabel[cat],
+      data: semanas.map(function(s) {
+        var row = rows.find(function(r) { return r.semana === s && r.categoria === cat; });
+        return row ? Number(row.total_kg) || 0 : 0;
+      }),
+      backgroundColor: DAMU.catColor[cat] + 'CC',
+      borderColor:     DAMU.catColor[cat],
+      borderRadius:    3,
+      fill:            false,
+      tension:         0.35,
+      pointRadius:     3,
+    };
+  });
+
+  return { labels: labels, datasets: datasets };
+}
+
+// ── Render / Update Chart ─────────────────────────────────────────
+function _renderGrafico(rows, mode) {
+  var canvas   = document.getElementById('chart-temporal');
+  var emptyEl  = document.getElementById('chart-empty');
+  if (!canvas) return;
+
+  var totalKg = rows.reduce(function(s,r) { return s + (Number(r.total_kg)||0); }, 0);
+  if (!rows.length || totalKg === 0) {
+    canvas.classList.add('hidden');
+    if (emptyEl) emptyEl.classList.remove('hidden');
+    return;
+  }
+
+  var chartData = _buildChartDatasets(rows);
+
+  if (_chartInstance) _chartInstance.destroy();
+  _chartInstance = new Chart(canvas, {
+    type: mode || 'bar',
+    data: chartData,
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 14 } },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              return ctx.dataset.label + ': ' + ctx.parsed.y.toLocaleString('es-CL') + ' kg';
+            },
+          },
+        },
+      },
+      scales: {
+        x: { stacked: mode !== 'line', ticks: { font: { size: 10 } } },
+        y: {
+          stacked: mode !== 'line',
+          beginAtZero: true,
+          ticks: { font: { size: 10 }, callback: function(v) { return v + ' kg'; } },
+          grid: { color: 'rgba(0,0,0,0.05)' },
+        },
+      },
+    },
+  });
+}
+
+function _setMode(mode) {
+  _currentMode = mode;
+  document.getElementById('btn-bar').classList.toggle('text-emerald-400',  mode === 'bar');
+  document.getElementById('btn-line').classList.toggle('text-emerald-400', mode === 'line');
+  if (_temporalRows.length) _renderGrafico(_temporalRows, mode);
+}
+
+// ── Render Red Acopio ─────────────────────────────────────────────
+function _renderRed(acopios) {
+  var wrap = document.getElementById('red-wrap');
+  if (!wrap) return;
+
+  var criticos = acopios.filter(function(a) { return (a.carga_actual_kg / (a.capacidad_kg || 1)) >= 0.80; });
+  var medios   = acopios.filter(function(a) {
+    var p = a.carga_actual_kg / (a.capacidad_kg || 1);
+    return p >= 0.50 && p < 0.80;
+  });
+  var libres   = acopios.filter(function(a) { return (a.carga_actual_kg / (a.capacidad_kg || 1)) < 0.50; });
+
+  if (!acopios.length) {
+    wrap.innerHTML = '<p class="text-slate-400 text-sm text-center py-4 col-span-3">Sin puntos de acopio vinculados a tu empresa.</p>';
+    return;
+  }
+
+  wrap.innerHTML =
+    '<div class="grid grid-cols-1 md:grid-cols-3 gap-4">' +
+      _redCard('🔴', 'CRÍTICO', criticos, 'bg-red-50 border-red-200 text-red-700') +
+      _redCard('🟡', 'MEDIO',   medios,   'bg-yellow-50 border-yellow-200 text-yellow-700') +
+      _redCard('🟢', 'LIBRE',   libres,   'bg-emerald-50 border-emerald-200 text-emerald-700') +
+    '</div>';
+}
+
+function _redCard(icono, titulo, items, cls) {
+  var lista = items.length
+    ? items.map(function(a) {
+        var pct = ((a.carga_actual_kg / (a.capacidad_kg || 1)) * 100).toFixed(0);
+        return '<li class="text-xs leading-relaxed">' + a.nombre + ' <span class="font-bold">(' + pct + '%)</span></li>';
+      }).join('')
+    : '<li class="text-xs text-slate-400 italic">Ninguno</li>';
+
+  return '<div class="border rounded-xl p-4 ' + cls + '">' +
+    '<p class="font-black text-base mb-2">' + icono + ' ' + titulo + ' <span class="text-xs font-normal opacity-70">(' + items.length + ')</span></p>' +
+    '<ul class="space-y-0.5 list-none pl-0">' + lista + '</ul>' +
+  '</div>';
+}
+
+// ── Cargar Dashboard ──────────────────────────────────────────────
+async function cargarDashboard(sb, uid, empresaId) {
+  // Mostrar empresa en hero
+  var nombreEmpresa = localStorage.getItem('damu_empresa_nombre') || '';
+  if (nombreEmpresa) {
+    var heroNom = document.getElementById('empresa-hero-nombre');
+    var heroBadge = document.getElementById('empresa-hero-badge');
+    if (heroNom)   heroNom.textContent   = nombreEmpresa;
+    if (heroBadge) heroBadge.classList.remove('hidden');
+  }
+
+  // Skeleton KPI mientras carga
+  var gridEl = document.getElementById('kpi-grid');
+  if (gridEl) {
+    gridEl.innerHTML = Array(6).fill(null).map(_skeletonCard).join('');
+  }
+
+  try {
+    // Consultas en paralelo
+    var resultados = await Promise.all([
+      sb.rpc('fn_kpi_productor_rep',      { p_empresa_id: empresaId }),
+      sb.rpc('fn_kpi_empresa_temporal',   { p_empresa_id: empresaId, p_semanas: 12 }),
+      sb.from('certificados_rep')
+        .select('categoria, toneladas_declaradas, meta_valorizacion_porcentaje, riesgo_multa_estimado')
+        .eq('empresa_id', empresaId)
+        .order('created_at', { ascending: false }),
+      sb.from('puntos_acopio')
+        .select('id, nombre, carga_actual_kg, capacidad_kg')
+        .eq('empresa_id', empresaId)
+        .limit(50),
+    ]);
+
+    var kpiRows    = resultados[0].data || [];
+    var tempRows   = resultados[1].data || [];
+    var certRows   = resultados[2].data || [];
+    var acopios    = resultados[3].data || [];
+
+    // Índices por categoría
+    var kpiPorCat = {};
+    kpiRows.forEach(function(r) { kpiPorCat[r.categoria] = r; });
+
+    var certPorCat = {};
+    certRows.forEach(function(c) {
+      if (!certPorCat[c.categoria]) certPorCat[c.categoria] = c;
+    });
+
+    // Totales globales
+    var totalKg  = kpiRows.reduce(function(s,r) { return s + (Number(r.total_kg)  || 0); }, 0);
+    var totalKm  = kpiRows.reduce(function(s,r) { return s + (Number(r.total_km)  || 0); }, 0);
+    var totalCo2 = kpiRows.reduce(function(s,r) { return s + (Number(r.co2e_kg)   || 0); }, 0);
+    var totalVia = kpiRows.reduce(function(s,r) { return s + (Number(r.n_viajes)  || 0); }, 0);
+
+    // % valorización global (meta más restrictiva entre todas las categorías declaradas)
+    var metaKgTotal = 0;
+    certRows.forEach(function(c) {
+      metaKgTotal += Number(c.toneladas_declaradas) * 1000 * Number(c.meta_valorizacion_porcentaje) / 100;
+    });
+    var pctVal = (metaKgTotal > 0) ? Math.min(100, totalKg / metaKgTotal * 100) : null;
+
+    // Multa estimada acumulada
+    var multaTotal = certRows.reduce(function(s,c) { return s + (Number(c.riesgo_multa_estimado) || 0); }, 0);
+
+    // Vacío: sin datos de ninguna fuente
+    var hayDatos = totalKg > 0 || certRows.length > 0 || acopios.length > 0;
+    if (!hayDatos) {
+      document.getElementById('empty-state').classList.remove('hidden');
+    }
+
+    // ── KPI Grid ──────────────────────────────────────────────────
+    _renderKPIGrid([
+      {
+        label: '% Valorización real',
+        value: pctVal !== null ? fmtPct(pctVal) : 'Sin meta',
+        color: pctVal === null ? 'text-slate-400'
+             : pctVal >= 80   ? 'text-emerald-600'
+             : pctVal >= 40   ? 'text-yellow-600'
+                               : 'text-red-500',
+        sub: 'meta legal ≥ 25%',
+      },
+      {
+        label: 'Riesgo multa estimado',
+        value: multaTotal > 0 ? fmtClp(multaTotal) : 'Sin riesgo',
+        color: multaTotal > 0 ? 'text-red-600' : 'text-emerald-600',
+        sub: certRows.length + ' declaración(es)',
+      },
+      {
+        label: 'Total kg recolectados',
+        value: fmtKg(totalKg),
+        color: 'text-slate-800',
+        sub: totalVia + ' viaje(s) registrado(s)',
+      },
+      {
+        label: 'CO₂e evitado',
+        value: fmtKg(totalCo2),
+        color: 'text-emerald-700',
+        sub: (totalKm).toFixed(0) + ' km totales',
+      },
+      {
+        label: 'Puntos de acopio',
+        value: acopios.length,
+        color: 'text-blue-600',
+        sub: acopios.filter(function(a) { return (a.carga_actual_kg / (a.capacidad_kg||1)) >= 0.8; }).length + ' en estado CRÍTICO',
+      },
+      {
+        label: 'Categorías activas',
+        value: Object.keys(kpiPorCat).filter(function(k) { return DAMU.categorias.indexOf(k) !== -1; }).length + ' / 5',
+        color: 'text-slate-700',
+        sub: 'según Ley REP Chile',
+      },
+    ]);
+
+    // ── Semáforo ──────────────────────────────────────────────────
+    _renderSemaforo(kpiPorCat, certPorCat);
+
+    // ── Gráfico temporal ──────────────────────────────────────────
+    _temporalRows = tempRows;
+    _renderGrafico(tempRows, _currentMode);
+
+    // ── Red de acopio ─────────────────────────────────────────────
+    _renderRed(acopios);
+
+  } catch(err) {
+    console.error('[Damu] cargarDashboard:', err.message || err);
+    var gridEl2 = document.getElementById('kpi-grid');
+    if (gridEl2) gridEl2.innerHTML = '<p class="col-span-6 text-red-500 text-sm">Error cargando datos: ' + (err.message || err) + '</p>';
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+async function _init() {
+  var sb = window.__damuSupabase;
+  if (!sb) return;
+
+  var sesRes = await sb.auth.getSession();
+  var uid    = sesRes.data && sesRes.data.session ? sesRes.data.session.user.id : null;
+  if (!uid) return;
+
+  var empresaId = localStorage.getItem('damu_empresa_id');
+  if (!empresaId) {
+    // Intentar recuperar empresa_id desde la tabla productoras_empresa
+    var { data: empData } = await sb
+      .from('productoras_empresa')
+      .select('empresa_id')
+      .eq('user_id_productor', uid)
+      .eq('activo', true)
+      .maybeSingle();
+    if (empData) {
+      empresaId = empData.empresa_id;
+      localStorage.setItem('damu_empresa_id', empresaId);
+    }
+  }
+
+  if (!empresaId) {
+    document.getElementById('empty-state').classList.remove('hidden');
+    var gridEl = document.getElementById('kpi-grid');
+    if (gridEl) gridEl.innerHTML = '';
+    document.getElementById('semaforo-wrap').innerHTML =
+      '<p class="text-slate-400 text-sm text-center py-4">Sin empresa vinculada. Usa la <a href="calculadora-rep.html" class="text-blue-600 underline">Calculadora REP</a> para configurar tu empresa.</p>';
+    document.getElementById('red-wrap').innerHTML = '';
+    return;
+  }
+
+  cargarDashboard(sb, uid, empresaId);
+}
+_init();
+</script>
+</body>
+</html>
