@@ -273,26 +273,93 @@ var _catLabelScan = DAMU.catLabel;
 // ═══════════════════════════════════════════════════════════════════
 // INICIALIZAR ESCÁNER (DOMContentLoaded)
 // ═══════════════════════════════════════════════════════════════════
+
+// auth-guard.js pone visibility:hidden en <html> de forma síncrona hasta
+// que getSession() resuelve y monta el nav. Si DOMContentLoaded dispara
+// antes de que auth-guard.js restaure la visibilidad, Html5QrcodeScanner
+// intentaría auto-arrancar la cámara sobre un árbol invisible, y Chromium
+// ≥112 / Firefox bloquean getUserMedia() en ese estado → la cámara nunca
+// abre. Solución: arrancar el escáner DESPUÉS de que visibility sea visible,
+// usando un MutationObserver para detectar el cambio sin polling.
+function _iniciarScannerCuandoVisible() {
+  if (document.documentElement.style.visibility !== 'hidden') {
+    // auth-guard.js ya terminó antes de DOMContentLoaded (caso habitual con
+    // sesión cacheada) → arrancar directamente.
+    iniciarEscaner();
+    return;
+  }
+  var obs = new MutationObserver(function(mutations, observer) {
+    if (document.documentElement.style.visibility !== 'hidden') {
+      observer.disconnect();
+      console.log('[Damu] escaner: página visible, arrancando Html5QrcodeScanner');
+      iniciarEscaner();
+    }
+  });
+  obs.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
+  console.log('[Damu] escaner: página aún oculta (auth-guard), esperando visibilidad…');
+}
+
 window.addEventListener('DOMContentLoaded', function () {
-  iniciarEscaner();
+  _iniciarScannerCuandoVisible();
   renderHistorial();
 });
 
 function iniciarEscaner() {
-  if (html5QrcodeScanner) {
-    try { html5QrcodeScanner.clear(); } catch(e) {}
+  var readerEl = document.getElementById('reader');
+
+  // ── Guard 1: Html5QrcodeScanner debe estar definido ───────────────
+  if (typeof Html5QrcodeScanner === 'undefined') {
+    console.error('[Damu] iniciarEscaner: Html5QrcodeScanner no está definido.' +
+      ' El script https://unpkg.com/html5-qrcode no cargó. ¿Problema de red o de CDN?');
+    if (readerEl) readerEl.innerHTML =
+      '<p class="text-red-500 text-sm text-center py-6">No se pudo cargar el lector QR.' +
+      ' Verifica tu conexión y recarga la página.</p>';
+    return;
   }
-  html5QrcodeScanner = new Html5QrcodeScanner(
-    'reader',
-    {
-      fps: 10,
-      qrbox:         { width: 220, height: 220 },
-      aspectRatio:   1,
-      rememberLastUsedCamera: true,
-    },
-    false // verbose = false
-  );
-  html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+
+  // ── Guard 2: getUserMedia debe estar disponible (requiere HTTPS) ──
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    console.error('[Damu] iniciarEscaner: navigator.mediaDevices.getUserMedia no disponible.' +
+      ' Protocolo actual:', location.protocol,
+      '— getUserMedia solo funciona en HTTPS o localhost.');
+    if (readerEl) readerEl.innerHTML =
+      '<p class="text-red-500 text-sm text-center py-6">El navegador no permite cámara en este contexto.' +
+      ' Verifica que la URL use HTTPS.</p>';
+    return;
+  }
+
+  console.log('[Damu] iniciarEscaner: inicializando…');
+
+  // Limpiar instancia anterior si existe
+  if (html5QrcodeScanner) {
+    try {
+      html5QrcodeScanner.clear();
+      console.log('[Damu] iniciarEscaner: instancia anterior limpiada');
+    } catch(e) {
+      console.warn('[Damu] iniciarEscaner: error al limpiar instancia anterior:', e.message || e);
+    }
+    html5QrcodeScanner = null;
+  }
+
+  try {
+    html5QrcodeScanner = new Html5QrcodeScanner(
+      'reader',
+      {
+        fps: 10,
+        qrbox:                  { width: 220, height: 220 },
+        aspectRatio:             1,
+        rememberLastUsedCamera:  true,
+      },
+      false // verbose = false
+    );
+    html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+    console.log('[Damu] iniciarEscaner: Html5QrcodeScanner.render() OK');
+  } catch(err) {
+    console.error('[Damu] iniciarEscaner: error al inicializar o renderizar el escáner:', err);
+    if (readerEl) readerEl.innerHTML =
+      '<p class="text-red-500 text-sm text-center py-6">Error al iniciar la cámara: ' +
+      (err.message || err) + '</p>';
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
