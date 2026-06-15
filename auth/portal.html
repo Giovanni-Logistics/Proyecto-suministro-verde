@@ -219,34 +219,45 @@ window.addEventListener('DOMContentLoaded', function () {
     if (e.key === 'Enter') handleSubmit();
   });
 
-  // ── Restaurar rol guardado de sesión anterior
-  var roleGuardado = localStorage.getItem('damu_role') || localStorage.getItem('damu_perfil');
-  selectRole(roleGuardado || 'productor');
+  // ── Siempre mostrar formulario limpio (sin pre-selección de rol anterior)
+  // El rol correcto lo determina checkSession() desde la tabla perfiles
+  selectRole('productor'); // default visual neutro
 
-  // ── Verificar sesión activa → redirigir automáticamente
+  // ── Verificar sesión activa → redirigir según perfiles reales en DB
   checkSession();
 });
 
 // ─────────────────────────────────────────────────────────────────
 async function checkSession() {
-  // ?action=login indica intención explícita de mostrar el formulario (cambio de rol, logout, etc.)
+  // ?action=login indica intención explícita de mostrar el formulario → nunca auto-redirigir
   if (new URLSearchParams(window.location.search).get('action') === 'login') return;
   try {
-    // getUser() valida el JWT contra el servidor, a diferencia de getSession() que solo
-    // lee el localStorage. Esto detecta tokens revocados o expirados y evita el loop:
-    //   portal → redirect con token stale → app (falla) → vuelve a portal → btn disabled → loop
     var res = await supabase.auth.getUser();
     if (res.error || !res.data || !res.data.user) return;
+    var uid = res.data.user.id;
 
-    var meta = res.data.user.user_metadata || {};
-    var role = localStorage.getItem('damu_role')
-            || localStorage.getItem('damu_perfil')
-            || meta.role
-            || 'productor';
+    // Consultar rol real desde perfiles (NO localStorage — puede estar desactualizado)
+    var rolesRes = await supabase
+      .from('perfiles').select('rol').eq('user_id', uid).eq('activo', true);
+    var roles = (rolesRes.data || []).map(function(r) { return r.rol; });
 
-    setMsg('ok', '✓ Sesión activa. Redirigiendo...');
-    document.getElementById('btn-submit').disabled = true;
-    setTimeout(function () { redirigir(role); }, 900);
+    if (roles.length === 0) {
+      // Sin perfiles — mostrar formulario para que el usuario elija rol y se loguee
+      return;
+    }
+
+    if (roles.length === 1) {
+      // Un solo rol: redirigir directo
+      var role = roles[0];
+      localStorage.setItem('damu_role', role);
+      setMsg('ok', '✓ Sesión activa. Redirigiendo...');
+      document.getElementById('btn-submit').disabled = true;
+      setTimeout(function () { redirigir(role); }, 900);
+    } else {
+      // Múltiples roles: mostrar selector
+      setMsg('ok', '✓ Sesión activa. Selecciona con qué módulo deseas ingresar.');
+      _mostrarSelectorRol(res.data.user);
+    }
 
   } catch (e) { /* sin sesión o error de red → mostrar formulario */ }
 }
