@@ -410,6 +410,7 @@ async function _procesarCargaDB(carga) {
     distancia_km: 0,
     costo_diesel: 0,
     cargas_qr_kg: carga.kgs || 0,
+    categoria:    carga.categoria || null,
   });
   if (e1) console.warn('[Damu] viajes insert:', e1.message);
 
