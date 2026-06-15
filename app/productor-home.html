@@ -670,8 +670,8 @@ async function guardarRuta() {
         .upsert({ nombre: sesRes.data.session.user.email || uid, user_id_productor: uid },
                 { onConflict: 'user_id_productor', ignoreDuplicates: false })
         .select('id').single();
-      console.log('[empresa-upsert]', empR);
-      if (empR.data) { empresaId = empR.data.id; localStorage.setItem('damu_empresa_id', empR.data.id); }
+      if (empR.error) console.warn('[empresa-upsert error]', empR.error.message);
+      else if (empR.data) { empresaId = empR.data.id; localStorage.setItem('damu_empresa_id', empR.data.id); }
     }
     var origen  = (document.getElementById('map-origin').value || '').trim() || null;
     var destino = (document.getElementById('map-dest').value   || '').trim() || null;
@@ -1168,8 +1168,8 @@ async function guardarProduccion() {
         .upsert({ nombre: sesRes.data.session.user.email || uid, user_id_productor: uid },
                 { onConflict: 'user_id_productor', ignoreDuplicates: false })
         .select('id').single();
-      console.log('[empresa-upsert]', empR);
-      if (empR.data) { empresaId = empR.data.id; localStorage.setItem('damu_empresa_id', empR.data.id); }
+      if (empR.error) console.warn('[empresa-upsert error]', empR.error.message);
+      else if (empR.data) { empresaId = empR.data.id; localStorage.setItem('damu_empresa_id', empR.data.id); }
     }
     if (!empresaId) { _setGuardarMsg('warn', '⚠️ Tu cuenta no tiene empresa REP creada todavía.'); return; }
     var { error } = await sb.from('produccion_rep').insert({
