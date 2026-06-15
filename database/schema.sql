@@ -582,3 +582,81 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
     AND created_at >= NOW() - (p_semanas||' weeks')::interval
   GROUP BY semana ORDER BY semana DESC;
 $$;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- FASE: Funciones atómicas para evitar race conditions
+-- Reemplazan el patrón "SELECT valor → calcular → UPDATE" en el frontend.
+-- Ambas funciones usan SECURITY DEFINER para ejecutar el UPDATE como superusuario
+-- pero validan explícitamente la identidad del caller mediante auth.uid().
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- ── 30. descontar_carga_acopio ────────────────────────────────────────────
+-- Descuenta p_kg de carga_actual_kg del punto de acopio en una sola operación
+-- atómica. Equivale a GREATEST(0, carga_actual_kg - p_kg).
+-- Requiere que el caller esté vinculado a la empresa del punto (o que el punto
+-- sea de la red compartida sin empresa_id), replicando la lógica de
+-- "acopio_update_linked_or_shared".
+-- Devuelve: nueva_carga_kg (valor tras el descuento).
+CREATE OR REPLACE FUNCTION public.descontar_carga_acopio(
+  p_punto_id uuid,
+  p_kg       numeric
+)
+RETURNS TABLE(nueva_carga_kg numeric)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  -- Verificar autorización: punto sin empresa (red global) o empresa vinculada al caller
+  IF NOT EXISTS (
+    SELECT 1 FROM public.puntos_acopio
+    WHERE id = p_punto_id
+      AND (
+        empresa_id IS NULL
+        OR empresa_id IN (
+          SELECT empresa_id FROM public.transportistas_empresa
+          WHERE user_id_transportista = auth.uid() AND activo = true
+        )
+      )
+  ) THEN
+    RAISE EXCEPTION 'No autorizado para modificar el punto de acopio %', p_punto_id;
+  END IF;
+
+  RETURN QUERY
+    UPDATE public.puntos_acopio
+       SET carga_actual_kg = GREATEST(0, carga_actual_kg - p_kg)
+     WHERE id = p_punto_id
+  RETURNING carga_actual_kg AS nueva_carga_kg;
+END;
+$$;
+
+-- ── 31. sumar_carga_flota ─────────────────────────────────────────────────
+-- Suma p_kg a carga_actual_kg del vehículo, capeando en capacidad_kg (LEAST).
+-- Opcionalmente actualiza el campo destino (categoría REP del último escaneo).
+-- Verifica que el vehículo pertenezca al caller (user_id = auth.uid()).
+-- Devuelve: nueva_carga_kg (tras la suma), capacidad_kg (para que el frontend
+-- pueda evaluar alerta de sobrecapacidad sin un SELECT adicional).
+CREATE OR REPLACE FUNCTION public.sumar_carga_flota(
+  p_vehiculo_id uuid,
+  p_kg          numeric,
+  p_destino     text DEFAULT NULL
+)
+RETURNS TABLE(nueva_carga_kg numeric, capacidad_kg numeric)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  -- Verificar que el vehículo pertenece al caller
+  IF NOT EXISTS (
+    SELECT 1 FROM public.flota_vehiculos
+    WHERE id = p_vehiculo_id AND user_id = auth.uid()
+  ) THEN
+    RAISE EXCEPTION 'No autorizado para modificar el vehículo %', p_vehiculo_id;
+  END IF;
+
+  RETURN QUERY
+    UPDATE public.flota_vehiculos
+       SET carga_actual_kg = LEAST(f.capacidad_kg, f.carga_actual_kg + p_kg),
+           destino         = COALESCE(p_destino, f.destino)
+      FROM public.flota_vehiculos AS f
+     WHERE public.flota_vehiculos.id = p_vehiculo_id
+       AND f.id = p_vehiculo_id
+  RETURNING public.flota_vehiculos.carga_actual_kg AS nueva_carga_kg,
+            public.flota_vehiculos.capacidad_kg;
+END;
+$$;
