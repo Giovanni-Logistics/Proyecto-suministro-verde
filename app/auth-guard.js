@@ -142,8 +142,8 @@
     // ── Nav final según perfil ────────────────────────────────────
     var enlaces = '';
     if (perfil === 'productor') {
-      // Productora: Calculadora REP + dropdown Herramientas (Mapa de Ruta)
-      enlaces = enlace('calculadora-rep.html', '🧾', 'Calculadora REP') + dropdown;
+      // Productora: Calculadora REP + Dashboard REP + dropdown Herramientas
+      enlaces = enlace('calculadora-rep.html', '🧾', 'Calculadora REP') + enlace('dashboard-productor.html', '📊', 'Dashboard REP') + dropdown;
     } else {
       // Transportista: Dashboard KPI + dropdown Herramientas (Mapa de Ruta + Escanear QR)
       enlaces = enlace('dashboard-kpi.html', '📊', 'Dashboard KPI') + dropdown;
