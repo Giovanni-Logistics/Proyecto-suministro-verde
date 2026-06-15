@@ -1231,6 +1231,351 @@ async function optimizarRecoleccion() {
     });
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FASE 3 — RUTAS SUGERIDAS
+// Asignación greedy vehículo → acopios prioritarios → centro de valorización
+// ═══════════════════════════════════════════════════════════════════════════
+
+var RENDIM_DEFAULT          = 12;    // km/L — rendimiento flota por defecto
+var DIESEL_DEFAULT          = 1200;  // CLP/L
+var CO2_KG_PER_LIT          = 2.68;  // kg CO₂e por litro de diésel quemado
+var MAX_PARADAS_VEH         = 4;     // máximo de paradas por vehículo en una asignación
+var RUTA_COLORS             = ['#2980b9', '#8e44ad', '#16a085', '#d35400', '#2c3e50'];
+
+var _asignacionesSugeridas  = [];
+var _distMatrixCache         = {};   // caché de sesión: clave hash coords → matriz
+var _rutaSugeridaLayerGroup  = null; // L.layerGroup para polilíneas sugeridas
+
+// ── 1. ORQUESTADOR ──────────────────────────────────────────────────────────
+async function calcularRutasSugeridas() {
+  var wrap = document.getElementById('rutas-sugeridas-wrap');
+  var btn  = document.getElementById('btn-calcular-rutas');
+  if (!wrap) return;
+
+  if (btn) { btn.textContent = '⟳ Calculando…'; btn.disabled = true; }
+  wrap.innerHTML = '<p class="text-slate-400 text-sm text-center py-4 flex items-center justify-center gap-2">'
+    + '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>'
+    + ' Consultando OSRM y calculando asignaciones…</p>';
+
+  try {
+    // Vehículos: con posición GPS y capacidad disponible > 0
+    var vehiculos = _flotaData.filter(function(v) {
+      return v.activo !== false && v.lat && v.lng
+        && ((v.capacidad_kg || 0) - (v.carga_actual_kg || 0)) > 0;
+    });
+
+    // Acopios prioritarios: CRÍTICO (>80%) o MEDIO (>50%), con carga real y coordenadas
+    var acopiosPrio = _acopiosData.filter(function(p) {
+      return _pctLlenado(p) >= 50 && p.lat && p.lng && p.carga_actual_kg > 0;
+    }).sort(function(a, b) { return _pctLlenado(b) - _pctLlenado(a); });
+
+    if (vehiculos.length === 0) {
+      wrap.innerHTML = '<p class="text-slate-400 text-sm text-center py-6">'
+        + 'Sin vehículos con posición GPS y capacidad disponible registrados.</p>';
+      return;
+    }
+    if (acopiosPrio.length === 0) {
+      wrap.innerHTML = '<p class="text-emerald-600 text-sm text-center py-6 font-semibold">'
+        + '✅ Sin puntos críticos ni medios pendientes — la red está en buen estado.</p>';
+      return;
+    }
+
+    // Posiciones para la matriz OSRM:
+    //   índices 0..V-1 = vehículos | índices V..V+P-1 = acopios
+    var nV           = vehiculos.length;
+    var allPositions = vehiculos.map(function(v) { return { lat: v.lat, lng: v.lng }; })
+      .concat(acopiosPrio.map(function(p) { return { lat: p.lat, lng: p.lng }; }));
+
+    // Caché de sesión por hash de coordenadas — evita múltiples llamadas OSRM
+    var cacheKey = allPositions.map(function(p) {
+      return p.lat.toFixed(4) + ',' + p.lng.toFixed(4);
+    }).join('|');
+
+    var distMatrix = _distMatrixCache[cacheKey]
+      ? _distMatrixCache[cacheKey]
+      : await _fetchOsrmTable(allPositions);
+    _distMatrixCache[cacheKey] = distMatrix;
+
+    var asignaciones = _buildAsignaciones(vehiculos, acopiosPrio, nV, distMatrix);
+    _asignacionesSugeridas = asignaciones;
+
+    _renderRutasSugeridas(asignaciones, acopiosPrio);
+    _trazarRutasSugeridas(asignaciones);
+
+  } catch(err) {
+    console.error('[Damu] calcularRutasSugeridas:', err);
+    wrap.innerHTML = '<p class="text-red-400 text-sm text-center py-4">⚠ Error al calcular rutas: '
+      + (err.message || err) + '</p>';
+  } finally {
+    if (btn) { btn.textContent = '⟳ Recalcular'; btn.disabled = false; }
+  }
+}
+
+// ── 2. OSRM TABLE SERVICE ────────────────────────────────────────────────────
+// Devuelve matriz de distancias en metros (NxN).
+// Usa annotations=duration,distance; si 'distances' no viene, estima
+// desde durations con velocidad promedio urbana de 50 km/h (13.89 m/s).
+// Límite práctico del servidor demo: ~100 pares — seguro para MVP.
+async function _fetchOsrmTable(positions) {
+  var coords = positions.map(function(p) {
+    return p.lng.toFixed(6) + ',' + p.lat.toFixed(6);
+  }).join(';');
+
+  var url = 'https://router.project-osrm.org/table/v1/driving/'
+    + coords + '?annotations=duration,distance';
+
+  var res  = await fetch(url);
+  var data = await res.json();
+  if (data.code !== 'Ok') throw new Error('OSRM table: ' + data.code);
+
+  if (data.distances) return data.distances;
+
+  // Fallback: estimar distancia desde duración (50 km/h promedio)
+  return (data.durations || []).map(function(row) {
+    return row.map(function(sec) {
+      return sec == null ? null : Math.round(sec * 13.89);
+    });
+  });
+}
+
+// ── 3. ALGORITMO GREEDY NEAREST-NEIGHBOR ─────────────────────────────────────
+//
+// Pasos:
+//   a) Ordenar vehículos por capacidad disponible DESC (mayor cap. primero).
+//   b) Para cada vehículo:
+//      b1. Desde la posición actual (vehículo al inicio, último acopio asignado
+//          después), buscar el candidato NO asignado MÁS CERCANO que quepa en
+//          la capacidad restante. Preferir CRÍTICO (>=80%) sobre MEDIO.
+//      b2. Asignar, restar capacidad, actualizar posición actual en la matriz.
+//      b3. Repetir hasta: sin candidatos, sin capacidad, o MAX_PARADAS_VEH.
+//   c) Calcular métricas (km, CLP, CO₂e) para cada asignación.
+//
+// Complejidad: O(V × P²) — adecuado para MVP con V, P < 20.
+function _buildAsignaciones(vehiculos, acopiosPrio, nV, distMatrix) {
+  var asignaciones = [];
+  var asignados    = {};  // {id: true} — acopios ya tomados por algún vehículo
+
+  var vehs = vehiculos.slice().sort(function(a, b) {
+    return ((b.capacidad_kg || 0) - (b.carga_actual_kg || 0))
+         - ((a.capacidad_kg || 0) - (a.carga_actual_kg || 0));
+  });
+
+  vehs.forEach(function(veh) {
+    var idxVeh    = vehiculos.indexOf(veh);
+    var capDisp   = (veh.capacidad_kg || 0) - (veh.carga_actual_kg || 0);
+    var paradas   = [];
+    var idxActual = idxVeh;
+
+    for (var iter = 0; iter < MAX_PARADAS_VEH; iter++) {
+      var candidatos = acopiosPrio.filter(function(p) {
+        return !asignados[p.id] && p.carga_actual_kg <= capDisp;
+      });
+      if (candidatos.length === 0) break;
+
+      // Preferir críticos; si no hay, usar medios
+      var pool = candidatos.filter(function(p) { return _pctLlenado(p) >= 80; });
+      if (pool.length === 0) pool = candidatos;
+
+      // Punto más cercano al idxActual según la matriz
+      var mejor = null, mejorDist = Infinity;
+      pool.forEach(function(p) {
+        var pi   = nV + acopiosPrio.indexOf(p);
+        var dist = distMatrix[idxActual] ? (distMatrix[idxActual][pi] || Infinity) : Infinity;
+        if (dist < mejorDist) { mejorDist = dist; mejor = { punto: p, idxEnMatriz: pi, distDesdeAnterior: dist }; }
+      });
+
+      if (!mejor || mejorDist === Infinity) break;
+
+      paradas.push(mejor);
+      asignados[mejor.punto.id] = true;
+      capDisp   -= mejor.punto.carga_actual_kg;
+      idxActual  = mejor.idxEnMatriz;
+    }
+
+    if (paradas.length === 0) return;
+
+    var distTotalM = paradas.reduce(function(s, p) { return s + (p.distDesdeAnterior || 0); }, 0);
+    var rendim     = parseFloat((document.getElementById('v-rendim') || {}).value) || RENDIM_DEFAULT;
+    var diesel     = parseFloat((document.getElementById('v-diesel') || {}).value) || DIESEL_DEFAULT;
+    var distKm     = distTotalM / 1000;
+    var litros     = distKm / (rendim || 1);
+
+    var catPrincipal = paradas[0].punto.categoria;
+
+    asignaciones.push({
+      vehiculo:     veh,
+      paradas:      paradas,
+      catPrincipal: catPrincipal,
+      centro:       _centros[catPrincipal] || _centros.envases,
+      distKm:       parseFloat(distKm.toFixed(1)),
+      costoClp:     Math.round(litros * diesel),
+      co2Kg:        parseFloat((litros * CO2_KG_PER_LIT).toFixed(2)),
+      cargaTotalKg: paradas.reduce(function(s, p) { return s + p.punto.carga_actual_kg; }, 0),
+    });
+  });
+
+  return asignaciones;
+}
+
+// ── 4. RENDER HTML DE ASIGNACIONES ───────────────────────────────────────────
+function _renderRutasSugeridas(asignaciones, acopiosPrio) {
+  var wrap = document.getElementById('rutas-sugeridas-wrap');
+  if (!wrap) return;
+
+  if (asignaciones.length === 0) {
+    wrap.innerHTML = '<p class="text-slate-400 text-sm text-center py-6">'
+      + 'No fue posible asignar vehículos. Verifica posición GPS y capacidad disponible de la flota.</p>';
+    return;
+  }
+
+  // Acopios críticos que quedaron sin asignación
+  var asignadosIds = {};
+  asignaciones.forEach(function(a) { a.paradas.forEach(function(p) { asignadosIds[p.punto.id] = true; }); });
+  var sinAsignar = acopiosPrio.filter(function(p) { return !asignadosIds[p.id] && _pctLlenado(p) >= 80; });
+
+  var bannerHtml = sinAsignar.length > 0
+    ? '<div class="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-xs text-red-700 font-semibold">'
+      + '⚠ ' + sinAsignar.length + ' punto(s) CRÍTICO(S) sin vehículo asignado: '
+      + sinAsignar.map(function(p) { return p.nombre.split('—')[0].trim(); }).join(', ')
+      + '. Descarga vehículos llenos o amplía la flota.</div>'
+    : '';
+
+  var cards = asignaciones.map(function(a, ai) {
+    var capDisp    = (a.vehiculo.capacidad_kg || 0) - (a.vehiculo.carga_actual_kg || 0);
+    var paradaHtml = '';
+
+    a.paradas.forEach(function(p, si) {
+      var pct      = _pctLlenado(p.punto);
+      var numCls   = pct >= 80 ? 'bg-red-500 text-white' : 'bg-amber-400 text-white';
+      var badgeCls = pct >= 80 ? 'bg-red-100 text-red-700 border-red-200' : 'bg-amber-100 text-amber-700 border-amber-200';
+      var distLbl  = p.distDesdeAnterior > 0 ? (p.distDesdeAnterior / 1000).toFixed(1) + ' km' : '< 0.1 km';
+
+      if (si > 0) paradaHtml += '<div class="pl-3 text-xs text-slate-300 leading-relaxed">↓ ' + distLbl + '</div>';
+      paradaHtml += '<div class="flex items-start gap-2.5">'
+        + '<div class="flex-shrink-0 w-5 h-5 rounded-full ' + numCls + ' text-xs font-bold flex items-center justify-center mt-0.5">' + (si + 1) + '</div>'
+        + '<div class="flex-1 min-w-0">'
+        + '<div class="flex items-center gap-1.5 flex-wrap">'
+        + '<p class="text-sm font-semibold text-slate-800 truncate">' + p.punto.nombre + '</p>'
+        + '<span class="text-xs font-bold px-1.5 py-0.5 rounded-full border flex-shrink-0 ' + badgeCls + '">' + _estadoLabel(pct) + '</span>'
+        + '</div>'
+        + '<p class="text-xs text-slate-400">' + p.punto.carga_actual_kg.toFixed(0) + ' kg a retirar'
+        + (si === 0 ? ' · ' + distLbl + ' desde vehículo' : '') + '</p>'
+        + '</div></div>';
+    });
+
+    paradaHtml += '<div class="pl-3 text-xs text-slate-300 leading-relaxed">↓ centro de valorización</div>'
+      + '<div class="flex items-start gap-2.5">'
+      + '<div class="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center mt-0.5 text-xs">🏭</div>'
+      + '<div><p class="text-sm font-semibold text-slate-800">' + a.centro.nombre + '</p>'
+      + '<p class="text-xs text-slate-400">Centro de valorización REP</p></div></div>';
+
+    var comparHtml = (a.vehiculo.destino && _centros[a.vehiculo.destino])
+      ? '<span class="ml-auto text-emerald-600 font-semibold text-xs">✅ Ruta optimizada activa</span>'
+      : '';
+
+    return '<div id="ruta-card-' + ai + '" class="border border-slate-200 rounded-xl overflow-hidden mb-3 last:mb-0">'
+      + '<div class="bg-slate-50 px-4 py-3 flex items-center justify-between border-b border-slate-200">'
+      + '<div class="flex items-center gap-2 min-w-0 flex-1">'
+      + '<span class="text-base flex-shrink-0">🚛</span>'
+      + '<div class="min-w-0"><p class="font-bold text-sm text-slate-800">' + a.vehiculo.patente + '</p>'
+      + '<p class="text-xs text-slate-400">Cap. disp: ' + capDisp.toLocaleString('es-CL') + ' kg · '
+      + a.cargaTotalKg.toFixed(0) + ' kg a cargar</p></div></div>'
+      + '<button onclick="aplicarRutaSugerida(' + ai + ')" '
+      + 'class="flex-shrink-0 ml-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors">'
+      + 'Aplicar →</button></div>'
+      + '<div class="px-4 py-3 space-y-1.5">' + paradaHtml + '</div>'
+      + '<div class="px-4 py-2.5 border-t border-slate-100 bg-slate-50/50 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">'
+      + '<span>📏 ' + a.distKm + ' km</span>'
+      + '<span>💰 $' + a.costoClp.toLocaleString('es-CL') + ' CLP</span>'
+      + '<span>🌿 ' + a.co2Kg + ' kg CO₂e</span>'
+      + comparHtml + '</div></div>';
+  }).join('');
+
+  wrap.innerHTML = bannerHtml + cards;
+}
+
+// ── 5. TRAZAR POLILÍNEAS DE RUTAS SUGERIDAS EN EL MAPA ───────────────────────
+// Línea punteada de color (azul/morada/verde oscuro) por ruta.
+// Distinta a la ruta "activa" del routing control OSRM (verde sólida).
+function _trazarRutasSugeridas(asignaciones) {
+  if (!_map) return;
+
+  if (_rutaSugeridaLayerGroup) {
+    _rutaSugeridaLayerGroup.clearLayers();
+  } else {
+    _rutaSugeridaLayerGroup = L.layerGroup().addTo(_map);
+  }
+
+  asignaciones.forEach(function(a, ai) {
+    var color  = RUTA_COLORS[ai % RUTA_COLORS.length];
+    var puntos = [[a.vehiculo.lat, a.vehiculo.lng]]
+      .concat(a.paradas.map(function(p) { return [p.punto.lat, p.punto.lng]; }))
+      .concat([[a.centro.lat, a.centro.lng]]);
+
+    L.polyline(puntos, { color: color, weight: 3, opacity: 0.75, dashArray: '6 8' })
+      .addTo(_rutaSugeridaLayerGroup);
+
+    // Número de asignación sobre el vehículo
+    L.marker([a.vehiculo.lat, a.vehiculo.lng], {
+      icon: L.divIcon({
+        className: '',
+        html: '<div style="background:' + color + ';color:#fff;border-radius:50%;width:20px;height:20px;'
+          + 'display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;'
+          + 'border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)">' + (ai + 1) + '</div>',
+        iconSize: [20, 20], iconAnchor: [10, 10],
+      }),
+      zIndexOffset: 500,
+    }).addTo(_rutaSugeridaLayerGroup);
+  });
+}
+
+// ── 6. APLICAR RUTA SUGERIDA ─────────────────────────────────────────────────
+// · Actualiza flota_vehiculos.destino en Supabase (clave de categoría, como FASE 2).
+// · Traza la ruta multi-parada completa en el routing control OSRM (ruta activa).
+// · Hace scroll al mapa y marca el botón como aplicado.
+async function aplicarRutaSugerida(ai) {
+  var a = _asignacionesSugeridas[ai];
+  if (!a) return;
+
+  var sb = window.__damuSupabase;
+  if (!sb) { alert('Sin conexión a la base de datos.'); return; }
+  var sesion = await sb.auth.getSession();
+  if (!sesion.data || !sesion.data.session) { alert('Sesión no activa.'); return; }
+
+  var { error } = await sb.from('flota_vehiculos')
+    .update({ destino: a.catPrincipal })
+    .eq('id', a.vehiculo.id);
+
+  if (error) { alert('Error al guardar la ruta: ' + error.message); return; }
+
+  // Trazar ruta completa multi-parada en el routing control (verde sólida = ruta activa)
+  var waypoints = [L.Routing.waypoint(L.latLng(a.vehiculo.lat, a.vehiculo.lng), '🚛 ' + a.vehiculo.patente)]
+    .concat(a.paradas.map(function(p) {
+      return L.Routing.waypoint(L.latLng(p.punto.lat, p.punto.lng), p.punto.nombre);
+    }))
+    .concat([L.Routing.waypoint(L.latLng(a.centro.lat, a.centro.lng), a.centro.nombre)]);
+
+  _routingControl.setWaypoints(waypoints);
+  _autoRouted = true;
+
+  var destEl = document.getElementById('map-dest');
+  if (destEl) destEl.value = a.centro.nombre;
+
+  var mapaEl = document.getElementById('mapa-controles');
+  if (mapaEl) window.scrollTo({ top: mapaEl.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' });
+
+  var card = document.getElementById('ruta-card-' + ai);
+  if (card) {
+    var btnCard = card.querySelector('button');
+    if (btnCard) {
+      btnCard.textContent = '✅ Aplicada';
+      btnCard.disabled    = true;
+      btnCard.className   = btnCard.className
+        .replace('bg-emerald-600 hover:bg-emerald-500', 'bg-slate-300 cursor-not-allowed');
+    }
+  }
+}
 </script>
 
 </body>
