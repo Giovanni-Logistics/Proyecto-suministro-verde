@@ -1234,9 +1234,9 @@ async function optimizarRecoleccion() {
 // Asignación greedy vehículo → acopios prioritarios → centro de valorización
 // ═══════════════════════════════════════════════════════════════════════════
 
-var RENDIM_DEFAULT          = 12;    // km/L — rendimiento flota por defecto
-var DIESEL_DEFAULT          = 1200;  // CLP/L
-var CO2_KG_PER_LIT          = 2.68;  // kg CO₂e por litro de diésel quemado
+var RENDIM_DEFAULT          = DAMU.rendimDefault;   // centralizado en constantes-rep.js
+var DIESEL_DEFAULT          = DAMU.dieselDefault;
+var CO2_KG_PER_LIT          = DAMU.co2PorLitro;
 var MAX_PARADAS_VEH         = 4;     // máximo de paradas por vehículo en una asignación
 var RUTA_COLORS             = ['#2980b9', '#8e44ad', '#16a085', '#d35400', '#2c3e50'];
 
