@@ -59,7 +59,7 @@
 <main class="max-w-5xl mx-auto w-full px-4 py-8 flex-1">
 
 <!-- ═══════════════════════════════════ TAB RUTAS ════════════════════════════════════ -->
-<div id="tab-rutas" class="tab-content space-y-8">
+<div id="tab-rutas" class="tab-content active space-y-8">
 
   <!-- Banner OSRM error -->
   <div id="osrm-error-banner" class="hidden bg-orange-50 border border-orange-200 rounded-2xl px-5 py-3 flex items-center gap-3 -mb-2">
@@ -552,6 +552,10 @@ window.addEventListener('DOMContentLoaded', function () {
   });
 
   cargarMapaOperativo();
+
+  // auth-guard oculta <html> hasta que resuelve sesión; invalidateSize
+  // asegura que Leaflet recalcule el contenedor luego de hacerse visible.
+  setTimeout(function() { if (_map) _map.invalidateSize(); }, 350);
 });
 
 // ═══════════════════════════ GEOCODING / ROUTING ═══════════════════════════
