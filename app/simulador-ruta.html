@@ -84,6 +84,13 @@
 <!-- ══════════════════════════════ MAIN ══════════════════════════════ -->
 <main class="max-w-5xl mx-auto w-full px-4 py-8 flex-1 space-y-8">
 
+  <!-- ── Banner error OSRM (auto-oculta a los 8s) ──────────────────── -->
+  <div id="osrm-error-banner" class="hidden bg-orange-50 border border-orange-200 rounded-2xl px-5 py-3 flex items-center gap-3 -mb-2">
+    <span class="text-orange-500 text-base flex-shrink-0">⚠️</span>
+    <p class="text-orange-700 text-sm font-semibold flex-1"><span id="osrm-error-msg"></span> — Las rutas sugeridas usarán estimación de distancia lineal.</p>
+    <button onclick="this.closest('#osrm-error-banner').classList.add('hidden')" class="text-orange-400 hover:text-orange-600 text-lg leading-none flex-shrink-0">×</button>
+  </div>
+
   <!-- ── Barra de alerta: acopios críticos (oculta hasta cargar datos) ── -->
   <div id="alert-crit" class="hidden bg-red-50 border border-red-200 rounded-2xl px-5 py-3 flex flex-wrap items-center gap-3 -mb-2">
     <span class="text-red-500 text-base flex-shrink-0">🚨</span>
