@@ -774,6 +774,107 @@ async function cargarEstadoRed() {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// EVOLUCIÓN TEMPORAL DEL TRANSPORTISTA — Chart.js líneas duales
+// ═══════════════════════════════════════════════════════════════════
+var _chartTMSInstance = null;
+
+async function cargarGraficoTemporal(sb, uid) {
+  if (!sb || !uid) return;
+  try {
+    var res = await sb.rpc('fn_kpi_transportista_temporal', { p_user_id: uid, p_semanas: 12 });
+    var rows = (res.data || []).slice().reverse(); // orden cronológico asc
+
+    var canvasEl  = document.getElementById('chart-tms-temporal');
+    var emptyEl   = document.getElementById('tms-chart-empty');
+    var eficBadge = document.getElementById('efic-badge');
+    var eficVal   = document.getElementById('efic-val');
+    if (!canvasEl) return;
+
+    if (!rows.length) {
+      canvasEl.classList.add('hidden');
+      if (emptyEl) emptyEl.classList.remove('hidden');
+      return;
+    }
+
+    var labels = rows.map(function(r) {
+      var d = new Date(r.semana);
+      return d.toLocaleDateString('es-CL', { day:'2-digit', month:'short' });
+    });
+    var kgData = rows.map(function(r) { return Number(r.total_kg) || 0; });
+    var kmData = rows.map(function(r) { return Number(r.total_km) || 0; });
+
+    // Eficiencia acumulada
+    var totalKg = kgData.reduce(function(a,b) { return a+b; }, 0);
+    var totalKm = kmData.reduce(function(a,b) { return a+b; }, 0);
+    if (totalKm > 0 && eficBadge && eficVal) {
+      eficVal.textContent = (totalKg / totalKm).toFixed(1) + ' kg/km';
+      eficBadge.classList.remove('hidden');
+    }
+
+    if (_chartTMSInstance) _chartTMSInstance.destroy();
+    _chartTMSInstance = new Chart(canvasEl, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'kg recolectados',
+            data: kgData,
+            borderColor: '#059669',
+            backgroundColor: 'rgba(5,150,105,0.08)',
+            fill: true,
+            tension: 0.35,
+            pointRadius: 4,
+            yAxisID: 'yKg',
+          },
+          {
+            label: 'km recorridos',
+            data: kmData,
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37,99,235,0.06)',
+            fill: true,
+            tension: 0.35,
+            pointRadius: 4,
+            borderDash: [5, 4],
+            yAxisID: 'yKm',
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 14 } },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                var u = ctx.datasetIndex === 0 ? ' kg' : ' km';
+                return ctx.dataset.label + ': ' + ctx.parsed.y.toLocaleString('es-CL') + u;
+              },
+            },
+          },
+        },
+        scales: {
+          yKg: {
+            type: 'linear', position: 'left', beginAtZero: true,
+            ticks: { font: { size: 10 }, callback: function(v) { return v + ' kg'; } },
+            grid: { color: 'rgba(0,0,0,0.05)' },
+          },
+          yKm: {
+            type: 'linear', position: 'right', beginAtZero: true,
+            ticks: { font: { size: 10 }, callback: function(v) { return v + ' km'; } },
+            grid: { drawOnChartArea: false },
+          },
+          x: { ticks: { font: { size: 10 } } },
+        },
+      },
+    });
+  } catch(err) {
+    console.warn('[Damu] cargarGraficoTemporal:', err.message || err);
+  }
+}
+
 // ── Cargar al iniciar ──────────────────────────────────────────
 // __damuSupabase está disponible de forma síncrona desde auth-guard.js
 async function _init() {
@@ -783,7 +884,10 @@ async function _init() {
   if (!sb) return;
   var sesRes = await sb.auth.getSession();
   var uid    = sesRes.data && sesRes.data.session ? sesRes.data.session.user.id : null;
-  if (uid) cargarKPIsEmpresa(sb, uid);
+  if (uid) {
+    cargarKPIsEmpresa(sb, uid);
+    cargarGraficoTemporal(sb, uid);
+  }
   cargarEstadoRed(); // no-op silencioso si no hay acopios
 }
 _init();
