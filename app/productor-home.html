@@ -1171,10 +1171,10 @@ async function guardarProduccion() {
       if (empR.error) console.warn('[empresa-upsert error]', empR.error.message);
       else if (empR.data) { empresaId = empR.data.id; localStorage.setItem('damu_empresa_id', empR.data.id); }
     }
-    if (!empresaId) { _setGuardarMsg('warn', '⚠️ Tu cuenta no tiene empresa REP creada todavía.'); return; }
+    // empresa_id es opcional: la política RLS produccion_insert_own solo exige user_id = auth.uid()
     var { error } = await sb.from('produccion_rep').insert({
       user_id:                      uid,
-      empresa_id:                   empresaId,
+      empresa_id:                   empresaId || null,
       categoria:                    saved.cat,
       toneladas:                    saved.tons,
       costo_estimado:               Math.round(saved.costoTotal || 0),
