@@ -374,7 +374,7 @@ async function cargarDashboard(sb, uid, empresaId) {
         .eq('empresa_id', empresaId)
         .order('created_at', { ascending: false }),
       sb.from('puntos_acopio')
-        .select('id, nombre, carga_actual_kg, capacidad_kg')
+        .select('id, nombre, carga_actual_kg, capacidad_total_kg')
         .eq('empresa_id', empresaId)
         .limit(50),
     ]);
