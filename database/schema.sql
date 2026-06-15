@@ -651,12 +651,10 @@ BEGIN
 
   RETURN QUERY
     UPDATE public.flota_vehiculos
-       SET carga_actual_kg = LEAST(f.capacidad_kg, f.carga_actual_kg + p_kg),
-           destino         = COALESCE(p_destino, f.destino)
-      FROM public.flota_vehiculos AS f
-     WHERE public.flota_vehiculos.id = p_vehiculo_id
-       AND f.id = p_vehiculo_id
-  RETURNING public.flota_vehiculos.carga_actual_kg AS nueva_carga_kg,
-            public.flota_vehiculos.capacidad_kg;
+       SET carga_actual_kg = LEAST(capacidad_kg, carga_actual_kg + p_kg),
+           destino         = COALESCE(p_destino, destino)
+     WHERE id = p_vehiculo_id
+  RETURNING carga_actual_kg AS nueva_carga_kg,
+            capacidad_kg;
 END;
 $$;
