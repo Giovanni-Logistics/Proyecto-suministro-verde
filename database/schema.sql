@@ -504,6 +504,7 @@ UPDATE public.viajes_operativos SET categoria =
 WHERE categoria IS NULL AND destino LIKE 'Centro REP%';
 
 -- ── 26. RPC: KPI empresa por semana × categoría ───────────────────────────
+-- SECURITY: p_empresa_id validado contra empresas/transportistas_empresa del caller
 CREATE OR REPLACE FUNCTION public.fn_kpi_empresa_temporal(
   p_empresa_id uuid, p_semanas int DEFAULT 12
 )
@@ -517,11 +518,16 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   FROM public.viajes_operativos
   WHERE empresa_id = p_empresa_id
     AND created_at >= NOW() - (p_semanas||' weeks')::interval
+    AND (
+      EXISTS (SELECT 1 FROM public.empresas WHERE id = p_empresa_id AND user_id_productor = auth.uid())
+      OR EXISTS (SELECT 1 FROM public.transportistas_empresa WHERE empresa_id = p_empresa_id AND user_id_transportista = auth.uid() AND activo = true)
+    )
   GROUP BY semana, COALESCE(categoria,'otros')
   ORDER BY semana DESC;
 $$;
 
 -- ── 27. RPC: Resumen REP del productor por categoría ─────────────────────
+-- SECURITY: p_empresa_id validado contra empresas/transportistas_empresa del caller
 CREATE OR REPLACE FUNCTION public.fn_kpi_productor_rep(p_empresa_id uuid)
 RETURNS TABLE(categoria text, total_kg numeric, total_km numeric, n_viajes bigint, co2e_kg numeric)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
@@ -532,10 +538,15 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
          ROUND(COALESCE(SUM(distancia_km),0)/12.0*2.68, 2)    AS co2e_kg
   FROM public.viajes_operativos
   WHERE empresa_id = p_empresa_id
+    AND (
+      EXISTS (SELECT 1 FROM public.empresas WHERE id = p_empresa_id AND user_id_productor = auth.uid())
+      OR EXISTS (SELECT 1 FROM public.transportistas_empresa WHERE empresa_id = p_empresa_id AND user_id_transportista = auth.uid() AND activo = true)
+    )
   GROUP BY COALESCE(categoria,'otros');
 $$;
 
 -- ── 28. RPC: KPI personal del transportista (totales de vida) ────────────
+-- SECURITY: fuerza p_user_id = auth.uid(), previene enumerar datos de otros usuarios
 CREATE OR REPLACE FUNCTION public.fn_kpi_transportista(p_user_id uuid)
 RETURNS TABLE(total_km numeric, total_kg numeric, total_costo numeric,
               n_viajes bigint, n_escaneos bigint, kg_por_km numeric, co2e_kg numeric)
@@ -549,10 +560,13 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
            THEN ROUND(COALESCE(SUM(cargas_qr_kg),0)/SUM(distancia_km),1) ELSE 0
          END AS kg_por_km,
          ROUND(COALESCE(SUM(distancia_km),0)/12.0*2.68, 2) AS co2e_kg
-  FROM public.viajes_operativos WHERE user_id = p_user_id;
+  FROM public.viajes_operativos
+  WHERE user_id = p_user_id
+    AND p_user_id = auth.uid();
 $$;
 
 -- ── 29. RPC: Evolución semanal del transportista ──────────────────────────
+-- SECURITY: fuerza p_user_id = auth.uid()
 CREATE OR REPLACE FUNCTION public.fn_kpi_transportista_temporal(
   p_user_id uuid, p_semanas int DEFAULT 12
 )
@@ -564,6 +578,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
          COUNT(*)                             AS n_viajes
   FROM public.viajes_operativos
   WHERE user_id = p_user_id
+    AND p_user_id = auth.uid()
     AND created_at >= NOW() - (p_semanas||' weeks')::interval
   GROUP BY semana ORDER BY semana DESC;
 $$;
