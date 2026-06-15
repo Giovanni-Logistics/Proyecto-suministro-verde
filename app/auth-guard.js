@@ -119,7 +119,9 @@
       itemsDrop += dropItem('escaner-qr.html', '📷', 'Escanear QR');
     }
 
-    var hayHerramientaActiva = esActivo('simulador-ruta.html') || esActivo('escaner-qr.html');
+    var hayHerramientaActiva = esActivo('simulador-ruta.html') || esActivo('escaner-qr.html')
+      || esActivo('productor-home.html') || esActivo('productor-historial.html')
+      || esActivo('productor-certificados.html') || esActivo('productor-monitor.html');
     var clsDropBtn = 'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border-0 cursor-pointer transition-colors '
       + (hayHerramientaActiva
           ? 'text-emerald-400 bg-slate-700/60 font-semibold'
