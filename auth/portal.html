@@ -208,23 +208,23 @@ window.addEventListener('DOMContentLoaded', function () {
 // ─────────────────────────────────────────────────────────────────
 async function checkSession() {
   try {
-    var result  = await supabase.auth.getSession();
-    var session = result.data && result.data.session;
-    if (!session) return;
+    // getUser() valida el JWT contra el servidor, a diferencia de getSession() que solo
+    // lee el localStorage. Esto detecta tokens revocados o expirados y evita el loop:
+    //   portal → redirect con token stale → app (falla) → vuelve a portal → btn disabled → loop
+    var res = await supabase.auth.getUser();
+    if (res.error || !res.data || !res.data.user) return;
 
-    var meta = session.user.user_metadata || {};
-    var role = meta.role
-            || localStorage.getItem('damu_role')
+    var meta = res.data.user.user_metadata || {};
+    var role = localStorage.getItem('damu_role')
             || localStorage.getItem('damu_perfil')
+            || meta.role
             || 'productor';
 
     setMsg('ok', '✓ Sesión activa. Redirigiendo...');
-    // Solo el submit button se deshabilita, NO el formulario entero
-    // (evita el bug de pointer-events-none que bloqueaba el toggle)
     document.getElementById('btn-submit').disabled = true;
     setTimeout(function () { redirigir(role); }, 900);
 
-  } catch (e) { /* sin sesión, continuar normal */ }
+  } catch (e) { /* sin sesión o error de red → mostrar formulario */ }
 }
 
 // ═══════════════════════════════════════════════════════════════════
