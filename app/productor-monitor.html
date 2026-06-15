@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Monitoreo de Transportistas — Damu SGC</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="constantes-rep.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth-guard.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
+
+<nav id="app-nav" class="bg-slate-900 sticky top-0 z-50 h-16 shadow-xl"></nav>
+
+<header class="bg-gradient-to-br from-slate-900 via-blue-900 to-blue-800 text-white py-7 px-8">
+  <div class="max-w-5xl mx-auto">
+    <span class="inline-block bg-white/10 border border-white/20 text-blue-200 text-xs font-bold px-3 py-1 rounded-full mb-3">🚚 Monitoreo de Transportistas</span>
+    <h1 class="text-2xl md:text-3xl font-black leading-tight mb-1">Transportistas</h1>
+    <p class="text-slate-300 text-sm">Visualiza la actividad de los transportistas vinculados a tu empresa REP.</p>
+  </div>
+</header>
+
+<main class="max-w-5xl mx-auto w-full px-4 py-8 flex-1 space-y-8">
+
+  <!-- Alerta sin empresa -->
+  <div id="banner-sin-empresa" class="hidden bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-start gap-3">
+    <span class="text-amber-500 text-xl flex-shrink-0 mt-0.5">⚠️</span>
+    <div>
+      <p class="text-amber-800 font-bold text-sm">Sin empresa REP registrada</p>
+      <p class="text-amber-700 text-xs mt-1">Tu cuenta no tiene empresa creada todavía. Contacta al administrador de la plataforma para activar tu perfil de productor.</p>
+    </div>
+  </div>
+
+  <!-- Transportistas activos -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-blue-800 to-blue-700 px-5 py-4 flex items-center justify-between">
+      <div>
+        <h2 class="text-white font-bold text-sm flex items-center gap-2">🚚 Transportistas Vinculados</h2>
+        <p class="text-blue-300 text-xs mt-0.5">Cuentas activas que operan bajo tu código de invitación</p>
+      </div>
+      <span id="badge-trans" class="text-xs bg-white/10 text-blue-200 border border-white/10 px-2.5 py-1 rounded-full">—</span>
+    </div>
+    <div id="wrap-transportistas" class="p-5">
+      <div class="py-8 text-center text-slate-400 text-sm flex items-center justify-center gap-2">
+        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        Cargando transportistas...
+      </div>
+    </div>
+  </div>
+
+  <!-- Actividad en rutas agrupada por transportista -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-slate-700 to-slate-600 px-5 py-4 flex items-center justify-between">
+      <div>
+        <h2 class="text-white font-bold text-sm flex items-center gap-2">🗺️ Actividad en Rutas</h2>
+        <p class="text-slate-400 text-xs mt-0.5">Últimos 50 viajes operativos de tu empresa, agrupados por transportista</p>
+      </div>
+      <button onclick="cargarMonitoreo()"
+        class="text-slate-300 hover:text-white border border-slate-600 hover:border-slate-400 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+        Actualizar
+      </button>
+    </div>
+    <div id="wrap-rutas-mon" class="p-5">
+      <div class="py-8 text-center text-slate-400 text-sm flex items-center justify-center gap-2">
+        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        Cargando actividad...
+      </div>
+    </div>
+  </div>
+
+  <!-- Actividad QR -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-emerald-800 to-emerald-700 px-5 py-4">
+      <h2 class="text-white font-bold text-sm flex items-center gap-2">📷 Escaneos QR</h2>
+      <p class="text-emerald-300 text-xs mt-0.5">Cargas registradas por QR en campo, por transportista</p>
+    </div>
+    <div id="wrap-qr-mon" class="p-5">
+      <div class="py-8 text-center text-slate-400 text-sm flex items-center justify-center gap-2">
+        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        Cargando escaneos QR...
+      </div>
+    </div>
+  </div>
+
+  <!-- Resumen KPIs empresa -->
+  <div id="kpis-empresa" class="hidden">
+    <h2 class="text-lg font-black text-slate-700 mb-4">📊 KPIs de la Empresa</h2>
+    <div id="kpis-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+  </div>
+
+</main>
+
+<footer class="bg-slate-900 text-slate-400 text-xs py-5 border-t border-slate-800 mt-auto">
+  <div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-3">
+    <p><strong class="text-white">Damu SGC</strong> — Trazabilidad Ley REP · Chile</p>
+    <p class="text-slate-600">© 2026 Damu SGC</p>
+  </div>
+</footer>
+
+<script>
+var CAT_LABEL = { envases:'📦 Envases', neumaticos:'🛞 Neumáticos', pilas:'🔋 Pilas/Bat.', raee:'🖥️ RAEE', aceites:'🛢️ Aceites' };
+var _empresaId  = null;
+var _sessionUid = null;
+
+function clp(n) { return '$' + Math.round(n).toLocaleString('es-CL') + ' CLP'; }
+function fmtFecha(iso) { return new Date(iso).toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' }); }
+function idCorto(uid) { return uid ? '…' + uid.slice(-8) : '—'; }
+
+async function cargarMonitoreo() {
+  var sb = window.__damuSupabase;
+  if (!sb) return;
+
+  setLoading('wrap-transportistas');
+  setLoading('wrap-rutas-mon');
+  setLoading('wrap-qr-mon');
+
+  try {
+    var sesRes = await sb.auth.getSession();
+    _sessionUid = sesRes.data.session.user.id;
+    _empresaId  = localStorage.getItem('damu_empresa_id');
+
+    if (!_empresaId) {
+      var eRes = await sb.from('empresas').select('id,nombre').eq('user_id_productor', _sessionUid).maybeSingle();
+      if (eRes.data) {
+        _empresaId = eRes.data.id;
+        localStorage.setItem('damu_empresa_id', _empresaId);
+        if (eRes.data.nombre) localStorage.setItem('damu_empresa_nombre', eRes.data.nombre);
+      }
+    }
+
+    if (!_empresaId) {
+      document.getElementById('banner-sin-empresa').classList.remove('hidden');
+      setVacio('wrap-transportistas', 'Sin empresa REP. Contacta al administrador.');
+      setVacio('wrap-rutas-mon', 'Sin empresa REP asociada.');
+      setVacio('wrap-qr-mon', 'Sin empresa REP asociada.');
+      return;
+    }
+
+    var [transRes, viajesRes] = await Promise.all([
+      sb.from('transportistas_empresa')
+        .select('id, user_id_transportista, activo, created_at')
+        .eq('empresa_id', _empresaId)
+        .order('created_at', { ascending: false }),
+      sb.from('viajes_operativos')
+        .select('id, user_id, origen, destino, distancia_km, costo_diesel, cargas_qr_kg, categoria, created_at')
+        .eq('empresa_id', _empresaId)
+        .order('created_at', { ascending: false })
+        .limit(50),
+    ]);
+
+    var transportistas = transRes.data || [];
+    var viajes         = viajesRes.data || [];
+
+    renderTransportistas(transportistas);
+    renderActividadRutas(viajes, transportistas);
+    renderActividadQR(viajes, transportistas);
+    renderKPIs(transportistas, viajes);
+
+  } catch (err) {
+    setError('wrap-transportistas', err.message);
+    setError('wrap-rutas-mon', err.message);
+    setError('wrap-qr-mon', err.message);
+  }
+}
+
+function renderTransportistas(trans) {
+  var wrap  = document.getElementById('wrap-transportistas');
+  var badge = document.getElementById('badge-trans');
+  var activos = trans.filter(function(t) { return t.activo !== false; });
+  if (badge) badge.textContent = activos.length + ' activo' + (activos.length !== 1 ? 's' : '');
+
+  if (trans.length === 0) {
+    wrap.innerHTML = '<div class="py-10 text-center"><div class="text-4xl mb-3">🚚</div><p class="text-slate-500 text-sm font-semibold">Sin transportistas vinculados</p><p class="text-slate-400 text-xs mt-1">Comparte tu código de invitación para que los transportistas se registren en la plataforma.</p><a href="productor-home.html" class="inline-block mt-3 text-xs text-emerald-600 underline">Ver código de invitación →</a></div>';
+    return;
+  }
+
+  var rows = trans.map(function(t) {
+    var estado = t.activo !== false
+      ? '<span class="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-0.5 rounded-full border border-emerald-200">Activo</span>'
+      : '<span class="bg-slate-100 text-slate-500 text-xs font-bold px-2 py-0.5 rounded-full border border-slate-200">Inactivo</span>';
+    return '<tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors">'
+      + '<td class="py-2.5 px-3"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm flex-shrink-0">🚚</div><div><p class="text-sm font-semibold text-slate-800">Transportista</p><p class="text-xs text-slate-400 font-mono">ID: ' + idCorto(t.user_id_transportista) + '</p></div></div></td>'
+      + '<td class="py-2.5 px-3">' + estado + '</td>'
+      + '<td class="py-2.5 px-3 text-xs text-slate-500">' + fmtFecha(t.created_at) + '</td>'
+      + '</tr>';
+  }).join('');
+
+  wrap.innerHTML = '<div class="overflow-x-auto -mx-1"><table class="w-full text-left min-w-[400px]"><thead><tr class="border-b border-slate-200"><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Transportista</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Estado</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Vinculado</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+    + '<p class="text-xs text-slate-400 mt-3">El ID de transportista corresponde a los últimos 8 caracteres del identificador único de la cuenta.</p>';
+}
+
+function renderActividadRutas(viajes, trans) {
+  var wrap   = document.getElementById('wrap-rutas-mon');
+  var rutasV = viajes.filter(function(v) { return (v.distancia_km || 0) > 0; });
+
+  if (rutasV.length === 0) {
+    setVacio('wrap-rutas-mon', 'Sin rutas registradas para esta empresa.');
+    return;
+  }
+
+  // Agrupar por user_id
+  var grupos = {};
+  rutasV.forEach(function(v) {
+    if (!grupos[v.user_id]) grupos[v.user_id] = { nViajes: 0, kmTotal: 0, costoTotal: 0, ultimoViaje: null };
+    grupos[v.user_id].nViajes++;
+    grupos[v.user_id].kmTotal    += (v.distancia_km || 0);
+    grupos[v.user_id].costoTotal += (v.costo_diesel || 0);
+    if (!grupos[v.user_id].ultimoViaje || v.created_at > grupos[v.user_id].ultimoViaje) {
+      grupos[v.user_id].ultimoViaje = v.created_at;
+    }
+  });
+
+  var rows = Object.keys(grupos).map(function(uid) {
+    var g = grupos[uid];
+    return '<tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors">'
+      + '<td class="py-2.5 px-3"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-sm flex-shrink-0">🚛</div><p class="text-sm font-mono text-slate-600">…' + uid.slice(-8) + '</p></div></td>'
+      + '<td class="py-2.5 px-3 text-sm text-center font-black text-slate-800">' + g.nViajes + '</td>'
+      + '<td class="py-2.5 px-3 text-sm text-right font-semibold text-emerald-700 tabular-nums">' + g.kmTotal.toFixed(1) + ' km</td>'
+      + '<td class="py-2.5 px-3 text-sm text-right text-slate-600 tabular-nums">' + clp(g.costoTotal) + '</td>'
+      + '<td class="py-2.5 px-3 text-xs text-slate-400 whitespace-nowrap">' + fmtFecha(g.ultimoViaje) + '</td>'
+      + '</tr>';
+  }).join('');
+
+  wrap.innerHTML = '<div class="overflow-x-auto -mx-1"><table class="w-full text-left min-w-[520px]"><thead><tr class="border-b border-slate-200"><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Transportista (ID)</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-center">Viajes</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Km totales</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Costo Diésel</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Último viaje</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
+function renderActividadQR(viajes, trans) {
+  var qrV = viajes.filter(function(v) { return (v.cargas_qr_kg || 0) > 0; });
+
+  if (qrV.length === 0) {
+    setVacio('wrap-qr-mon', 'Sin escaneos QR registrados para esta empresa. Los transportistas pueden escanear desde la sección Escanear QR.');
+    return;
+  }
+
+  // Agrupar por user_id
+  var grupos = {};
+  qrV.forEach(function(v) {
+    if (!grupos[v.user_id]) grupos[v.user_id] = { nScans: 0, kgTotal: 0, ultimoScan: null };
+    grupos[v.user_id].nScans++;
+    grupos[v.user_id].kgTotal  += (v.cargas_qr_kg || 0);
+    if (!grupos[v.user_id].ultimoScan || v.created_at > grupos[v.user_id].ultimoScan) {
+      grupos[v.user_id].ultimoScan = v.created_at;
+    }
+  });
+
+  var rows = Object.keys(grupos).map(function(uid) {
+    var g = grupos[uid];
+    return '<tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors">'
+      + '<td class="py-2.5 px-3"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-sm flex-shrink-0">📷</div><p class="text-sm font-mono text-slate-600">…' + uid.slice(-8) + '</p></div></td>'
+      + '<td class="py-2.5 px-3 text-sm text-center font-black text-slate-800">' + g.nScans + '</td>'
+      + '<td class="py-2.5 px-3 text-sm text-right font-black text-emerald-700 tabular-nums">' + g.kgTotal.toFixed(1) + ' kg</td>'
+      + '<td class="py-2.5 px-3 text-sm text-right text-slate-500 tabular-nums">' + (g.kgTotal/1000).toFixed(3) + ' t</td>'
+      + '<td class="py-2.5 px-3 text-xs text-slate-400 whitespace-nowrap">' + fmtFecha(g.ultimoScan) + '</td>'
+      + '</tr>';
+  }).join('');
+
+  document.getElementById('wrap-qr-mon').innerHTML = '<div class="overflow-x-auto -mx-1"><table class="w-full text-left min-w-[480px]"><thead><tr class="border-b border-slate-200"><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Transportista (ID)</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-center">Escaneos</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Kg total</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Toneladas</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Último scan</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
+function renderKPIs(trans, viajes) {
+  var activos  = trans.filter(function(t){return t.activo!==false;}).length;
+  var totalKm  = viajes.reduce(function(a,v){return a+(v.distancia_km||0);},0);
+  var totalKg  = viajes.reduce(function(a,v){return a+(v.cargas_qr_kg||0);},0);
+  var totalCost= viajes.reduce(function(a,v){return a+(v.costo_diesel||0);},0);
+
+  var sec  = document.getElementById('kpis-empresa');
+  var grid = document.getElementById('kpis-grid');
+  grid.innerHTML = [
+    { icon:'🚚', lbl:'Transportistas activos', val: activos,                      col:'text-blue-700' },
+    { icon:'📏', lbl:'Km totales',             val: totalKm.toFixed(1) + ' km',   col:'text-slate-700'},
+    { icon:'📦', lbl:'Kg QR escaneados',       val: totalKg.toFixed(0) + ' kg',   col:'text-emerald-700'},
+    { icon:'⛽', lbl:'Costo diésel empresa',   val: clp(totalCost),               col:'text-red-500'  },
+  ].map(function(k) {
+    return '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-center"><div class="text-2xl mb-1">' + k.icon + '</div><div class="text-sm font-black ' + k.col + '">' + k.val + '</div><div class="text-xs text-slate-500 mt-0.5">' + k.lbl + '</div></div>';
+  }).join('');
+
+  sec.classList.remove('hidden');
+}
+
+function setLoading(id) {
+  document.getElementById(id).innerHTML = '<div class="py-8 text-center text-slate-400 text-sm flex items-center justify-center gap-2"><svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Cargando...</div>';
+}
+function setVacio(id, msg) {
+  document.getElementById(id).innerHTML = '<div class="py-8 text-center text-slate-400 text-sm">' + msg + '</div>';
+}
+function setError(id, msg) {
+  document.getElementById(id).innerHTML = '<div class="py-6 text-center"><p class="text-red-600 text-sm font-bold">❌ Error: ' + msg + '</p></div>';
+}
+
+window.addEventListener('DOMContentLoaded', function () { cargarMonitoreo(); });
+</script>
+</body>
+</html>
