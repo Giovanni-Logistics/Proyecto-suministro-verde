@@ -907,6 +907,73 @@ async function cargarGraficoTemporal(sb, uid) {
   }
 }
 
+// ── Código de invitación (productor) ──────────────────────────
+var _codigoInvitacion = null;
+
+async function cargarCodigoInvitacion(sb, uid) {
+  var perfil = localStorage.getItem('damu_role') || '';
+  if (perfil !== 'productor') return;
+
+  try {
+    var { data, error } = await sb
+      .from('empresas')
+      .select('nombre, codigo_invitacion')
+      .eq('user_id_productor', uid)
+      .maybeSingle();
+
+    if (error || !data || !data.codigo_invitacion) return;
+
+    _codigoInvitacion = data.codigo_invitacion;
+
+    var sec    = document.getElementById('empresa-prod-section');
+    var nombre = document.getElementById('prod-empresa-nombre');
+    var codEl  = document.getElementById('prod-codigo');
+
+    if (nombre) nombre.textContent = data.nombre || '—';
+    if (codEl)  codEl.textContent  = data.codigo_invitacion;
+    if (sec)    sec.classList.remove('hidden');
+  } catch (_) {}
+}
+
+function copiarCodigo() {
+  if (!_codigoInvitacion) return;
+  var btn   = document.getElementById('btn-copiar-codigo');
+  var label = document.getElementById('btn-copiar-label');
+  var texto = _codigoInvitacion;
+
+  var exito = function () {
+    if (!btn || !label) return;
+    var prevHtml  = btn.innerHTML;
+    label.textContent = '¡Copiado!';
+    btn.classList.replace('bg-emerald-600', 'bg-emerald-700');
+    btn.classList.remove('hover:bg-emerald-500');
+    setTimeout(function () {
+      btn.innerHTML = prevHtml;
+      btn.classList.replace('bg-emerald-700', 'bg-emerald-600');
+      btn.classList.add('hover:bg-emerald-500');
+    }, 2000);
+  };
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texto).then(exito).catch(function () {
+      _copiarFallback(texto, exito);
+    });
+  } else {
+    _copiarFallback(texto, exito);
+  }
+}
+
+function _copiarFallback(texto, callback) {
+  var el = document.createElement('textarea');
+  el.value = texto;
+  el.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+  document.body.appendChild(el);
+  el.focus();
+  el.select();
+  try { document.execCommand('copy'); if (callback) callback(); } catch (_) {}
+  document.body.removeChild(el);
+}
+
 // ── Cargar al iniciar ──────────────────────────────────────────
 // __damuSupabase está disponible de forma síncrona desde auth-guard.js
 async function _init() {
@@ -919,6 +986,7 @@ async function _init() {
   if (uid) {
     cargarKPIsEmpresa(sb, uid);
     cargarGraficoTemporal(sb, uid);
+    cargarCodigoInvitacion(sb, uid);
   }
   cargarEstadoRed(); // no-op silencioso si no hay acopios
 }
