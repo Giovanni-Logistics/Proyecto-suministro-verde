@@ -157,6 +157,24 @@
           <div id="bar-chart" class="space-y-3"></div>
         </div>
 
+        <!-- ── Guardar / Registrar producción ──────────────────── -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <span>💾</span> Registrar producción en la empresa
+            </p>
+            <p class="text-xs text-slate-500 mt-0.5">Guarda este cálculo vinculado a tu empresa para que aparezca en el Dashboard REP y en los reportes de certificación.</p>
+            <div id="guardar-msg" class="hidden mt-2.5 text-xs px-3 py-2 rounded-lg border font-medium"></div>
+          </div>
+          <button id="btn-guardar" onclick="guardarProduccion()"
+            class="flex-shrink-0 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-white font-bold text-sm px-5 py-3 rounded-xl transition-colors flex items-center gap-2 shadow-sm whitespace-nowrap">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+            </svg>
+            <span id="btn-guardar-txt">Guardar producción</span>
+          </button>
+        </div>
+
         <!-- ── Descargar Certificado PDF ─────────────────────────── -->
         <div class="bg-gradient-to-r from-emerald-50 to-slate-50 border border-emerald-200 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
@@ -482,25 +500,6 @@ async function generarCertificadoPDF() {
   if (!saved || !saved.costoTotal) {
     alert('Primero ingresa los parámetros y calcula los resultados para generar el certificado.');
     return;
-  }
-
-  // ── Guardar en Supabase antes de generar el PDF ───────────────
-  var sb = window.__damuSupabase;
-  if (sb) {
-    try {
-      var sesion = await sb.auth.getSession();
-      if (sesion.data && sesion.data.session) {
-        await sb.from('certificados_rep').insert({
-          user_id:                     sesion.data.session.user.id,
-          categoria:                   saved.cat,
-          toneladas_declaradas:        saved.tons,
-          meta_valorizacion_porcentaje: saved.meta || 0,
-          riesgo_multa_estimado:       saved.multa || 0,
-        });
-      }
-    } catch (e) {
-      console.warn('[Damu] Error guardando certificado:', e.message);
-    }
   }
 
   // ── Leer formulario ───────────────────────────────────────────
