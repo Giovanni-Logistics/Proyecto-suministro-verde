@@ -18,10 +18,13 @@
 
   // 3 — Cierre de sesión (llamado por el botón "Salir" del nav)
   window.__damuSignOut = async function () {
-    try { await _sb.auth.signOut(); } catch (e) {}
-    localStorage.removeItem('damu_role');
-    localStorage.removeItem('damu_perfil');
-    localStorage.removeItem('damu_session');
+    // scope:'local' limpia solo esta sesión/dispositivo sin revocar las de otros dispositivos.
+    // signOut() sin scope usa 'global' por defecto en Supabase JS v2 ≥2.47 e invalida
+    // todos los tokens del usuario en el servidor, cerrando sesión en todos los equipos.
+    try { await _sb.auth.signOut({ scope: 'local' }); } catch (e) {}
+    ['damu_role', 'damu_perfil', 'damu_session',
+     'damu_empresa_id', 'damu_empresa_nombre', 'damu_codigo_invitacion']
+      .forEach(function (k) { localStorage.removeItem(k); });
     window.location.href = '../index.html';
   };
 
