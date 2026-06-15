@@ -147,8 +147,11 @@
     // ── Nav final según perfil ────────────────────────────────────
     var enlaces = '';
     if (perfil === 'productor') {
-      // Productora: Calculadora REP + Dashboard REP + dropdown Herramientas
-      enlaces = enlace('calculadora-rep.html', '🧾', 'Calculadora REP') + enlace('dashboard-productor.html', '📊', 'Dashboard REP') + dropdown;
+      // Productora: módulo restructurado con 4 páginas
+      enlaces = enlace('productor-home.html',          '🏠', 'Inicio')
+              + enlace('productor-historial.html',      '📋', 'Historial')
+              + enlace('productor-certificados.html',   '📄', 'Certificados')
+              + enlace('productor-monitor.html',        '🚚', 'Transportistas');
     } else {
       // Transportista: Dashboard KPI + dropdown Herramientas (Mapa de Ruta + Escanear QR)
       enlaces = enlace('dashboard-kpi.html', '📊', 'Dashboard KPI') + dropdown;
