@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Inicio — Productor REP · Damu SGC</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="constantes-rep.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth-guard.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
+  <style>
+    input[type=range] { accent-color: #059669; }
+    #map img { max-width: none !important; }
+    .leaflet-top, .leaflet-bottom { z-index: 10 !important; }
+    .leaflet-routing-container { display: none !important; }
+    #map { height: 440px; min-height: 300px; }
+    .bar-fill { transition: width 0.6s ease; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    @keyframes pulse-acopio {
+      0%, 100% { box-shadow: 0 2px 8px rgba(0,0,0,.35), 0 0 0 4px rgba(231,76,60,.25); }
+      50%       { box-shadow: 0 2px 8px rgba(0,0,0,.35), 0 0 0 9px rgba(231,76,60,.08); }
+    }
+    .damu-popup .leaflet-popup-content-wrapper { border-radius: 14px; box-shadow: 0 8px 28px rgba(0,0,0,.18); padding: 0; }
+    .damu-popup .leaflet-popup-content { margin: 14px 14px; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
+
+<nav id="app-nav" class="bg-slate-900 sticky top-0 z-50 h-16 shadow-xl"></nav>
+
+<header class="bg-gradient-to-br from-slate-900 via-emerald-900 to-emerald-800 text-white py-7 px-8">
+  <div class="max-w-5xl mx-auto">
+    <span class="inline-block bg-white/10 border border-white/20 text-emerald-200 text-xs font-bold px-3 py-1 rounded-full mb-3">🏠 Centro de Operaciones REP</span>
+    <h1 class="text-2xl md:text-3xl font-black leading-tight mb-1">Módulo Productor</h1>
+    <p class="text-slate-300 text-sm">Gestiona tus rutas de recolección y registra tu producción REP desde un solo lugar.</p>
+  </div>
+</header>
+
+<!-- Tab bar -->
+<div class="bg-white border-b border-slate-200 sticky top-16 z-40 shadow-sm">
+  <div class="max-w-5xl mx-auto px-4">
+    <div class="flex gap-1 py-2">
+      <button id="tab-btn-rutas" onclick="setTab('rutas')"
+        class="tab-btn flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-colors">
+        🗺️ Mapa / Rutas
+      </button>
+      <button id="tab-btn-calc" onclick="setTab('calc')"
+        class="tab-btn flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-colors">
+        🧾 Calculadora REP
+      </button>
+    </div>
+  </div>
+</div>
+
+<main class="max-w-5xl mx-auto w-full px-4 py-8 flex-1">
+
+<!-- ═══════════════════════════════════ TAB RUTAS ════════════════════════════════════ -->
+<div id="tab-rutas" class="tab-content space-y-8">
+
+  <!-- Banner OSRM error -->
+  <div id="osrm-error-banner" class="hidden bg-orange-50 border border-orange-200 rounded-2xl px-5 py-3 flex items-center gap-3 -mb-2">
+    <span class="text-orange-500 text-base flex-shrink-0">⚠️</span>
+    <p class="text-orange-700 text-sm font-semibold flex-1"><span id="osrm-error-msg"></span> — Las rutas sugeridas usarán estimación de distancia lineal.</p>
+    <button onclick="this.closest('#osrm-error-banner').classList.add('hidden')" class="text-orange-400 hover:text-orange-600 text-lg leading-none flex-shrink-0">×</button>
+  </div>
+
+  <!-- Alerta críticos -->
+  <div id="alert-crit" class="hidden bg-red-50 border border-red-200 rounded-2xl px-5 py-3 flex flex-wrap items-center gap-3 -mb-2">
+    <span class="text-red-500 text-base flex-shrink-0">🚨</span>
+    <span id="alert-crit-msg" class="text-red-700 font-semibold text-sm flex-1 min-w-0"></span>
+    <button onclick="optimizarRecoleccion()"
+      class="bg-red-600 hover:bg-red-500 active:bg-red-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors flex-shrink-0">
+      Optimizar ruta ahora →
+    </button>
+  </div>
+
+  <!-- Mapa + controles -->
+  <div id="mapa-controles" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-slate-800 to-slate-700 px-5 py-4">
+      <div class="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 class="text-white font-bold text-sm flex items-center gap-2">
+            🗺️ Mapa Operativo · Red REP
+            <span id="mapa-loading-badge" class="text-xs bg-white/10 text-slate-300 px-2 py-0.5 rounded-full font-normal animate-pulse">Cargando red...</span>
+          </h2>
+          <p class="text-slate-400 text-xs mt-0.5">Puntos de acopio en tiempo real · Ruteo OSRM · Nominatim</p>
+        </div>
+        <div class="flex gap-2 flex-shrink-0">
+          <button id="btn-refresh-mapa" onclick="cargarMapaOperativo()"
+            class="text-slate-300 hover:text-white border border-slate-600 hover:border-slate-400 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Actualizar
+          </button>
+          <button id="btn-optimizar-ruta" onclick="optimizarRecoleccion()"
+            class="hidden bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+            🚨 Optimizar Recolección
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1.5">📍 Punto de origen</label>
+          <input id="map-origin" type="text" list="sg-origin" autocomplete="off"
+            placeholder="Ej: Maipú, Santiago"
+            oninput="debSuggest('map-origin','sg-origin')"
+            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"/>
+          <datalist id="sg-origin"></datalist>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1.5">🏭 Destino</label>
+          <input id="map-dest" type="text" list="sg-dest" autocomplete="off"
+            placeholder="Ej: San Bernardo, Santiago"
+            oninput="debSuggest('map-dest','sg-dest')"
+            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"/>
+          <datalist id="sg-dest"></datalist>
+        </div>
+      </div>
+
+      <div id="waypoints-container" class="space-y-2 mb-3"></div>
+      <button onclick="agregarParada()" id="btn-add-waypoint"
+        class="text-xs text-emerald-700 font-semibold border border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50 px-3 py-1.5 rounded-lg transition-colors mb-3 disabled:opacity-40 disabled:cursor-not-allowed">
+        ＋ Agregar parada intermedia
+      </button>
+
+      <div class="flex flex-wrap gap-3 mb-4">
+        <button onclick="calcularRuta()" id="btn-calcular"
+          class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+          🧭 Calcular Ruta
+        </button>
+        <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+          <input type="checkbox" id="chk-roundtrip" class="accent-emerald-600 w-4 h-4"/> Ida y vuelta
+        </label>
+      </div>
+
+      <!-- Resultado ruta + botón guardar -->
+      <div id="route-result" class="hidden mb-4 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 text-sm">
+        <span class="text-emerald-600 font-semibold">✅ Ruta calculada:</span>
+        <span class="font-black text-emerald-800" id="dist-label">— km</span>
+        <span class="text-slate-500" id="route-duration"></span>
+        <div class="ml-auto flex items-center gap-2 flex-wrap">
+          <span id="ruta-msg" class="hidden text-xs font-medium px-3 py-1.5 rounded-lg border"></span>
+          <button id="btn-guardar-ruta" onclick="guardarRuta()"
+            class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+            Guardar Ruta
+          </button>
+        </div>
+      </div>
+
+      <div id="map" class="w-full rounded-xl border border-slate-200 overflow-hidden"></div>
+
+      <div class="flex flex-wrap items-center gap-4 mt-2.5 text-xs">
+        <span id="status-acopios" class="text-slate-400 flex items-center gap-1">
+          <svg class="w-3 h-3 animate-spin text-slate-300" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+          Cargando acopios...
+        </span>
+        <span id="status-criticos" class="hidden text-xs font-semibold"></span>
+        <span id="status-flota" class="hidden text-slate-400 text-xs"></span>
+        <div class="flex items-center gap-3 ml-auto flex-wrap">
+          <span class="flex items-center gap-1.5 text-slate-400"><span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:#2ecc71;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>Libre &lt;50%</span>
+          <span class="flex items-center gap-1.5 text-slate-400"><span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:#f59e0b;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>Medio 50–80%</span>
+          <span class="flex items-center gap-1.5 text-slate-400"><span style="display:inline-block;width:13px;height:13px;border-radius:50%;background:#e74c3c;border:2.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>Crítico &gt;80%</span>
+          <span class="text-slate-400">🚛 Flota</span>
+        </div>
+      </div>
+      <p class="text-xs text-slate-400 mt-2">Cartografía: © <a href="https://www.openstreetmap.org/copyright" target="_blank" class="underline">OpenStreetMap</a> · Ruteo: OSRM · Geocodificación: Nominatim</p>
+    </div>
+  </div>
+
+  <!-- Red de acopio -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-slate-700 to-slate-600 px-5 py-3.5 flex items-center justify-between">
+      <div>
+        <h2 class="text-white font-bold text-sm">📍 Red de Acopio REP</h2>
+        <p class="text-slate-400 text-xs mt-0.5">Estado en tiempo real</p>
+      </div>
+      <span id="badge-total-acopios" class="text-xs bg-white/10 text-slate-300 border border-white/10 px-2.5 py-1 rounded-full">— puntos</span>
+    </div>
+    <div id="tabla-acopios-wrap" class="p-5">
+      <p class="text-slate-400 text-sm text-center py-4 flex items-center justify-center gap-2">
+        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        Cargando puntos de acopio...
+      </p>
+    </div>
+  </div>
+
+  <!-- Mi Flota -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-slate-700 to-slate-600 px-5 py-3.5 flex items-center justify-between">
+      <div>
+        <h2 class="text-white font-bold text-sm">🚛 Mi Flota</h2>
+        <p class="text-slate-400 text-xs mt-0.5">Vehículos registrados</p>
+      </div>
+      <span id="badge-total-flota" class="text-xs bg-white/10 text-slate-300 border border-white/10 px-2.5 py-1 rounded-full">— vehículos</span>
+    </div>
+    <div id="tabla-flota-wrap" class="p-5">
+      <p class="text-slate-400 text-sm text-center py-4 flex items-center justify-center gap-2">
+        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        Cargando flota...
+      </p>
+    </div>
+  </div>
+
+  <!-- Rutas sugeridas -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-slate-700 to-slate-600 px-5 py-3.5 flex items-center justify-between">
+      <div>
+        <h2 class="text-white font-bold text-sm">🧠 Rutas Sugeridas</h2>
+        <p class="text-slate-400 text-xs mt-0.5">Asignación óptima: vehículo → acopios prioritarios → centro</p>
+      </div>
+      <button id="btn-calcular-rutas" onclick="calcularRutasSugeridas()"
+        class="text-slate-300 hover:text-white border border-slate-600 hover:border-slate-400 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Recalcular
+      </button>
+    </div>
+    <div id="rutas-sugeridas-wrap" class="p-5">
+      <p class="text-slate-400 text-sm text-center py-4">Cargando mapa operativo…</p>
+    </div>
+  </div>
+
+  <!-- Variables Operativas Pro -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-emerald-700 to-emerald-600 px-5 py-4">
+      <h2 class="text-white font-bold text-sm flex items-center gap-2">🧮 Variables Operativas Pro</h2>
+      <p class="text-emerald-200 text-xs mt-0.5">La distancia se pre-carga desde el mapa</p>
+    </div>
+    <div class="p-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div>
+          <div class="flex justify-between mb-1.5">
+            <label class="text-xs font-bold text-slate-500">⛽ Precio diésel (CLP/L)</label>
+            <span class="text-xs font-black text-slate-700"><span id="lbl-diesel">1.200</span> CLP/L</span>
+          </div>
+          <input type="range" id="v-diesel" min="800" max="2500" value="1200" step="50" class="w-full"
+            oninput="document.getElementById('lbl-diesel').textContent=parseInt(this.value).toLocaleString('es-CL'); recalcVars()"/>
+          <div class="flex justify-between text-xs text-slate-400 mt-0.5"><span>$800</span><span>$2.500 /L</span></div>
+        </div>
+        <div>
+          <div class="flex justify-between mb-1.5">
+            <label class="text-xs font-bold text-slate-500">🛢️ Rendimiento de flota</label>
+            <span class="text-xs font-black text-slate-700"><span id="lbl-rendim">12</span> km/L</span>
+          </div>
+          <input type="range" id="v-rendim" min="5" max="20" value="12" step="0.5" class="w-full"
+            oninput="document.getElementById('lbl-rendim').textContent=parseFloat(this.value).toFixed(1); recalcVars()"/>
+          <div class="flex justify-between text-xs text-slate-400 mt-0.5"><span>5 km/L</span><span>20 km/L</span></div>
+        </div>
+        <div>
+          <div class="flex justify-between mb-1.5">
+            <label class="text-xs font-bold text-slate-500">📏 Distancia al gestor</label>
+            <span class="text-xs font-black text-emerald-600">
+              <span id="lbl-dist">40</span> km
+              <span id="dist-auto-badge" class="hidden text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full ml-1 font-bold">✓ Mapa</span>
+            </span>
+          </div>
+          <input type="range" id="v-dist" min="5" max="1000" value="40" class="w-full"
+            oninput="document.getElementById('lbl-dist').textContent=this.value;
+                     document.getElementById('dist-auto-badge').classList.add('hidden');
+                     recalcVars()"/>
+          <div class="flex justify-between text-xs text-slate-400 mt-0.5"><span>5 km</span><span>1.000 km</span></div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1.5">🔄 Frecuencia de retiro</label>
+          <select id="v-freq" onchange="recalcVars()"
+            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+            <option value="12">Mensual (12 retiros/año)</option>
+            <option value="4">Trimestral (4 retiros/año)</option>
+            <option value="2">Semestral (2 retiros/año)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1.5">💼 Inversión inicial (CLP)</label>
+          <input type="number" id="v-inversion" placeholder="Ej: 5000000" min="0" oninput="recalcVars()"
+            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"/>
+        </div>
+        <div>
+          <div class="flex justify-between mb-1.5">
+            <label class="text-xs font-bold text-slate-500">♻️ Calidad del material</label>
+            <span class="text-xs font-black text-slate-700"><span id="lbl-calidad">70</span>%</span>
+          </div>
+          <input type="range" id="v-calidad" min="20" max="100" value="70" class="w-full"
+            oninput="document.getElementById('lbl-calidad').textContent=this.value; recalcVars()"/>
+          <div class="flex justify-between text-xs text-slate-400 mt-0.5"><span>20%</span><span>100%</span></div>
+        </div>
+      </div>
+      <button onclick="recalcVars()"
+        class="mt-6 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm px-6 py-3 rounded-xl transition-colors">
+        ⚡ Calcular proyección operativa
+      </button>
+    </div>
+  </div>
+
+  <!-- Resultados vars pro -->
+  <div id="results-section" class="hidden space-y-6">
+    <h2 class="text-lg font-black text-slate-700">Proyección de Costos Operativos</h2>
+    <div id="res-grid" class="grid grid-cols-2 md:grid-cols-3 gap-4"></div>
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+      <h3 class="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">📊 Desglose de costo anual</h3>
+      <div id="res-bars" class="space-y-3"></div>
+    </div>
+    <div class="bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-4 text-xs text-emerald-700">
+      ⚠ Proyección referencial. Los costos reales dependen de condiciones específicas del operador.
+    </div>
+  </div>
+
+</div><!-- end tab-rutas -->
+
+<!-- ═══════════════════════════════════ TAB CALCULADORA ════════════════════════════════════ -->
+<div id="tab-calc" class="tab-content space-y-6">
+
+  <!-- Banner empresa -->
+  <div id="empresa-prod-banner" class="hidden bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+    <div class="bg-gradient-to-r from-emerald-800 to-emerald-700 px-5 py-3.5 flex items-center justify-between">
+      <h2 class="text-white font-bold text-sm flex items-center gap-2">🏢 Mi Empresa REP</h2>
+      <span class="text-xs bg-white/10 text-emerald-200 border border-white/15 px-2.5 py-1 rounded-full">Código para transportistas</span>
+    </div>
+    <div class="p-5 flex flex-wrap items-center gap-5">
+      <div class="flex-1 min-w-0">
+        <p class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-0.5">Razón social</p>
+        <p id="prod-empresa-nombre" class="text-base font-black text-slate-800 truncate">—</p>
+      </div>
+      <div class="flex-shrink-0 text-center">
+        <p class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Código de invitación</p>
+        <div class="flex items-center gap-2">
+          <span id="prod-codigo-invitacion"
+            class="text-2xl font-black tracking-[.3em] text-emerald-700 font-mono bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl select-all">
+            ——————
+          </span>
+          <button onclick="_copiarCodigo()" title="Copiar código"
+            class="bg-emerald-600 hover:bg-emerald-500 text-white p-2.5 rounded-xl transition-colors flex-shrink-0">
+            <svg id="icono-copiar" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+
+    <!-- Panel inputs -->
+    <div class="bg-white rounded-2xl border border-emerald-100 shadow-sm overflow-hidden">
+      <div class="bg-gradient-to-r from-emerald-700 to-emerald-600 px-5 py-4">
+        <h2 class="text-white font-bold text-sm">🏭 Parámetros del Productor</h2>
+        <p class="text-emerald-200 text-xs mt-0.5">Datos de tu declaración REP anual</p>
+      </div>
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1.5">Categoría REP</label>
+          <select id="s-cat" onchange="recalc()" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+            <option value="envases">📦 Envases y embalajes</option>
+            <option value="neumaticos">🛞 Neumáticos</option>
+            <option value="pilas">🔋 Pilas y baterías</option>
+            <option value="raee">🖥️ Aparatos eléctricos (RAEE)</option>
+            <option value="aceites">🛢️ Aceites lubricantes</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1.5">Toneladas puestas en mercado / año</label>
+          <input type="number" id="s-tons" placeholder="Ej: 200" min="1" oninput="recalc()"
+            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"/>
+        </div>
+        <div>
+          <div class="flex justify-between mb-1.5">
+            <label class="text-xs font-bold text-slate-500">Meta de valorización</label>
+            <span id="sv-meta" class="text-xs font-black text-emerald-600">25%</span>
+          </div>
+          <input type="range" id="s-meta" min="5" max="80" value="25" class="w-full"
+            oninput="document.getElementById('sv-meta').textContent=this.value+'%'; recalc()"/>
+          <div class="flex justify-between text-xs mt-0.5">
+            <span class="text-slate-400">5%</span>
+            <span class="text-amber-500 font-semibold">⚠ Mínimo legal ≈ 20%</span>
+            <span class="text-slate-400">80%</span>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1.5">Región de operación</label>
+          <select id="s-region" onchange="recalc()" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+            <option value="1">Región Metropolitana</option>
+            <option value="1.08">Valparaíso</option>
+            <option value="1.12">Biobío</option>
+            <option value="1.2">Otra región</option>
+          </select>
+        </div>
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <label class="block text-xs font-bold text-amber-800 mb-1.5">⚖️ ¿Qué pasaría si valorizas menos? (simulación)</label>
+          <input type="number" id="s-tons-real" placeholder="Dejar vacío = usa meta del slider" min="0" oninput="recalc()"
+            class="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"/>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel resultados -->
+    <div class="space-y-4">
+      <div id="results-empty" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-12 text-center">
+        <div class="text-5xl mb-3">🧾</div>
+        <p class="text-slate-500 text-sm font-semibold">Ingresa los parámetros para calcular</p>
+        <p class="text-slate-400 text-xs mt-1">Los resultados aparecerán aquí en tiempo real</p>
+      </div>
+      <div id="results-content" class="hidden space-y-4">
+        <div class="grid grid-cols-2 gap-3" id="kpi-grid"></div>
+        <div id="multas-section"></div>
+        <div class="bg-white rounded-2xl border border-emerald-100 shadow-sm p-5">
+          <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">📋 Desglose operativo anual</h3>
+          <table id="tabla-desglose" class="w-full text-xs"></table>
+        </div>
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">📊 Distribución de costos</h3>
+          <div id="bar-chart" class="space-y-3"></div>
+        </div>
+
+        <!-- Guardar producción → produccion_rep -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-bold text-slate-800 flex items-center gap-2">💾 Registrar producción</p>
+            <p class="text-xs text-slate-500 mt-0.5">Guarda este cálculo en tu historial de producción REP para generar certificados posteriormente.</p>
+            <div id="guardar-msg" class="hidden mt-2.5 text-xs px-3 py-2 rounded-lg border font-medium"></div>
+          </div>
+          <button id="btn-guardar" onclick="guardarProduccion()"
+            class="flex-shrink-0 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-white font-bold text-sm px-5 py-3 rounded-xl transition-colors flex items-center gap-2 shadow-sm whitespace-nowrap">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+            <span id="btn-guardar-txt">Guardar producción</span>
+          </button>
+        </div>
+
+        <!-- Link a certificados -->
+        <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <p class="text-sm font-bold text-emerald-800 flex items-center gap-2">📄 ¿Necesitas un certificado PDF?</p>
+            <p class="text-xs text-slate-500 mt-0.5">Guarda primero tu producción, luego ve a la sección Certificados para generar el PDF oficial.</p>
+          </div>
+          <a href="productor-certificados.html"
+            class="flex-shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm px-5 py-3 rounded-xl transition-colors flex items-center gap-2 whitespace-nowrap no-underline">
+            Ir a Certificados →
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div><!-- end tab-calc -->
+
+</main>
+
+<footer class="bg-slate-900 text-slate-400 text-xs py-5 border-t border-slate-800 mt-auto">
+  <div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-3">
+    <p><strong class="text-white">Damu SGC</strong> — Trazabilidad Ley REP · Chile</p>
+    <div class="flex gap-4 flex-wrap justify-center">
+      <a href="../auth/portal.html" class="hover:text-white transition-colors">Portal</a>
+      <a href="../pages/productores.html" class="hover:text-white transition-colors">Productores</a>
+    </div>
+    <p class="text-slate-600">© 2026 Damu SGC</p>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
+<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.min.js"></script>
+
+<script>
+// ═══════════════════════════ TAB SWITCHING ═══════════════════════════
+function setTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(function(el) { el.classList.remove('active'); });
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(function(el) {
+    el.classList.remove('bg-white', 'text-slate-800', 'shadow-sm');
+    el.classList.add('text-slate-400');
+  });
+  var activeBtn = document.getElementById('tab-btn-' + tab);
+  activeBtn.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
+  activeBtn.classList.remove('text-slate-400');
+
+  if (tab === 'rutas' && _map) {
+    setTimeout(function() { _map.invalidateSize(); }, 100);
+  }
+  if (tab === 'calc') {
+    _cargarBannerEmpresa();
+  }
+}
+
+// ═══════════════════════════ MAP GLOBALS ═══════════════════════════
+var _map              = null;
+var _routingControl   = null;
+var _waypointCount    = 0;
+var _debTimers        = {};
+var _routeCalculated  = false;
+var _autoRouted       = false;
+var _centros          = DAMU.centros;
+var STOP_COLORS       = ['#059669','#2980b9','#f59e0b','#8e44ad','#e74c3c','#1abc9c'];
+var STOP_LABELS       = ['A','B','C','D','E','F'];
+
+// ═══════════════════════════ MAP INIT ═══════════════════════════
+window.addEventListener('DOMContentLoaded', function () {
+  setTab('rutas');
+
+  _map = L.map('map', { scrollWheelZoom: false }).setView([-33.4489, -70.6693], 11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',
+    maxZoom: 19,
+  }).addTo(_map);
+
+  _routingControl = L.Routing.control({
+    waypoints: [],
+    router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1', profile: 'driving' }),
+    show: false, addWaypoints: false, draggableWaypoints: false, fitSelectedRoutes: true,
+    lineOptions: { styles: [{ color: '#059669', weight: 5, opacity: 0.85 }], extendToWaypoints: true, missingRouteTolerance: 1 },
+    createMarker: function (i, wp) {
+      var color = STOP_COLORS[Math.min(i, STOP_COLORS.length - 1)];
+      var letra = STOP_LABELS[Math.min(i, STOP_LABELS.length - 1)];
+      return L.marker(wp.latLng, {
+        icon: L.divIcon({
+          className: '',
+          html: '<div style="width:28px;height:28px;border-radius:50%;background:' + color
+            + ';border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:900">' + letra + '</div>',
+          iconSize: [28, 28], iconAnchor: [14, 14],
+        }),
+      });
+    },
+  }).addTo(_map);
+
+  _routingControl.on('routesfound', function (e) {
+    var route   = e.routes[0];
+    var distKm  = Math.round(route.summary.totalDistance / 1000);
+    var mins    = Math.round(route.summary.totalTime / 60);
+    var durText = mins >= 60 ? Math.floor(mins / 60) + ' h ' + (mins % 60) + ' min' : mins + ' min';
+    _routeCalculated = true;
+    document.getElementById('dist-label').textContent     = distKm + ' km';
+    document.getElementById('route-duration').textContent = '⏱ ' + durText;
+    document.getElementById('route-result').classList.remove('hidden');
+    var rutaMsg = document.getElementById('ruta-msg');
+    if (rutaMsg) rutaMsg.classList.add('hidden');
+    inyectarDistancia(distKm);
+  });
+
+  _routingControl.on('routingerror', function (e) {
+    var msg = (e.error && e.error.message) ? e.error.message : 'Sin conexión con OSRM. Intenta más tarde.';
+    var banner = document.getElementById('osrm-error-banner');
+    if (banner) {
+      document.getElementById('osrm-error-msg').textContent = msg;
+      banner.classList.remove('hidden');
+      setTimeout(function() { banner.classList.add('hidden'); }, 8000);
+    }
+    document.getElementById('btn-calcular').disabled    = false;
+    document.getElementById('btn-calcular').textContent = '🧭 Calcular Ruta';
+  });
+
+  cargarMapaOperativo();
+});
+
+// ═══════════════════════════ GEOCODING / ROUTING ═══════════════════════════
+function debSuggest(inputId, listId) {
+  clearTimeout(_debTimers[inputId]);
+  _debTimers[inputId] = setTimeout(function () {
+    var q = document.getElementById(inputId).value.trim();
+    if (q.length < 3) return;
+    fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(q)
+      + '&countrycodes=cl&format=json&limit=5&accept-language=es')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var list = document.getElementById(listId);
+        list.innerHTML = '';
+        data.forEach(function (item) {
+          var opt = document.createElement('option');
+          opt.value = item.display_name;
+          list.appendChild(opt);
+        });
+      }).catch(function () {});
+  }, 350);
+}
+
+async function geocodificar(query) {
+  var url = 'https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(query)
+    + '&countrycodes=cl&format=json&limit=1&accept-language=es';
+  var res  = await fetch(url);
+  var data = await res.json();
+  if (!data.length) throw new Error('No se encontró la dirección: "' + query + '"');
+  return L.latLng(parseFloat(data[0].lat), parseFloat(data[0].lon));
+}
+
+function agregarParada() {
+  var container = document.getElementById('waypoints-container');
+  if (container.children.length >= 3) return;
+  _waypointCount++;
+  var idx = _waypointCount;
+  var inpId = 'wp-inp-' + idx, lstId = 'wp-list-' + idx;
+  var div = document.createElement('div');
+  div.className = 'flex gap-2 items-center';
+  div.innerHTML = '<div class="flex-1"><input id="' + inpId + '" type="text" list="' + lstId + '" autocomplete="off"'
+    + ' placeholder="Parada ' + idx + ': ej. Pudahuel, Santiago"'
+    + ' oninput="debSuggest(\'' + inpId + '\',\'' + lstId + '\')"'
+    + ' class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"/>'
+    + '<datalist id="' + lstId + '"></datalist></div>'
+    + '<button onclick="this.parentElement.remove(); actualizarBtnAgregar();"'
+    + ' class="text-red-400 hover:text-red-600 border border-red-200 hover:border-red-400 rounded-lg px-3 py-2 text-xs font-bold transition-colors flex-shrink-0">✕</button>';
+  container.appendChild(div);
+  actualizarBtnAgregar();
+}
+
+function actualizarBtnAgregar() {
+  document.getElementById('btn-add-waypoint').disabled = (document.getElementById('waypoints-container').children.length >= 3);
+}
+
+async function calcularRuta() {
+  var originStr = document.getElementById('map-origin').value.trim();
+  var destStr   = document.getElementById('map-dest').value.trim();
+  if (!originStr || !destStr) { alert('Ingresa el punto de origen y el destino para continuar.'); return; }
+  var btn = document.getElementById('btn-calcular');
+  btn.textContent = '⏳ Geocodificando…'; btn.disabled = true;
+  try {
+    var wpTexts = [];
+    document.querySelectorAll('#waypoints-container input').forEach(function (inp) {
+      if (inp.value.trim()) wpTexts.push(inp.value.trim());
+    });
+    var roundtrip = document.getElementById('chk-roundtrip').checked;
+    var allTexts  = [originStr].concat(wpTexts).concat([destStr]);
+    var allLatLng = await Promise.all(allTexts.map(geocodificar));
+    var latlngs   = roundtrip ? allLatLng.concat([allLatLng[0]]) : allLatLng;
+    var waypoints = latlngs.map(function (ll, i) {
+      return L.Routing.waypoint(ll, STOP_LABELS[Math.min(i, STOP_LABELS.length - 1)]);
+    });
+    btn.textContent = '⏳ Calculando ruta OSRM…';
+    _routingControl.setWaypoints(waypoints);
+  } catch (err) {
+    alert('Error: ' + err.message);
+    btn.textContent = '🧭 Calcular Ruta'; btn.disabled = false;
+  }
+}
+
+function inyectarDistancia(km) {
+  var slider = document.getElementById('v-dist');
+  var label  = document.getElementById('lbl-dist');
+  var badge  = document.getElementById('dist-auto-badge');
+  var btn    = document.getElementById('btn-calcular');
+  if (!slider) return;
+  var val = Math.max(5, Math.min(1000, km));
+  slider.value = val; label.textContent = val; badge.classList.remove('hidden');
+  btn.textContent = '🧭 Calcular Ruta'; btn.disabled = false;
+  slider.dispatchEvent(new Event('input'));
+}
+
+// ═══════════════════════════ GUARDAR RUTA (explícito) ═══════════════════════════
+async function guardarRuta() {
+  if (!_routeCalculated) { _setRutaMsg('warn', '⚠️ Calcula una ruta primero.'); return; }
+  var sb        = window.__damuSupabase;
+  var empresaId = localStorage.getItem('damu_empresa_id');
+  var btn       = document.getElementById('btn-guardar-ruta');
+  btn.disabled  = true; btn.textContent = 'Guardando…';
+  try {
+    var sesRes = await sb.auth.getSession();
+    var uid    = sesRes.data.session.user.id;
+    if (!empresaId) {
+      var eRes = await sb.from('empresas').select('id').eq('user_id_productor', uid).maybeSingle();
+      if (eRes.data) { empresaId = eRes.data.id; localStorage.setItem('damu_empresa_id', empresaId); }
+    }
+    var origen  = (document.getElementById('map-origin').value || '').trim() || null;
+    var destino = (document.getElementById('map-dest').value   || '').trim() || null;
+    var dist    = parseFloat(document.getElementById('v-dist').value) || 0;
+    var rendim  = parseFloat(document.getElementById('v-rendim').value) || 12;
+    var diesel  = parseFloat(document.getElementById('v-diesel').value) || 1200;
+    var litros  = (dist * 2) / rendim;
+    var costo   = Math.round(litros * diesel);
+    var { error } = await sb.from('viajes_operativos').insert({
+      user_id: uid, empresa_id: empresaId || null,
+      origen: origen, destino: destino, distancia_km: dist, costo_diesel: costo, cargas_qr_kg: 0,
+    });
+    if (error) throw error;
+    _setRutaMsg('ok', '✓ Ruta guardada en el historial.');
+    _routeCalculated = false;
+  } catch (err) {
+    _setRutaMsg('err', '❌ Error al guardar: ' + err.message);
+  } finally {
+    btn.disabled = false; btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg> Guardar Ruta';
+  }
+}
+
+function _setRutaMsg(tipo, texto) {
+  var el = document.getElementById('ruta-msg');
+  if (!el) return;
+  el.className = 'text-xs font-medium px-3 py-1.5 rounded-lg border '
+    + (tipo === 'ok'   ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+     : tipo === 'warn' ? 'bg-amber-50 border-amber-200 text-amber-700'
+                       : 'bg-red-50 border-red-200 text-red-700');
+  el.textContent = texto;
+  el.classList.remove('hidden');
+  if (tipo === 'ok') setTimeout(function () { el.classList.add('hidden'); }, 7000);
+}
+
+// ═══════════════════════════ VARIABLES PRO (recalcVars) ═══════════════════════════
+function recalcVars() {
+  var diesel    = parseFloat(document.getElementById('v-diesel').value);
+  var rendim    = parseFloat(document.getElementById('v-rendim').value);
+  var dist      = parseFloat(document.getElementById('v-dist').value);
+  var freq      = parseInt(document.getElementById('v-freq').value);
+  var inversion = parseFloat(document.getElementById('v-inversion').value) || 0;
+  var litrosPorViaje   = (dist * 2) / rendim;
+  var costoPorViaje    = litrosPorViaje * diesel;
+  var costoAnualDiesel = costoPorViaje * freq;
+  var costoMensual     = costoAnualDiesel / 12;
+  var costoPorKm       = diesel / rendim;
+  var paybackMeses     = (inversion > 0 && costoAnualDiesel > 0) ? (inversion / costoAnualDiesel * 12).toFixed(1) : null;
+  function clpv(n) { return '$' + Math.round(n).toLocaleString('es-CL') + ' CLP'; }
+
+  document.getElementById('res-grid').innerHTML = [
+    { icon:'⛽', lbl:'Costo por viaje',    val: clpv(costoPorViaje),    col:'text-red-500'   },
+    { icon:'📅', lbl:'Costo anual diésel', val: clpv(costoAnualDiesel), col:'text-red-500'   },
+    { icon:'💳', lbl:'Costo mensual',      val: clpv(costoMensual),     col:'text-amber-500' },
+    { icon:'📏', lbl:'Costo por km',       val: clpv(costoPorKm)+'/km', col:'text-slate-700' },
+    { icon:'🛢️', lbl:'Litros / viaje',     val: litrosPorViaje.toFixed(0)+' L', col:'text-slate-700' },
+    { icon:'⏱️', lbl:'Payback inversión',  val: paybackMeses ? paybackMeses+' meses' : '—', col:'text-emerald-600' },
+  ].map(function (k) {
+    return '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-center">'
+      + '<div class="text-2xl mb-1">' + k.icon + '</div>'
+      + '<div class="text-sm font-black ' + k.col + '">' + k.val + '</div>'
+      + '<div class="text-xs text-slate-500 mt-0.5">' + k.lbl + '</div></div>';
+  }).join('');
+
+  document.getElementById('res-bars').innerHTML = [
+    { lbl:'Costo por viaje',   val: costoPorViaje,    color:'#dc2626' },
+    { lbl:'Costo mensual',     val: costoMensual,     color:'#f59e0b' },
+    { lbl:'Costo anual total', val: costoAnualDiesel, color:'#059669' },
+  ].map(function (b) {
+    var pct = costoAnualDiesel > 0 ? Math.min(100, Math.round(b.val / costoAnualDiesel * 100)) : 0;
+    return '<div class="flex items-center gap-3">'
+      + '<div class="text-xs text-slate-500 text-right flex-shrink-0 w-28">' + b.lbl + '</div>'
+      + '<div class="flex-1 h-4 bg-slate-100 rounded-full overflow-hidden">'
+      + '<div class="bar-fill h-full rounded-full" style="width:' + pct + '%;background:' + b.color + '"></div>'
+      + '</div>'
+      + '<div class="text-xs font-semibold text-slate-600 flex-shrink-0 w-32 text-right">' + clpv(b.val) + '</div></div>';
+  }).join('');
+  document.getElementById('results-section').classList.remove('hidden');
+}
+
+// ═══════════════════════════ MAPA OPERATIVO ═══════════════════════════
+var _acopiosData      = [];
+var _flotaData        = [];
+var _marcadoresAcopio = [];
+var _marcadoresFlota  = [];
+window._acopiosData   = _acopiosData;
+
+async function cargarMapaOperativo() {
+  var sb = window.__damuSupabase;
+  if (!sb) return;
+  _setBtnRefresh(true);
+  try {
+    var sesRes = await sb.auth.getSession();
+    var uid    = sesRes.data && sesRes.data.session ? sesRes.data.session.user.id : null;
+    var results = await Promise.all([
+      sb.from('puntos_acopio').select('*').eq('activo', true),
+      uid ? sb.from('flota_vehiculos').select('*').eq('user_id', uid).eq('activo', true) : Promise.resolve({ data: [] }),
+    ]);
+    if (results[0].error) throw results[0].error;
+    _acopiosData = results[0].data || [];
+    _flotaData   = results[1].data || [];
+    window._acopiosData = _acopiosData;
+    _pintarAcopios(_acopiosData);
+    _pintarFlota(_flotaData);
+    _verificarCriticos(_acopiosData);
+    _actualizarEstadoBar(_acopiosData, _flotaData);
+    _renderTablaAcopios(_acopiosData);
+    _renderTablaFlota(_flotaData);
+    calcularRutasSugeridas();
+  } catch (err) {
+    var elS = document.getElementById('status-acopios');
+    if (elS) { elS.textContent = '⚠ Error al cargar puntos de acopio'; elS.classList.add('text-red-400'); }
+  } finally {
+    _setBtnRefresh(false);
+  }
+}
+
+function _setBtnRefresh(loading) {
+  var btn = document.getElementById('btn-refresh-mapa');
+  var badge = document.getElementById('mapa-loading-badge');
+  if (!btn) return;
+  btn.disabled = loading;
+  if (loading) { btn.classList.add('opacity-50'); if (badge) badge.classList.remove('hidden'); }
+  else         { btn.classList.remove('opacity-50'); if (badge) badge.classList.add('hidden'); }
+}
+
+function _pctLlenado(p) { return p.capacidad_total_kg > 0 ? (p.carga_actual_kg / p.capacidad_total_kg) * 100 : 0; }
+function _colorAcopio(pct) { return pct >= 80 ? '#e74c3c' : pct >= 50 ? '#f59e0b' : '#2ecc71'; }
+function _estadoLabel(pct) { return pct >= 80 ? 'CRÍTICO' : pct >= 50 ? 'MEDIO' : 'LIBRE'; }
+
+function _pintarAcopios(acopios) {
+  _marcadoresAcopio.forEach(function (m) { m.remove(); });
+  _marcadoresAcopio = [];
+  var catLabel = { envases:'Envases', neumaticos:'Neumáticos', pilas:'Pilas/Bat.', raee:'RAEE', aceites:'Aceites' };
+  acopios.forEach(function (p) {
+    var pct = _pctLlenado(p), color = _colorAcopio(pct), critico = pct >= 80, sz = critico ? 20 : 14, borde = critico ? 3 : 2;
+    var icon = L.divIcon({
+      className: '',
+      html: '<div style="width:' + sz + 'px;height:' + sz + 'px;border-radius:50%;background:' + color
+        + ';border:' + borde + 'px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3)'
+        + (critico ? ';animation:pulse-acopio 1.8s ease-in-out infinite' : '') + ';cursor:pointer"></div>',
+      iconSize: [sz, sz], iconAnchor: [sz / 2, sz / 2],
+    });
+    var popupHtml = '<div style="min-width:215px;font-family:\'Segoe UI\',sans-serif;font-size:13px;">'
+      + '<p style="font-weight:800;margin:0 0 2px;color:#0f172a">' + p.nombre + '</p>'
+      + '<p style="font-size:11px;color:#94a3b8;margin:0 0 10px">' + (catLabel[p.categoria] || p.categoria) + '</p>'
+      + '<div style="background:#f8fafc;border-radius:8px;padding:9px 10px;margin-bottom:10px">'
+      + '<div style="background:#e2e8f0;border-radius:4px;height:8px;overflow:hidden;margin-bottom:5px">'
+      + '<div style="background:' + color + ';width:' + Math.min(pct, 100).toFixed(0) + '%;height:100%;border-radius:4px"></div>'
+      + '</div><span style="font-weight:800;font-size:13px;color:' + color + '">' + pct.toFixed(0) + '% — ' + _estadoLabel(pct) + '</span></div>'
+      + (critico ? '<button onclick="autoRellenarRuta(window._acopiosData.find(function(x){return x.id===\'' + p.id + '\';}))" '
+        + 'style="width:100%;background:#e74c3c;color:#fff;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🚨 Iniciar retiro urgente</button>'
+        : '<p style="font-size:11px;color:#94a3b8;margin:0">Sin urgencia de retiro inmediato</p>')
+      + '</div>';
+    var marker = L.marker([p.lat, p.lng], { icon: icon, title: p.nombre })
+      .bindPopup(popupHtml, { maxWidth: 250, className: 'damu-popup' }).addTo(_map);
+    _marcadoresAcopio.push(marker);
+  });
+}
+
+function _pintarFlota(flota) {
+  _marcadoresFlota.forEach(function (m) { m.remove(); });
+  _marcadoresFlota = [];
+  flota.forEach(function (v) {
+    if (!v.lat || !v.lng) return;
+    var icon = L.divIcon({ className: '', html: '<div style="font-size:22px;line-height:1;filter:drop-shadow(0 2px 5px rgba(0,0,0,.5));cursor:pointer">🚛</div>', iconSize: [26, 24], iconAnchor: [13, 12] });
+    var marker = L.marker([v.lat, v.lng], { icon: icon, title: v.patente })
+      .bindPopup('<p style="font-weight:800">🚛 ' + v.patente + '</p><p style="font-size:11px;color:#94a3b8">' + (v.conductor || 'Sin conductor') + '</p>', { maxWidth: 200, className: 'damu-popup' })
+      .addTo(_map);
+    _marcadoresFlota.push(marker);
+  });
+}
+
+function _verificarCriticos(acopios) {
+  var criticos = acopios.filter(function (p) { return _pctLlenado(p) >= 80; });
+  var alertBar = document.getElementById('alert-crit');
+  var alertMsg = document.getElementById('alert-crit-msg');
+  var btnOpt   = document.getElementById('btn-optimizar-ruta');
+  if (criticos.length > 0) {
+    var nombres = criticos.slice(0, 3).map(function (p) { return p.nombre.split('—')[0].trim(); });
+    alertMsg.textContent = criticos.length + ' punto(s) en estado CRÍTICO: ' + nombres.join(', ') + (criticos.length > 3 ? ' y ' + (criticos.length - 3) + ' más.' : '.');
+    alertBar.classList.remove('hidden');
+    if (btnOpt) btnOpt.classList.remove('hidden');
+  } else {
+    alertBar.classList.add('hidden');
+    if (btnOpt) btnOpt.classList.add('hidden');
+  }
+}
+
+function _actualizarEstadoBar(acopios, flota) {
+  var criticos = acopios.filter(function (p) { return _pctLlenado(p) >= 80; }).length;
+  var elA = document.getElementById('status-acopios');
+  var elC = document.getElementById('status-criticos');
+  var elF = document.getElementById('status-flota');
+  if (elA) { elA.innerHTML = '📍 ' + acopios.length + ' puntos de acopio cargados'; elA.classList.remove('text-slate-400'); elA.classList.add(acopios.length > 0 ? 'text-emerald-600' : 'text-slate-400'); }
+  if (elC) { elC.textContent = criticos > 0 ? '🔴 ' + criticos + ' crítico(s)' : '🟢 Ningún punto crítico'; elC.className = 'text-xs font-semibold ' + (criticos > 0 ? 'text-red-500' : 'text-emerald-600'); elC.classList.remove('hidden'); }
+  if (elF && flota.length > 0) { elF.textContent = '🚛 ' + flota.length + ' vehículo(s) en red'; elF.classList.remove('hidden'); }
+}
+
+var _catLabel  = { envases:'Envases', neumaticos:'Neumáticos', pilas:'Pilas/Bat.', raee:'RAEE', aceites:'Aceites' };
+var _tipoLabel = { camion:'Camión', furgon:'Furgón', camion_mayor:'Camión Mayor' };
+
+function _renderTablaAcopios(acopios) {
+  var wrap = document.getElementById('tabla-acopios-wrap');
+  var badge = document.getElementById('badge-total-acopios');
+  if (!wrap) return;
+  if (badge) badge.textContent = acopios.length + ' punto' + (acopios.length !== 1 ? 's' : '');
+  if (acopios.length === 0) { wrap.innerHTML = '<p class="text-slate-400 text-sm text-center py-4">Sin puntos de acopio en la red.</p>'; return; }
+  var rows = acopios.slice().sort(function (a, b) { return _pctLlenado(b) - _pctLlenado(a); }).map(function (p) {
+    var pct = _pctLlenado(p), color = _colorAcopio(pct);
+    var cls = pct >= 80 ? 'bg-red-100 text-red-700 border-red-200' : pct >= 50 ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200';
+    var accion = pct >= 80 ? '<button onclick="autoRellenarRuta(window._acopiosData.find(function(x){return x.id===\'' + p.id + '\';}))" class="text-xs bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 rounded-lg transition-colors font-semibold">Retirar</button>' : '<span class="text-xs text-slate-300">—</span>';
+    return '<tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/70 transition-colors">'
+      + '<td class="py-2.5 px-3 text-sm font-semibold text-slate-800 max-w-[200px] truncate">' + p.nombre + '</td>'
+      + '<td class="py-2.5 px-3 text-xs text-slate-500">' + (_catLabel[p.categoria] || p.categoria) + '</td>'
+      + '<td class="py-2.5 px-3 min-w-[100px]"><div class="flex items-center gap-2"><div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden"><div class="h-full rounded-full" style="width:' + Math.min(pct, 100).toFixed(0) + '%;background:' + color + '"></div></div><span class="text-xs font-bold w-8 text-right" style="color:' + color + '">' + pct.toFixed(0) + '%</span></div></td>'
+      + '<td class="py-2.5 px-3"><span class="text-xs font-bold px-2 py-0.5 rounded-full border ' + cls + '">' + _estadoLabel(pct) + '</span></td>'
+      + '<td class="py-2.5 px-3">' + accion + '</td></tr>';
+  }).join('');
+  wrap.innerHTML = '<div class="overflow-x-auto -mx-1"><table class="w-full text-left min-w-[480px]"><thead><tr class="border-b border-slate-200"><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Acopio</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Cat.</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide w-32">Ocupación</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Estado</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Acción</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
+function _renderTablaFlota(flota) {
+  var wrap  = document.getElementById('tabla-flota-wrap');
+  var badge = document.getElementById('badge-total-flota');
+  if (!wrap) return;
+  if (badge) badge.textContent = flota.length + ' vehículo' + (flota.length !== 1 ? 's' : '');
+  if (flota.length === 0) { wrap.innerHTML = '<p class="text-slate-400 text-sm text-center py-6">No tienes vehículos registrados.</p>'; return; }
+  var rows = flota.map(function (v) {
+    var pct = v.capacidad_kg > 0 ? (v.carga_actual_kg / v.capacidad_kg) * 100 : 0, color = _colorAcopio(pct);
+    return '<tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/70 transition-colors">'
+      + '<td class="py-2.5 px-3 text-sm font-bold text-slate-800">🚛 ' + v.patente + '</td>'
+      + '<td class="py-2.5 px-3 text-xs text-slate-600">' + (v.conductor || '—') + '</td>'
+      + '<td class="py-2.5 px-3 text-xs text-slate-500">' + (_tipoLabel[v.tipo] || v.tipo || '—') + '</td>'
+      + '<td class="py-2.5 px-3 min-w-[90px]"><div class="flex items-center gap-2"><div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden"><div class="h-full rounded-full" style="width:' + Math.min(pct, 100).toFixed(0) + '%;background:' + color + '"></div></div><span class="text-xs font-bold w-8 text-right" style="color:' + color + '">' + pct.toFixed(0) + '%</span></div></td>'
+      + '<td class="py-2.5 px-3 text-xs text-slate-500">' + (v.destino && _centros[v.destino] ? _centros[v.destino].nombre : (v.destino || '—')) + '</td></tr>';
+  }).join('');
+  wrap.innerHTML = '<div class="overflow-x-auto -mx-1"><table class="w-full text-left min-w-[400px]"><thead><tr class="border-b border-slate-200"><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Patente</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Conductor</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Tipo</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide w-28">Carga</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Destino</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
+function autoRellenarRuta(punto) {
+  if (!punto) return;
+  _map.closePopup();
+  var destInput = document.getElementById('map-dest');
+  if (destInput) {
+    destInput.value = punto.nombre;
+    destInput.style.borderColor = '#e74c3c'; destInput.style.boxShadow = '0 0 0 3px rgba(231,76,60,.2)';
+    setTimeout(function () { destInput.style.borderColor = ''; destInput.style.boxShadow = ''; }, 2000);
+  }
+  var sec = document.getElementById('mapa-controles');
+  if (sec) window.scrollTo({ top: sec.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' });
+}
+
+async function optimizarRecoleccion() {
+  var criticos = _acopiosData.filter(function (p) { return _pctLlenado(p) >= 80; }).sort(function (a, b) { return _pctLlenado(b) - _pctLlenado(a); });
+  if (criticos.length === 0) { alert('No hay puntos críticos en este momento.'); return; }
+  try {
+    var origenLL = await new Promise(function (resolve) {
+      if (!navigator.geolocation) { resolve(null); return; }
+      navigator.geolocation.getCurrentPosition(function (pos) { resolve(L.latLng(pos.coords.latitude, pos.coords.longitude)); }, function () { resolve(null); }, { timeout: 4000 });
+    });
+    if (!origenLL) origenLL = L.latLng(criticos[0].lat - 0.015, criticos[0].lng - 0.015);
+    var waypoints = [L.Routing.waypoint(origenLL, 'Mi posición')].concat(criticos.map(function (p) { return L.Routing.waypoint(L.latLng(p.lat, p.lng), p.nombre); }));
+    _routingControl.setWaypoints(waypoints);
+    var bounds = L.latLngBounds(criticos.map(function (p) { return [p.lat, p.lng]; }));
+    _map.fitBounds(bounds.pad(0.25));
+  } catch (err) { alert('Error: ' + err.message); }
+}
+
+// ═══════════════════════════ RUTAS SUGERIDAS ═══════════════════════════
+var RENDIM_DEFAULT             = DAMU.rendimDefault;
+var DIESEL_DEFAULT             = DAMU.dieselDefault;
+var CO2_KG_PER_LIT             = DAMU.co2PorLitro;
+var MAX_PARADAS_VEH            = 4;
+var RUTA_COLORS                = ['#2980b9','#8e44ad','#16a085','#d35400','#2c3e50'];
+var _asignacionesSugeridas     = [];
+var _distMatrixCache           = {};
+var _rutaSugeridaLayerGroup    = null;
+
+async function calcularRutasSugeridas() {
+  var wrap = document.getElementById('rutas-sugeridas-wrap');
+  var btn  = document.getElementById('btn-calcular-rutas');
+  if (!wrap) return;
+  if (btn) { btn.textContent = '⟳ Calculando…'; btn.disabled = true; }
+  wrap.innerHTML = '<p class="text-slate-400 text-sm text-center py-4 flex items-center justify-center gap-2"><svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Calculando…</p>';
+  try {
+    var vehiculos = _flotaData.filter(function(v) { return v.activo !== false && v.lat && v.lng && ((v.capacidad_kg || 0) - (v.carga_actual_kg || 0)) > 0; });
+    var acopiosPrio = _acopiosData.filter(function(p) { return _pctLlenado(p) >= 50 && p.lat && p.lng && p.carga_actual_kg > 0; }).sort(function(a, b) { return _pctLlenado(b) - _pctLlenado(a); });
+    if (vehiculos.length === 0) { wrap.innerHTML = '<p class="text-slate-400 text-sm text-center py-6">Sin vehículos con posición GPS y capacidad disponible.</p>'; return; }
+    if (acopiosPrio.length === 0) { wrap.innerHTML = '<p class="text-emerald-600 text-sm text-center py-6 font-semibold">✅ Sin puntos críticos ni medios pendientes — la red está en buen estado.</p>'; return; }
+    var nV = vehiculos.length;
+    var allPositions = vehiculos.map(function(v) { return { lat: v.lat, lng: v.lng }; }).concat(acopiosPrio.map(function(p) { return { lat: p.lat, lng: p.lng }; }));
+    var cacheKey = allPositions.map(function(p) { return p.lat.toFixed(4) + ',' + p.lng.toFixed(4); }).join('|');
+    var distMatrix = _distMatrixCache[cacheKey] ? _distMatrixCache[cacheKey] : await _fetchOsrmTable(allPositions);
+    _distMatrixCache[cacheKey] = distMatrix;
+    var asignaciones = _buildAsignaciones(vehiculos, acopiosPrio, nV, distMatrix);
+    _asignacionesSugeridas = asignaciones;
+    _renderRutasSugeridas(asignaciones, acopiosPrio);
+    _trazarRutasSugeridas(asignaciones);
+  } catch(err) {
+    wrap.innerHTML = '<p class="text-red-400 text-sm text-center py-4">⚠ Error al calcular rutas: ' + (err.message || err) + '</p>';
+  } finally {
+    if (btn) { btn.textContent = '⟳ Recalcular'; btn.disabled = false; }
+  }
+}
+
+async function _fetchOsrmTable(positions) {
+  var coords = positions.map(function(p) { return p.lng.toFixed(6) + ',' + p.lat.toFixed(6); }).join(';');
+  var res  = await fetch('https://router.project-osrm.org/table/v1/driving/' + coords + '?annotations=duration,distance');
+  var data = await res.json();
+  if (data.code !== 'Ok') throw new Error('OSRM table: ' + data.code);
+  if (data.distances) return data.distances;
+  return (data.durations || []).map(function(row) { return row.map(function(sec) { return sec == null ? null : Math.round(sec * 13.89); }); });
+}
+
+function _buildAsignaciones(vehiculos, acopiosPrio, nV, distMatrix) {
+  var asignaciones = [], asignados = {};
+  vehiculos.slice().sort(function(a, b) { return ((b.capacidad_kg||0)-(b.carga_actual_kg||0)) - ((a.capacidad_kg||0)-(a.carga_actual_kg||0)); }).forEach(function(veh) {
+    var idxVeh = vehiculos.indexOf(veh), capDisp = (veh.capacidad_kg||0) - (veh.carga_actual_kg||0), paradas = [], idxActual = idxVeh;
+    for (var iter = 0; iter < MAX_PARADAS_VEH; iter++) {
+      var candidatos = acopiosPrio.filter(function(p) { return !asignados[p.id] && p.carga_actual_kg <= capDisp; });
+      if (candidatos.length === 0) break;
+      var pool = candidatos.filter(function(p) { return _pctLlenado(p) >= 80; });
+      if (pool.length === 0) pool = candidatos;
+      var mejor = null, mejorDist = Infinity;
+      pool.forEach(function(p) {
+        var pi = nV + acopiosPrio.indexOf(p), dist = distMatrix[idxActual] ? (distMatrix[idxActual][pi] || Infinity) : Infinity;
+        if (dist < mejorDist) { mejorDist = dist; mejor = { punto: p, idxEnMatriz: pi, distDesdeAnterior: dist }; }
+      });
+      if (!mejor || mejorDist === Infinity) break;
+      paradas.push(mejor); asignados[mejor.punto.id] = true; capDisp -= mejor.punto.carga_actual_kg; idxActual = mejor.idxEnMatriz;
+    }
+    if (paradas.length === 0) return;
+    var distKm = paradas.reduce(function(s,p){return s+(p.distDesdeAnterior||0);},0)/1000;
+    var rendim = parseFloat((document.getElementById('v-rendim')||{}).value) || RENDIM_DEFAULT;
+    var diesel = parseFloat((document.getElementById('v-diesel')||{}).value) || DIESEL_DEFAULT;
+    var litros = distKm / (rendim || 1);
+    var catPrincipal = paradas[0].punto.categoria;
+    asignaciones.push({ vehiculo:veh, paradas:paradas, catPrincipal:catPrincipal, centro:_centros[catPrincipal]||_centros.envases, distKm:parseFloat(distKm.toFixed(1)), costoClp:Math.round(litros*diesel), co2Kg:parseFloat((litros*CO2_KG_PER_LIT).toFixed(2)), cargaTotalKg:paradas.reduce(function(s,p){return s+p.punto.carga_actual_kg;},0) });
+  });
+  return asignaciones;
+}
+
+function _renderRutasSugeridas(asignaciones, acopiosPrio) {
+  var wrap = document.getElementById('rutas-sugeridas-wrap');
+  if (!wrap) return;
+  if (asignaciones.length === 0) { wrap.innerHTML = '<p class="text-slate-400 text-sm text-center py-6">No fue posible asignar vehículos.</p>'; return; }
+  var asignadosIds = {};
+  asignaciones.forEach(function(a){a.paradas.forEach(function(p){asignadosIds[p.punto.id]=true;});});
+  var sinAsignar = acopiosPrio.filter(function(p){return !asignadosIds[p.id]&&_pctLlenado(p)>=80;});
+  var bannerHtml = sinAsignar.length > 0 ? '<div class="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-xs text-red-700 font-semibold">⚠ ' + sinAsignar.length + ' punto(s) CRÍTICO(S) sin vehículo asignado.</div>' : '';
+  var cards = asignaciones.map(function(a, ai) {
+    var capDisp = (a.vehiculo.capacidad_kg||0) - (a.vehiculo.carga_actual_kg||0);
+    var paradaHtml = '';
+    a.paradas.forEach(function(p, si) {
+      var pct = _pctLlenado(p.punto);
+      var numCls = pct >= 80 ? 'bg-red-500 text-white' : 'bg-amber-400 text-white';
+      var badgeCls = pct >= 80 ? 'bg-red-100 text-red-700 border-red-200' : 'bg-amber-100 text-amber-700 border-amber-200';
+      var distLbl = p.distDesdeAnterior > 0 ? (p.distDesdeAnterior/1000).toFixed(1)+' km' : '< 0.1 km';
+      if (si > 0) paradaHtml += '<div class="pl-3 text-xs text-slate-300 leading-relaxed">↓ ' + distLbl + '</div>';
+      paradaHtml += '<div class="flex items-start gap-2.5"><div class="flex-shrink-0 w-5 h-5 rounded-full ' + numCls + ' text-xs font-bold flex items-center justify-center mt-0.5">' + (si+1) + '</div><div class="flex-1 min-w-0"><div class="flex items-center gap-1.5 flex-wrap"><p class="text-sm font-semibold text-slate-800 truncate">' + p.punto.nombre + '</p><span class="text-xs font-bold px-1.5 py-0.5 rounded-full border flex-shrink-0 ' + badgeCls + '">' + _estadoLabel(pct) + '</span></div><p class="text-xs text-slate-400">' + p.punto.carga_actual_kg.toFixed(0) + ' kg a retirar</p></div></div>';
+    });
+    paradaHtml += '<div class="pl-3 text-xs text-slate-300 leading-relaxed">↓ centro</div><div class="flex items-start gap-2.5"><div class="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center mt-0.5 text-xs">🏭</div><div><p class="text-sm font-semibold text-slate-800">' + a.centro.nombre + '</p><p class="text-xs text-slate-400">Centro de valorización REP</p></div></div>';
+    return '<div id="ruta-card-' + ai + '" class="border border-slate-200 rounded-xl overflow-hidden mb-3 last:mb-0"><div class="bg-slate-50 px-4 py-3 flex items-center justify-between border-b border-slate-200"><div class="flex items-center gap-2 min-w-0 flex-1"><span class="text-base flex-shrink-0">🚛</span><div class="min-w-0"><p class="font-bold text-sm text-slate-800">' + a.vehiculo.patente + '</p><p class="text-xs text-slate-400">Cap. disp: ' + capDisp.toLocaleString('es-CL') + ' kg · ' + a.cargaTotalKg.toFixed(0) + ' kg a cargar</p></div></div><button onclick="aplicarRutaSugerida(' + ai + ')" class="flex-shrink-0 ml-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors">Aplicar →</button></div><div class="px-4 py-3 space-y-1.5">' + paradaHtml + '</div><div class="px-4 py-2.5 border-t border-slate-100 bg-slate-50/50 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600"><span>📏 ' + a.distKm + ' km</span><span>💰 $' + a.costoClp.toLocaleString('es-CL') + ' CLP</span><span>🌿 ' + a.co2Kg + ' kg CO₂e</span></div></div>';
+  }).join('');
+  wrap.innerHTML = bannerHtml + cards;
+}
+
+function _trazarRutasSugeridas(asignaciones) {
+  if (!_map) return;
+  if (_rutaSugeridaLayerGroup) { _rutaSugeridaLayerGroup.clearLayers(); }
+  else { _rutaSugeridaLayerGroup = L.layerGroup().addTo(_map); }
+  asignaciones.forEach(function(a, ai) {
+    var color = RUTA_COLORS[ai % RUTA_COLORS.length];
+    var puntos = [[a.vehiculo.lat,a.vehiculo.lng]].concat(a.paradas.map(function(p){return[p.punto.lat,p.punto.lng];})).concat([[a.centro.lat,a.centro.lng]]);
+    L.polyline(puntos, { color:color, weight:3, opacity:0.75, dashArray:'6 8' }).addTo(_rutaSugeridaLayerGroup);
+    L.marker([a.vehiculo.lat,a.vehiculo.lng], { icon:L.divIcon({ className:'', html:'<div style="background:' + color + ';color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)">' + (ai+1) + '</div>', iconSize:[20,20], iconAnchor:[10,10] }), zIndexOffset:500 }).addTo(_rutaSugeridaLayerGroup);
+  });
+}
+
+async function aplicarRutaSugerida(ai) {
+  var a = _asignacionesSugeridas[ai];
+  if (!a) return;
+  var sb = window.__damuSupabase;
+  var sesion = await sb.auth.getSession();
+  if (!sesion.data || !sesion.data.session) { alert('Sesión no activa.'); return; }
+  var { error } = await sb.from('flota_vehiculos').update({ destino: a.catPrincipal }).eq('id', a.vehiculo.id);
+  if (error) { alert('Error al guardar la ruta: ' + error.message); return; }
+  var waypoints = [L.Routing.waypoint(L.latLng(a.vehiculo.lat,a.vehiculo.lng),'🚛 '+a.vehiculo.patente)]
+    .concat(a.paradas.map(function(p){return L.Routing.waypoint(L.latLng(p.punto.lat,p.punto.lng),p.punto.nombre);}))
+    .concat([L.Routing.waypoint(L.latLng(a.centro.lat,a.centro.lng),a.centro.nombre)]);
+  _routingControl.setWaypoints(waypoints);
+  _autoRouted = true;
+  var destEl = document.getElementById('map-dest');
+  if (destEl) destEl.value = a.centro.nombre;
+  var mapaEl = document.getElementById('mapa-controles');
+  if (mapaEl) window.scrollTo({ top: mapaEl.getBoundingClientRect().top + window.scrollY - 80, behavior:'smooth' });
+  var card = document.getElementById('ruta-card-' + ai);
+  if (card) { var btnCard = card.querySelector('button'); if (btnCard) { btnCard.textContent='✅ Aplicada'; btnCard.disabled=true; } }
+}
+
+// ═══════════════════════════ CALCULADORA REP ═══════════════════════════
+var _lastCalcResult = null;
+var tarifas = {
+  envases:    { reco:18000, trans:12000, val:22000, co2:0.8  },
+  neumaticos: { reco:25000, trans:18000, val:30000, co2:1.4  },
+  pilas:      { reco:35000, trans:20000, val:45000, co2:0.4  },
+  raee:       { reco:40000, trans:25000, val:50000, co2:1.1  },
+  aceites:    { reco:22000, trans:15000, val:28000, co2:0.9  },
+};
+function clp(n) { return (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('es-CL') + ' CLP'; }
+
+function recalc() {
+  var cat     = document.getElementById('s-cat').value;
+  var tons    = parseFloat(document.getElementById('s-tons').value) || 0;
+  var meta    = parseFloat(document.getElementById('s-meta').value) / 100;
+  var regMult = parseFloat(document.getElementById('s-region').value);
+  var rawReal = parseFloat(document.getElementById('s-tons-real').value);
+  if (!tons) {
+    document.getElementById('results-empty').classList.remove('hidden');
+    document.getElementById('results-content').classList.add('hidden');
+    return;
+  }
+  var t = tarifas[cat];
+  var tonsVal  = tons * meta;
+  var tonsReal = isNaN(rawReal) ? tonsVal : rawReal;
+  var costoReco  = tonsVal * t.reco  * regMult;
+  var costoTrans = tonsVal * t.trans * regMult;
+  var costoVal   = tonsVal * t.val   * regMult;
+  var costoTotal = costoReco + costoTrans + costoVal;
+  var co2        = tonsReal * 0.9 * t.co2;
+  var metaLegal  = tons * 0.20;
+  var shortfall  = Math.max(0, metaLegal - tonsReal);
+  var multa      = shortfall * 195000;
+  var cumple     = tonsReal >= metaLegal;
+
+  document.getElementById('results-empty').classList.add('hidden');
+  document.getElementById('results-content').classList.remove('hidden');
+
+  document.getElementById('kpi-grid').innerHTML = [
+    { icon:'⚖️', lbl:'Tons. a valorizar',   val: tonsVal.toFixed(1) + ' t',  col:'text-emerald-600' },
+    { icon:'💸', lbl:'Costo total est.',     val: clp(costoTotal),             col:'text-red-500'     },
+    { icon:'🌿', lbl:'CO₂e evitado (est.)', val: co2.toFixed(1) + ' tCO₂e',  col:'text-emerald-600' },
+    { icon:'⚖️', lbl:'Multa en riesgo',     val: cumple ? 'Sin riesgo' : clp(multa), col: cumple ? 'text-emerald-600' : 'text-red-500' },
+  ].map(function(k) {
+    return '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-center"><div class="text-2xl mb-1">' + k.icon + '</div><div class="text-xs text-slate-500 mb-1">' + k.lbl + '</div><div class="text-sm font-black ' + k.col + '">' + k.val + '</div></div>';
+  }).join('');
+
+  var mBorder = cumple ? 'border-emerald-200' : 'border-red-200';
+  var mBg     = cumple ? 'bg-emerald-50'      : 'bg-red-50';
+  var mText   = cumple ? 'text-emerald-700'   : 'text-red-700';
+  var mTitle  = cumple ? '✅ Cumplimiento: sin riesgo de multa' : shortfall === metaLegal ? '🚨 Incumplimiento total' : '⚠️ Riesgo parcial de multa Art. 48';
+  document.getElementById('multas-section').innerHTML = '<div class="border ' + mBorder + ' ' + mBg + ' rounded-2xl p-5"><h3 class="text-sm font-bold ' + mText + ' mb-3">' + mTitle + '</h3><div class="space-y-1.5 text-xs text-slate-600"><div class="flex justify-between"><span>Meta legal mínima (≈20%):</span><strong>' + metaLegal.toFixed(1) + ' t</strong></div><div class="flex justify-between"><span>Brecha:</span><strong>' + shortfall.toFixed(1) + ' t</strong></div><div class="flex justify-between border-t border-slate-200 pt-2 mt-1"><span class="font-bold">Multa estimada Art. 48:</span><strong class="' + mText + '">' + (cumple ? '$0 CLP' : clp(multa)) + '</strong></div></div></div>';
+
+  document.getElementById('tabla-desglose').innerHTML = '<thead><tr class="text-left"><th class="pb-2 pr-4 text-xs text-slate-400 font-semibold">Ítem</th><th class="pb-2 text-xs text-slate-400 font-semibold text-right">Monto / año</th></tr></thead><tbody>'
+    + [['Recolección en origen',costoReco],['Transporte al gestor',costoTrans],['Proceso de valorización',costoVal],['Total costos operativos',costoTotal]].map(function([lbl,monto],i) {
+      return '<tr class="border-t border-slate-100"><td class="py-2 pr-4 text-slate-600' + (i===3?' font-bold text-slate-800':'') + '">' + lbl + '</td><td class="py-2 text-right font-bold' + (i===3?' text-emerald-700':' text-slate-700') + '">' + clp(monto) + '</td></tr>';
+    }).join('') + '</tbody>';
+
+  var maxV = Math.max(costoReco, costoTrans, costoVal);
+  document.getElementById('bar-chart').innerHTML = [
+    { lbl:'Recolección',val:costoReco,color:'#dc2626' },
+    { lbl:'Transporte',val:costoTrans,color:'#f59e0b' },
+    { lbl:'Valorización',val:costoVal,color:'#2980b9' },
+  ].map(function(b) {
+    var pct = maxV ? Math.round(b.val/maxV*100) : 0;
+    return '<div class="flex items-center gap-3"><div class="text-xs text-slate-500 text-right flex-shrink-0 w-24">' + b.lbl + '</div><div class="flex-1 h-4 bg-slate-100 rounded-full overflow-hidden"><div class="bar-fill h-full rounded-full" style="width:' + pct + '%;background:' + b.color + '"></div></div><div class="text-xs font-semibold text-slate-600 flex-shrink-0 w-28 text-right">' + clp(b.val) + '</div></div>';
+  }).join('');
+
+  _lastCalcResult = { cat, tons, tonsVal, costoTotal, co2, multa, cumple, meta: parseFloat(document.getElementById('s-meta').value), ts: Date.now() };
+}
+
+// ═══════════════════════════ GUARDAR PRODUCCIÓN → produccion_rep ═══════════════════════════
+async function guardarProduccion() {
+  var saved = _lastCalcResult;
+  if (!saved || !saved.tons) { _setGuardarMsg('warn', '⚠️ Primero completa el cálculo.'); return; }
+  var sb  = window.__damuSupabase;
+  var btn = document.getElementById('btn-guardar');
+  var txt = document.getElementById('btn-guardar-txt');
+  if (!sb) { _setGuardarMsg('err', '❌ Error de conexión.'); return; }
+  btn.disabled = true; txt.textContent = 'Guardando…';
+  try {
+    var sesRes = await sb.auth.getSession();
+    if (!sesRes.data || !sesRes.data.session) { _setGuardarMsg('err', '❌ Sesión no activa.'); return; }
+    var uid = sesRes.data.session.user.id;
+    var empresaId = localStorage.getItem('damu_empresa_id');
+    if (!empresaId) {
+      var eRes = await sb.from('empresas').select('id').eq('user_id_productor', uid).maybeSingle();
+      if (eRes.data) { empresaId = eRes.data.id; localStorage.setItem('damu_empresa_id', empresaId); }
+    }
+    if (!empresaId) { _setGuardarMsg('warn', '⚠️ Tu cuenta no tiene empresa REP creada todavía.'); return; }
+    var { error } = await sb.from('produccion_rep').insert({
+      user_id:                      uid,
+      empresa_id:                   empresaId,
+      categoria:                    saved.cat,
+      toneladas:                    saved.tons,
+      costo_estimado:               Math.round(saved.costoTotal || 0),
+      meta_valorizacion_porcentaje: saved.meta || 0,
+      riesgo_multa_estimado:        saved.multa || 0,
+    });
+    if (error) throw error;
+    _setGuardarMsg('ok', '✓ Producción registrada. Aparece en tu Historial.');
+  } catch (err) {
+    _setGuardarMsg('err', '❌ No se pudo guardar: ' + err.message);
+  } finally {
+    btn.disabled = false; txt.textContent = 'Guardar producción';
+  }
+}
+
+function _setGuardarMsg(tipo, texto) {
+  var el = document.getElementById('guardar-msg');
+  if (!el) return;
+  el.className = 'mt-2.5 text-xs px-3 py-2 rounded-lg border font-medium '
+    + (tipo === 'ok' ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+     : tipo === 'warn' ? 'bg-amber-50 border-amber-200 text-amber-700'
+                       : 'bg-red-50 border-red-200 text-red-700');
+  el.textContent = texto;
+  el.classList.remove('hidden');
+  if (tipo === 'ok') setTimeout(function () { el.classList.add('hidden'); }, 7000);
+}
+
+// ═══════════════════════════ BANNER EMPRESA ═══════════════════════════
+function _cargarBannerEmpresa() {
+  var nombre  = localStorage.getItem('damu_empresa_nombre') || '';
+  var codigo  = localStorage.getItem('damu_codigo_invitacion') || '';
+  if (!nombre && !codigo) return;
+  var banner = document.getElementById('empresa-prod-banner');
+  var nomEl  = document.getElementById('prod-empresa-nombre');
+  var codEl  = document.getElementById('prod-codigo-invitacion');
+  if (banner) banner.classList.remove('hidden');
+  if (nomEl && nombre) nomEl.textContent = nombre;
+  if (codEl && codigo) codEl.textContent = codigo;
+}
+
+function _copiarCodigo() {
+  var codigo = (document.getElementById('prod-codigo-invitacion') || {}).textContent || '';
+  if (!codigo.trim() || codigo === '——————') return;
+  navigator.clipboard.writeText(codigo.trim()).then(function () {
+    var icono = document.getElementById('icono-copiar');
+    if (icono) {
+      icono.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>';
+      setTimeout(function () { icono.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>'; }, 1500);
+    }
+  }).catch(function () {});
+}
+</script>
+</body>
+</html>
