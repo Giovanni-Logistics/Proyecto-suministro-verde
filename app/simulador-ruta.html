@@ -932,6 +932,8 @@ async function cargarMapaOperativo() {
     _renderTablaAcopios(_acopiosData);
     _renderTablaFlota(_flotaData);
 
+    calcularRutasSugeridas(); // async fire-and-forget — no bloquea el render del mapa
+
   } catch (err) {
     console.error('[Damu] Error cargando Mapa Operativo:', err);
     var elS = document.getElementById('status-acopios');
