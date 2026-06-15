@@ -418,7 +418,16 @@ function onScanSuccess(decodedText) {
 }
 
 function onScanFailure(error) {
-  // Frame sin QR — se ignora silenciosamente
+  // Html5QrcodeScanner llama a este callback por cada frame sin QR detectado
+  // (string que contiene "NotFoundException") — eso es normal y se ignora.
+  // Cualquier otro tipo de error sí se loguea para poder diagnosticarlo.
+  if (!error) return;
+  var msg = (typeof error === 'string') ? error : (error.message || String(error));
+  if (msg.indexOf('NotFoundException') !== -1 || msg.indexOf('No MultiFormat') !== -1) {
+    return; // frame sin código — silencioso
+  }
+  // Error real: NotAllowedError (permiso denegado), NotFoundError (sin cámara), etc.
+  console.error('[Damu] onScanFailure — error de cámara:', msg, error);
 }
 
 // ═══════════════════════════════════════════════════════════════════
