@@ -136,6 +136,38 @@
 
 </main>
 
+<!-- ══ MODAL QR ══ -->
+<div id="modal-qr" class="hidden fixed inset-0 z-[200] bg-black/60 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+
+    <div class="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100">
+      <h3 class="font-black text-slate-800 text-base flex items-center gap-2">
+        <span class="text-xl">📱</span> QR de entrega
+      </h3>
+      <button onclick="cerrarModalQR()"
+        class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors text-xl font-bold flex items-center justify-center leading-none">
+        ×
+      </button>
+    </div>
+
+    <div class="p-6 space-y-4">
+      <div class="bg-slate-50 rounded-xl p-4 flex justify-center min-h-[240px] items-center">
+        <canvas id="qr-canvas"></canvas>
+      </div>
+      <p id="qr-token-display" class="text-xs text-center text-slate-400 font-mono break-all"></p>
+      <p id="qr-error" class="hidden text-xs text-center text-red-500 font-semibold"></p>
+      <div class="bg-amber-50 border border-amber-100 rounded-xl px-4 py-2.5">
+        <p class="text-xs text-center text-amber-700">Muestra este QR al transportista al momento de entregarle las cargas asignadas.</p>
+      </div>
+      <button onclick="cerrarModalQR()"
+        class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 rounded-xl text-sm transition-colors">
+        Cerrar
+      </button>
+    </div>
+
+  </div>
+</div>
+
 <footer class="bg-slate-900 text-slate-400 text-xs py-5 border-t border-slate-800 mt-auto">
   <div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-3">
     <p><strong class="text-white">Damu SGC</strong> — Trazabilidad Ley REP · Chile</p>
@@ -144,79 +176,325 @@
 </footer>
 
 <script>
-var CAT_LABEL = { envases:'📦 Envases', neumaticos:'🛞 Neumáticos', pilas:'🔋 Pilas/Bat.', raee:'🖥️ RAEE', aceites:'🛢️ Aceites' };
+// ═══════════════════════════════════════════════════════════════════
+// PRODUCTOR MONITOR — monitoreo de transportistas + entregas activas
+// ═══════════════════════════════════════════════════════════════════
+
+var CAT_LABEL = {
+  envases:    '📦 Envases',
+  neumaticos: '🛞 Neumáticos',
+  pilas:      '🔋 Pilas/Bat.',
+  raee:       '🖥️ RAEE',
+  aceites:    '🛢️ Aceites',
+  electricos: '🔌 Eléctricos',
+  textil:     '👕 Textil',
+};
+
 var _empresaId  = null;
 var _sessionUid = null;
+var _codigoInv  = null;
 
-function clp(n) { return '$' + Math.round(n).toLocaleString('es-CL') + ' CLP'; }
+function clp(n)        { return '$' + Math.round(n).toLocaleString('es-CL') + ' CLP'; }
 function fmtFecha(iso) { return new Date(iso).toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' }); }
-function idCorto(uid) { return uid ? '…' + uid.slice(-8) : '—'; }
+function idCorto(uid)  { return uid ? '…' + uid.slice(-8) : '—'; }
+function _esc(s)       { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+// ─────────────────────────────────────────────────────────────────
 async function cargarMonitoreo() {
   var sb = window.__damuSupabase;
   if (!sb) return;
 
-  setLoading('wrap-transportistas');
-  setLoading('wrap-rutas-mon');
-  setLoading('wrap-qr-mon');
+  ['wrap-transportistas','wrap-rutas-mon','wrap-qr-mon','wrap-entregas']
+    .forEach(function(id) { setLoading(id); });
 
   try {
     var sesRes = await sb.auth.getSession();
     _sessionUid = sesRes.data.session.user.id;
-    _empresaId  = localStorage.getItem('damu_empresa_id');
 
-    if (!_empresaId) {
-      var eRes = await sb.from('empresas').select('id,nombre').eq('user_id_productor', _sessionUid).maybeSingle();
-      if (eRes.data) {
-        _empresaId = eRes.data.id;
-        localStorage.setItem('damu_empresa_id', _empresaId);
-        if (eRes.data.nombre) localStorage.setItem('damu_empresa_nombre', eRes.data.nombre);
-      }
-    }
+    // Siempre consultar empresa (incluye codigo_invitacion para TAREA 1)
+    var eRes = await sb.from('empresas')
+      .select('id, nombre, codigo_invitacion')
+      .eq('user_id_productor', _sessionUid)
+      .maybeSingle();
 
-    if (!_empresaId) {
+    if (!eRes.data) {
       document.getElementById('banner-sin-empresa').classList.remove('hidden');
-      setVacio('wrap-transportistas', 'Sin empresa REP. Contacta al administrador.');
-      setVacio('wrap-rutas-mon', 'Sin empresa REP asociada.');
-      setVacio('wrap-qr-mon', 'Sin empresa REP asociada.');
+      ['wrap-transportistas','wrap-rutas-mon','wrap-qr-mon','wrap-entregas']
+        .forEach(function(id) { setVacio(id, 'Sin empresa REP asociada.'); });
       return;
     }
 
-    var [transRes, viajesRes] = await Promise.all([
+    _empresaId = eRes.data.id;
+    localStorage.setItem('damu_empresa_id', _empresaId);
+    if (eRes.data.nombre) localStorage.setItem('damu_empresa_nombre', eRes.data.nombre);
+
+    // TAREA 1 — mostrar/generar código de invitación
+    await renderCodigoInvitacion(sb, eRes.data);
+
+    // Consultas en paralelo — incluye estado y transportista_id en viajes
+    var resultados = await Promise.all([
       sb.from('transportistas_empresa')
         .select('id, user_id_transportista, activo, created_at')
         .eq('empresa_id', _empresaId)
         .order('created_at', { ascending: false }),
       sb.from('viajes_operativos')
-        .select('id, user_id, origen, destino, distancia_km, costo_diesel, cargas_qr_kg, categoria, created_at')
+        .select('id, user_id, origen, destino, distancia_km, costo_diesel, cargas_qr_kg, categoria, estado, transportista_id, created_at')
         .eq('empresa_id', _empresaId)
         .order('created_at', { ascending: false })
         .limit(50),
+      sb.from('produccion_rep')
+        .select('id, categoria, toneladas, estado, transportista_asignado_id')
+        .eq('empresa_id', _empresaId)
+        .in('estado', ['disponible', 'en_camino', 'entregado'])
+        .order('created_at', { ascending: false }),
     ]);
 
-    var transportistas = transRes.data || [];
-    var viajes         = viajesRes.data || [];
+    var transportistas = resultados[0].data || [];
+    var viajes         = resultados[1].data || [];
+    var producciones   = resultados[2].data || [];
 
     renderTransportistas(transportistas);
+    renderEntregasActivas(viajes, producciones);   // TAREA 2/3
     renderActividadRutas(viajes, transportistas);
     renderActividadQR(viajes, transportistas);
     renderKPIs(transportistas, viajes);
 
   } catch (err) {
-    setError('wrap-transportistas', err.message);
-    setError('wrap-rutas-mon', err.message);
-    setError('wrap-qr-mon', err.message);
+    console.error('[Damu] cargarMonitoreo:', err);
+    ['wrap-transportistas','wrap-rutas-mon','wrap-qr-mon','wrap-entregas']
+      .forEach(function(id) { setError(id, err.message); });
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// TAREA 1 — Código de invitación
+// ═══════════════════════════════════════════════════════════════════
+
+async function renderCodigoInvitacion(sb, empresa) {
+  var codigo = empresa.codigo_invitacion;
+
+  if (!codigo) {
+    // Generar un código único de 8 caracteres y guardarlo
+    codigo = crypto.randomUUID().slice(0, 8).toUpperCase();
+    var upd = await sb.from('empresas')
+      .update({ codigo_invitacion: codigo })
+      .eq('id', empresa.id);
+    if (upd.error) {
+      console.warn('[Damu] Error generando código de invitación:', upd.error.message);
+    }
+  }
+
+  _codigoInv = codigo;
+  localStorage.setItem('damu_codigo_invitacion', codigo);
+
+  var card    = document.getElementById('card-codigo');
+  var display = document.getElementById('codigo-display');
+  if (card)    card.classList.remove('hidden');
+  if (display) display.textContent = codigo;
+}
+
+function copiarCodigoInv() {
+  if (!_codigoInv) return;
+  var btn = document.getElementById('btn-copiar-inv');
+
+  var onExito = function() {
+    if (!btn) return;
+    var prev = btn.innerHTML;
+    btn.innerHTML = '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> ¡Copiado!';
+    btn.classList.add('bg-emerald-700');
+    btn.classList.remove('bg-emerald-600');
+    setTimeout(function() {
+      btn.innerHTML = prev;
+      btn.classList.remove('bg-emerald-700');
+      btn.classList.add('bg-emerald-600');
+    }, 2000);
+  };
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(_codigoInv).then(onExito).catch(function() {
+      _copiarFallback(_codigoInv, onExito);
+    });
+  } else {
+    _copiarFallback(_codigoInv, onExito);
+  }
+}
+
+function _copiarFallback(text, cb) {
+  var el = document.createElement('textarea');
+  el.value = text;
+  el.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+  document.body.appendChild(el);
+  el.focus();
+  el.select();
+  try { document.execCommand('copy'); if (cb) cb(); } catch (_) {}
+  document.body.removeChild(el);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TAREA 2/3 — Entregas activas
+// ═══════════════════════════════════════════════════════════════════
+
+function renderEntregasActivas(viajes, producciones) {
+  if (!viajes.length) {
+    setVacio('wrap-entregas', 'Sin viajes registrados para esta empresa todavía.');
+    return;
+  }
+
+  // Mapear cargas por transportista_asignado_id para lookup rápido
+  var cargasPorTrans = {};
+  producciones.forEach(function(p) {
+    if (!p.transportista_asignado_id) return;
+    if (!cargasPorTrans[p.transportista_asignado_id]) cargasPorTrans[p.transportista_asignado_id] = [];
+    cargasPorTrans[p.transportista_asignado_id].push(p);
+  });
+
+  var rows = viajes.map(function(v) {
+
+    // ── Transportista ───────────────────────────────────────────
+    var transHTML = v.transportista_id
+      ? '<div class="flex items-center gap-1.5">'
+          + '<div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs flex-shrink-0">🚛</div>'
+          + '<span class="font-mono text-xs text-slate-600">…' + v.transportista_id.slice(-8) + '</span>'
+        + '</div>'
+      : '<span class="text-slate-400 text-xs">Sin asignar</span>';
+
+    // ── Ruta ─────────────────────────────────────────────────────
+    var rutaHTML = '<div class="space-y-0.5 min-w-[120px]">'
+      + '<p class="text-xs text-slate-600 truncate max-w-[180px]">' + _esc(v.origen  || '—') + '</p>'
+      + '<p class="text-xs text-slate-400 leading-none">↓</p>'
+      + '<p class="text-xs text-slate-600 truncate max-w-[180px]">' + _esc(v.destino || '—') + '</p>'
+      + (v.distancia_km ? '<p class="text-xs font-semibold text-blue-600 mt-0.5">' + v.distancia_km + ' km</p>' : '')
+      + '</div>';
+
+    // ── Carga asignada ────────────────────────────────────────────
+    var cargas = v.transportista_id && cargasPorTrans[v.transportista_id];
+    var cargaHTML = cargas && cargas.length
+      ? cargas.map(function(p) {
+          var cat = CAT_LABEL[p.categoria] || _esc(p.categoria || 'REP');
+          return '<p class="text-xs text-slate-600">' + cat + ' · ' + (p.toneladas || '?') + ' t</p>';
+        }).join('')
+      : '<span class="text-slate-400 text-xs">—</span>';
+
+    // ── Estado (TAREA 3) ──────────────────────────────────────────
+    var estadoHTML;
+    if (v.estado === 'entregado') {
+      estadoHTML = '<span class="bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap">✓ Entregado</span>';
+    } else if (v.estado === 'en_camino') {
+      estadoHTML = '<span class="bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap">🚛 En camino</span>';
+    } else {
+      estadoHTML = '<span class="bg-slate-100 text-slate-500 border border-slate-200 text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap">Sin asignar</span>';
+    }
+
+    // ── Botón QR (solo para en_camino) ───────────────────────────
+    var qrHTML = v.estado === 'en_camino'
+      ? '<button onclick="verQR(\'' + v.id + '\')"'
+          + ' class="bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap">'
+          + '<svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">'
+            + '<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>'
+          + '</svg>Ver QR</button>'
+      : '<span class="text-slate-300 text-xs">—</span>';
+
+    return '<tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">'
+      + '<td class="py-3 px-3">' + transHTML + '</td>'
+      + '<td class="py-3 px-3">' + rutaHTML + '</td>'
+      + '<td class="py-3 px-3">' + cargaHTML + '</td>'
+      + '<td class="py-3 px-3">' + estadoHTML + '</td>'
+      + '<td class="py-3 px-3">' + qrHTML + '</td>'
+      + '</tr>';
+  }).join('');
+
+  document.getElementById('wrap-entregas').innerHTML =
+    '<div class="overflow-x-auto -mx-1">'
+    + '<table class="w-full text-left min-w-[660px]">'
+    + '<thead><tr class="border-b border-slate-200">'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Transportista</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Ruta</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Carga asignada</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Estado</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">QR</th>'
+    + '</tr></thead>'
+    + '<tbody>' + rows + '</tbody>'
+    + '</table></div>';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MODAL QR
+// ═══════════════════════════════════════════════════════════════════
+
+async function verQR(viajeId) {
+  var sb = window.__damuSupabase;
+  if (!sb) return;
+
+  var modal   = document.getElementById('modal-qr');
+  var canvas  = document.getElementById('qr-canvas');
+  var tokenEl = document.getElementById('qr-token-display');
+  var errorEl = document.getElementById('qr-error');
+
+  // Limpiar estado anterior
+  if (tokenEl) tokenEl.textContent = 'Consultando…';
+  if (errorEl) { errorEl.textContent = ''; errorEl.classList.add('hidden'); }
+  var ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  modal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+
+  try {
+    var qrRes = await sb.from('entregas_qr')
+      .select('token, viaje_id, empresa_id, estado')
+      .eq('viaje_id', viajeId)
+      .maybeSingle();
+
+    if (!qrRes.data) {
+      if (tokenEl) tokenEl.textContent = '';
+      if (errorEl) { errorEl.textContent = 'Sin registro QR para este viaje.'; errorEl.classList.remove('hidden'); }
+      return;
+    }
+
+    var payload = JSON.stringify({
+      tipo:       'damu_entrega',
+      token:      qrRes.data.token,
+      viaje_id:   qrRes.data.viaje_id,
+      empresa_id: qrRes.data.empresa_id,
+    });
+
+    if (tokenEl) tokenEl.textContent = 'Token: ' + qrRes.data.token;
+
+    QRCode.toCanvas(canvas, payload, {
+      width:  224,
+      margin: 2,
+      color:  { dark: '#0f172a', light: '#ffffff' },
+    }, function(err) {
+      if (err) {
+        console.error('[Damu] QR render error:', err);
+        if (errorEl) { errorEl.textContent = 'Error al generar QR: ' + err.message; errorEl.classList.remove('hidden'); }
+      }
+    });
+
+  } catch (err) {
+    console.error('[Damu] verQR:', err);
+    if (tokenEl) tokenEl.textContent = '';
+    if (errorEl) { errorEl.textContent = 'Error: ' + err.message; errorEl.classList.remove('hidden'); }
+  }
+}
+
+function cerrarModalQR() {
+  document.getElementById('modal-qr').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Secciones existentes — sin cambios
+// ═══════════════════════════════════════════════════════════════════
+
 function renderTransportistas(trans) {
-  var wrap  = document.getElementById('wrap-transportistas');
-  var badge = document.getElementById('badge-trans');
+  var wrap    = document.getElementById('wrap-transportistas');
+  var badge   = document.getElementById('badge-trans');
   var activos = trans.filter(function(t) { return t.activo !== false; });
   if (badge) badge.textContent = activos.length + ' activo' + (activos.length !== 1 ? 's' : '');
 
   if (trans.length === 0) {
-    wrap.innerHTML = '<div class="py-10 text-center"><div class="text-4xl mb-3">🚚</div><p class="text-slate-500 text-sm font-semibold">Sin transportistas vinculados</p><p class="text-slate-400 text-xs mt-1">Comparte tu código de invitación para que los transportistas se registren en la plataforma.</p><a href="productor-home.html" class="inline-block mt-3 text-xs text-emerald-600 underline">Ver código de invitación →</a></div>';
+    wrap.innerHTML = '<div class="py-10 text-center"><div class="text-4xl mb-3">🚚</div><p class="text-slate-500 text-sm font-semibold">Sin transportistas vinculados</p><p class="text-slate-400 text-xs mt-1">Comparte el código de invitación para que los transportistas se vinculen a tu empresa.</p></div>';
     return;
   }
 
@@ -232,28 +510,21 @@ function renderTransportistas(trans) {
   }).join('');
 
   wrap.innerHTML = '<div class="overflow-x-auto -mx-1"><table class="w-full text-left min-w-[400px]"><thead><tr class="border-b border-slate-200"><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Transportista</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Estado</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Vinculado</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-    + '<p class="text-xs text-slate-400 mt-3">El ID de transportista corresponde a los últimos 8 caracteres del identificador único de la cuenta.</p>';
+    + '<p class="text-xs text-slate-400 mt-3">El ID corresponde a los últimos 8 caracteres del identificador único de la cuenta.</p>';
 }
 
 function renderActividadRutas(viajes, trans) {
-  var wrap   = document.getElementById('wrap-rutas-mon');
   var rutasV = viajes.filter(function(v) { return (v.distancia_km || 0) > 0; });
+  if (rutasV.length === 0) { setVacio('wrap-rutas-mon', 'Sin rutas registradas para esta empresa.'); return; }
 
-  if (rutasV.length === 0) {
-    setVacio('wrap-rutas-mon', 'Sin rutas registradas para esta empresa.');
-    return;
-  }
-
-  // Agrupar por user_id
   var grupos = {};
   rutasV.forEach(function(v) {
-    if (!grupos[v.user_id]) grupos[v.user_id] = { nViajes: 0, kmTotal: 0, costoTotal: 0, ultimoViaje: null };
-    grupos[v.user_id].nViajes++;
-    grupos[v.user_id].kmTotal    += (v.distancia_km || 0);
-    grupos[v.user_id].costoTotal += (v.costo_diesel || 0);
-    if (!grupos[v.user_id].ultimoViaje || v.created_at > grupos[v.user_id].ultimoViaje) {
-      grupos[v.user_id].ultimoViaje = v.created_at;
-    }
+    var uid = v.user_id;
+    if (!grupos[uid]) grupos[uid] = { nViajes: 0, kmTotal: 0, costoTotal: 0, ultimoViaje: null };
+    grupos[uid].nViajes++;
+    grupos[uid].kmTotal    += (v.distancia_km || 0);
+    grupos[uid].costoTotal += (v.costo_diesel  || 0);
+    if (!grupos[uid].ultimoViaje || v.created_at > grupos[uid].ultimoViaje) grupos[uid].ultimoViaje = v.created_at;
   });
 
   var rows = Object.keys(grupos).map(function(uid) {
@@ -267,26 +538,27 @@ function renderActividadRutas(viajes, trans) {
       + '</tr>';
   }).join('');
 
-  wrap.innerHTML = '<div class="overflow-x-auto -mx-1"><table class="w-full text-left min-w-[520px]"><thead><tr class="border-b border-slate-200"><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Transportista (ID)</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-center">Viajes</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Km totales</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Costo Diésel</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Último viaje</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  document.getElementById('wrap-rutas-mon').innerHTML =
+    '<div class="overflow-x-auto -mx-1"><table class="w-full text-left min-w-[520px]"><thead><tr class="border-b border-slate-200">'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Transportista (ID)</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-center">Viajes</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Km totales</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Costo Diésel</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Último viaje</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 
 function renderActividadQR(viajes, trans) {
   var qrV = viajes.filter(function(v) { return (v.cargas_qr_kg || 0) > 0; });
+  if (qrV.length === 0) { setVacio('wrap-qr-mon', 'Sin escaneos QR registrados. Los transportistas pueden escanear desde la sección Escanear QR.'); return; }
 
-  if (qrV.length === 0) {
-    setVacio('wrap-qr-mon', 'Sin escaneos QR registrados para esta empresa. Los transportistas pueden escanear desde la sección Escanear QR.');
-    return;
-  }
-
-  // Agrupar por user_id
   var grupos = {};
   qrV.forEach(function(v) {
-    if (!grupos[v.user_id]) grupos[v.user_id] = { nScans: 0, kgTotal: 0, ultimoScan: null };
-    grupos[v.user_id].nScans++;
-    grupos[v.user_id].kgTotal  += (v.cargas_qr_kg || 0);
-    if (!grupos[v.user_id].ultimoScan || v.created_at > grupos[v.user_id].ultimoScan) {
-      grupos[v.user_id].ultimoScan = v.created_at;
-    }
+    var uid = v.user_id;
+    if (!grupos[uid]) grupos[uid] = { nScans: 0, kgTotal: 0, ultimoScan: null };
+    grupos[uid].nScans++;
+    grupos[uid].kgTotal += (v.cargas_qr_kg || 0);
+    if (!grupos[uid].ultimoScan || v.created_at > grupos[uid].ultimoScan) grupos[uid].ultimoScan = v.created_at;
   });
 
   var rows = Object.keys(grupos).map(function(uid) {
@@ -300,40 +572,61 @@ function renderActividadQR(viajes, trans) {
       + '</tr>';
   }).join('');
 
-  document.getElementById('wrap-qr-mon').innerHTML = '<div class="overflow-x-auto -mx-1"><table class="w-full text-left min-w-[480px]"><thead><tr class="border-b border-slate-200"><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Transportista (ID)</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-center">Escaneos</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Kg total</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Toneladas</th><th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Último scan</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  document.getElementById('wrap-qr-mon').innerHTML =
+    '<div class="overflow-x-auto -mx-1"><table class="w-full text-left min-w-[480px]"><thead><tr class="border-b border-slate-200">'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Transportista (ID)</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-center">Escaneos</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Kg total</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">Toneladas</th>'
+    + '<th class="py-2 px-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Último scan</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 
 function renderKPIs(trans, viajes) {
-  var activos  = trans.filter(function(t){return t.activo!==false;}).length;
-  var totalKm  = viajes.reduce(function(a,v){return a+(v.distancia_km||0);},0);
-  var totalKg  = viajes.reduce(function(a,v){return a+(v.cargas_qr_kg||0);},0);
-  var totalCost= viajes.reduce(function(a,v){return a+(v.costo_diesel||0);},0);
+  var activos   = trans.filter(function(t){ return t.activo !== false; }).length;
+  var totalKm   = viajes.reduce(function(a,v){ return a+(v.distancia_km||0); }, 0);
+  var totalKg   = viajes.reduce(function(a,v){ return a+(v.cargas_qr_kg||0); }, 0);
+  var totalCost = viajes.reduce(function(a,v){ return a+(v.costo_diesel||0);  }, 0);
 
   var sec  = document.getElementById('kpis-empresa');
   var grid = document.getElementById('kpis-grid');
   grid.innerHTML = [
-    { icon:'🚚', lbl:'Transportistas activos', val: activos,                      col:'text-blue-700' },
-    { icon:'📏', lbl:'Km totales',             val: totalKm.toFixed(1) + ' km',   col:'text-slate-700'},
+    { icon:'🚚', lbl:'Transportistas activos', val: activos,                      col:'text-blue-700'   },
+    { icon:'📏', lbl:'Km totales',             val: totalKm.toFixed(1) + ' km',   col:'text-slate-700'  },
     { icon:'📦', lbl:'Kg QR escaneados',       val: totalKg.toFixed(0) + ' kg',   col:'text-emerald-700'},
-    { icon:'⛽', lbl:'Costo diésel empresa',   val: clp(totalCost),               col:'text-red-500'  },
+    { icon:'⛽', lbl:'Costo diésel empresa',   val: clp(totalCost),               col:'text-red-500'    },
   ].map(function(k) {
-    return '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-center"><div class="text-2xl mb-1">' + k.icon + '</div><div class="text-sm font-black ' + k.col + '">' + k.val + '</div><div class="text-xs text-slate-500 mt-0.5">' + k.lbl + '</div></div>';
+    return '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-center">'
+      + '<div class="text-2xl mb-1">' + k.icon + '</div>'
+      + '<div class="text-sm font-black ' + k.col + '">' + k.val + '</div>'
+      + '<div class="text-xs text-slate-500 mt-0.5">' + k.lbl + '</div>'
+      + '</div>';
   }).join('');
 
   sec.classList.remove('hidden');
 }
 
+// ─────────────────────────────────────────────────────────────────
 function setLoading(id) {
-  document.getElementById(id).innerHTML = '<div class="py-8 text-center text-slate-400 text-sm flex items-center justify-center gap-2"><svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Cargando...</div>';
+  var el = document.getElementById(id);
+  if (el) el.innerHTML = '<div class="py-8 text-center text-slate-400 text-sm flex items-center justify-center gap-2"><svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Cargando...</div>';
 }
 function setVacio(id, msg) {
-  document.getElementById(id).innerHTML = '<div class="py-8 text-center text-slate-400 text-sm">' + msg + '</div>';
+  var el = document.getElementById(id);
+  if (el) el.innerHTML = '<div class="py-8 text-center text-slate-400 text-sm">' + _esc(msg) + '</div>';
 }
 function setError(id, msg) {
-  document.getElementById(id).innerHTML = '<div class="py-6 text-center"><p class="text-red-600 text-sm font-bold">❌ Error: ' + msg + '</p></div>';
+  var el = document.getElementById(id);
+  if (el) el.innerHTML = '<div class="py-6 text-center"><p class="text-red-600 text-sm font-bold">❌ Error: ' + _esc(msg) + '</p></div>';
 }
 
-window.addEventListener('DOMContentLoaded', function () { cargarMonitoreo(); });
+window.addEventListener('DOMContentLoaded', function () {
+  cargarMonitoreo();
+  // Cerrar modal al hacer clic en el fondo oscuro
+  document.getElementById('modal-qr').addEventListener('click', function(e) {
+    if (e.target === this) cerrarModalQR();
+  });
+});
 </script>
 </body>
 </html>
