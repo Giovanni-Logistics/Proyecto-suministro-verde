@@ -245,6 +245,116 @@
 </div>
 
 <!-- ══════════════════════════════════════════════════════════
+     MODAL ENTREGA QR — confirmación damu_entrega
+══════════════════════════════════════════════════════════ -->
+<div id="modal-entrega"
+  class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9998] p-4">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden">
+
+    <!-- Estado: cargando -->
+    <div id="me-loading" class="py-12 text-center px-6">
+      <svg class="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+      </svg>
+      <p class="text-slate-600 text-sm font-semibold">Verificando QR de entrega…</p>
+      <p class="text-slate-400 text-xs mt-1">Consultando base de datos</p>
+    </div>
+
+    <!-- Estado: error -->
+    <div id="me-error" class="hidden">
+      <div class="bg-gradient-to-r from-red-600 to-red-500 px-6 py-7 text-center">
+        <div class="text-5xl mb-3">❌</div>
+        <h3 class="text-white font-black text-lg mb-1">QR inválido</h3>
+        <p id="me-error-msg" class="text-red-100 text-xs">QR inválido o ya utilizado</p>
+      </div>
+      <div class="p-5">
+        <button onclick="cerrarModalEntrega(true)"
+          class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm py-2.5 rounded-xl transition-colors">
+          📷 Escanear otro
+        </button>
+      </div>
+    </div>
+
+    <!-- Estado: confirmar -->
+    <div id="me-confirm" class="hidden">
+      <div class="bg-gradient-to-r from-amber-600 to-amber-500 px-6 py-5 text-center">
+        <div class="text-4xl mb-2">📋</div>
+        <h3 class="text-white font-black text-lg mb-1">Confirmar entrega</h3>
+        <p class="text-amber-100 text-xs">Revisa los datos antes de confirmar</p>
+      </div>
+      <div class="p-5 space-y-3">
+        <!-- Ruta -->
+        <div class="bg-slate-50 rounded-xl border border-slate-200 p-4">
+          <p class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Ruta</p>
+          <div class="flex items-start gap-2">
+            <div class="flex flex-col items-center flex-shrink-0 mt-0.5">
+              <div class="w-2 h-2 rounded-full bg-blue-500"></div>
+              <div class="w-0.5 h-5 bg-slate-300 my-0.5"></div>
+              <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+            </div>
+            <div class="flex-1 space-y-2 min-w-0">
+              <p id="me-origen"  class="text-sm font-semibold text-slate-700 truncate">—</p>
+              <p id="me-destino" class="text-sm font-semibold text-slate-700 truncate">—</p>
+            </div>
+          </div>
+          <p id="me-distancia" class="hidden text-xs text-blue-600 font-semibold mt-2"></p>
+        </div>
+        <!-- Cargas -->
+        <div class="bg-slate-50 rounded-xl border border-slate-200 p-4">
+          <p class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Cargas asignadas</p>
+          <div id="me-cargas" class="space-y-1.5"></div>
+        </div>
+        <!-- Error inline -->
+        <p id="me-confirm-err"
+          class="hidden text-xs text-center text-red-700 font-semibold bg-red-50 border border-red-200 rounded-xl py-2 px-3"></p>
+      </div>
+      <div class="px-5 pb-5 flex gap-2">
+        <button onclick="cerrarModalEntrega(true)"
+          class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm py-2.5 rounded-xl transition-colors">
+          Cancelar
+        </button>
+        <button id="me-btn-confirmar" onclick="confirmarEntrega()"
+          class="flex-1 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-sm py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5">
+          <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+          </svg>
+          Confirmar entrega
+        </button>
+      </div>
+    </div>
+
+    <!-- Estado: éxito -->
+    <div id="me-success" class="hidden">
+      <div class="bg-gradient-to-r from-emerald-600 to-emerald-500 px-6 py-7 text-center">
+        <div class="text-5xl mb-3">✅</div>
+        <h3 class="text-white font-black text-xl mb-1">¡Entrega confirmada!</h3>
+        <p class="text-emerald-100 text-xs">Trazabilidad actualizada correctamente</p>
+      </div>
+      <div class="p-5 space-y-3">
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 text-center">
+          <p class="text-emerald-800 text-sm font-semibold">
+            Estado actualizado a <strong>Entregado</strong>
+          </p>
+          <p class="text-emerald-600 text-xs mt-0.5">Ruta y cargas marcadas como completadas</p>
+        </div>
+        <div class="flex gap-2">
+          <a href="dashboard-kpi.html"
+            class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm py-2.5 rounded-xl transition-colors text-center no-underline">
+            📊 Dashboard
+          </a>
+          <button onclick="cerrarModalEntrega(false)"
+            class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm py-2.5 rounded-xl transition-colors">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
      SCRIPT — Html5QrcodeScanner + trazabilidad Supabase
 ══════════════════════════════════════════════════════════ -->
 <script>
@@ -366,6 +476,18 @@ function iniciarEscaner() {
 // CALLBACK — QR detectado
 // ═══════════════════════════════════════════════════════════════════
 function onScanSuccess(decodedText) {
+  // ── Detectar tipo de QR Damu antes de procesar ─────────────
+  var _parsed = null;
+  try { _parsed = JSON.parse(decodedText); } catch(e) {}
+
+  // QR de entrega de transportista → flujo propio
+  if (_parsed && _parsed.tipo === 'damu_entrega') {
+    try { html5QrcodeScanner.clear(); } catch(e) {}
+    html5QrcodeScanner = null;
+    _procesarEntregaQR(_parsed);
+    return;
+  }
+
   try { html5QrcodeScanner.clear(); } catch(e) {}
 
   // Intentar parsear QR estructurado de Damu
@@ -601,6 +723,223 @@ async function renderHistorial() {
       + '<td class="px-4 py-2.5 text-slate-400 whitespace-nowrap">' + c.fecha + ' ' + c.hora + '</td>'
       + '</tr>';
   }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ENTREGA QR — flujo completo para tipo 'damu_entrega'
+// ═══════════════════════════════════════════════════════════════════
+
+var _pendingEntrega = null; // { token, viaje_id, empresa_id, uid }
+
+function _esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+var _ME_ESTADOS = ['me-loading', 'me-error', 'me-confirm', 'me-success'];
+function _meEstado(activo) {
+  _ME_ESTADOS.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.toggle('hidden', id !== activo);
+  });
+}
+
+async function _procesarEntregaQR(payload) {
+  var sb = window.__damuSupabase;
+
+  // Mostrar modal en estado cargando
+  var modal = document.getElementById('modal-entrega');
+  if (modal) modal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  _meEstado('me-loading');
+
+  try {
+    if (!sb) throw new Error('Sin conexión a base de datos.');
+
+    var sesRes = await sb.auth.getSession();
+    if (!sesRes.data || !sesRes.data.session) throw new Error('Sesión expirada. Vuelve a iniciar sesión.');
+    var uid = sesRes.data.session.user.id;
+
+    // 1. Verificar que el QR existe y está pendiente
+    var qrRes = await sb.from('entregas_qr')
+      .select('id, token, viaje_id, empresa_id, estado')
+      .eq('token', payload.token)
+      .eq('estado', 'pendiente')
+      .maybeSingle();
+
+    if (qrRes.error) throw new Error('Error al verificar QR: ' + qrRes.error.message);
+
+    if (!qrRes.data) {
+      // No encontrado o ya utilizado
+      _meEstado('me-error');
+      var errMsg = document.getElementById('me-error-msg');
+      if (errMsg) errMsg.textContent = 'QR inválido o ya utilizado.';
+      return;
+    }
+
+    var entrega = qrRes.data;
+
+    // 2. Consultar datos del viaje y cargas en paralelo
+    var resultados = await Promise.all([
+      sb.from('viajes_operativos')
+        .select('id, origen, destino, distancia_km, estado')
+        .eq('id', entrega.viaje_id)
+        .maybeSingle(),
+      sb.from('produccion_rep')
+        .select('id, categoria, toneladas')
+        .eq('empresa_id', entrega.empresa_id)
+        .eq('transportista_asignado_id', uid)
+        .eq('estado', 'en_camino'),
+    ]);
+
+    var viaje   = resultados[0].data;
+    var cargas  = resultados[1].data || [];
+
+    // Guardar estado pendiente para confirmarEntrega()
+    _pendingEntrega = {
+      token:      entrega.token,
+      viaje_id:   entrega.viaje_id,
+      empresa_id: entrega.empresa_id,
+      uid:        uid,
+    };
+
+    // 3. Poblar UI del modal de confirmación
+    var _cat = {
+      envases:    '📦 Envases y Embalajes',
+      neumaticos: '🛞 Neumáticos',
+      pilas:      '🔋 Pilas y Baterías',
+      raee:       '🖥️ RAEE',
+      aceites:    '🛢️ Aceites Lubricantes',
+      electricos: '🔌 Eléctricos',
+      textil:     '👕 Textil',
+    };
+
+    var origenEl    = document.getElementById('me-origen');
+    var destinoEl   = document.getElementById('me-destino');
+    var distEl      = document.getElementById('me-distancia');
+    var cargasEl    = document.getElementById('me-cargas');
+
+    if (origenEl)  origenEl.textContent  = viaje ? (viaje.origen  || 'Sin origen')  : 'Sin datos';
+    if (destinoEl) destinoEl.textContent = viaje ? (viaje.destino || 'Sin destino') : 'Sin datos';
+    if (distEl) {
+      if (viaje && viaje.distancia_km) {
+        distEl.textContent = viaje.distancia_km + ' km';
+        distEl.classList.remove('hidden');
+      } else {
+        distEl.classList.add('hidden');
+      }
+    }
+
+    if (cargasEl) {
+      if (!cargas.length) {
+        cargasEl.innerHTML = '<p class="text-slate-400 text-xs">Sin cargas en_camino asociadas.</p>';
+      } else {
+        cargasEl.innerHTML = cargas.map(function(c) {
+          var label = _cat[c.categoria] || _esc(c.categoria || 'REP');
+          return '<div class="flex items-center justify-between bg-white rounded-lg border border-slate-200 px-3 py-2">'
+            + '<span class="text-xs text-slate-700 font-semibold">' + label + '</span>'
+            + '<span class="text-xs font-black text-emerald-700 tabular-nums">' + (c.toneladas || '?') + ' t</span>'
+            + '</div>';
+        }).join('');
+      }
+    }
+
+    var errEl = document.getElementById('me-confirm-err');
+    if (errEl) errEl.classList.add('hidden');
+
+    var btn = document.getElementById('me-btn-confirmar');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Confirmar entrega'; }
+
+    _meEstado('me-confirm');
+
+  } catch (err) {
+    console.error('[Damu] _procesarEntregaQR:', err);
+    _meEstado('me-error');
+    var errMsg = document.getElementById('me-error-msg');
+    if (errMsg) errMsg.textContent = err.message || 'Error inesperado al verificar el QR.';
+  }
+}
+
+async function confirmarEntrega() {
+  var sb  = window.__damuSupabase;
+  var btn = document.getElementById('me-btn-confirmar');
+  var errEl = document.getElementById('me-confirm-err');
+  var data = _pendingEntrega;
+
+  if (!sb || !data) return;
+
+  // Bloquear botón durante el proceso
+  btn.disabled = true;
+  btn.innerHTML = '<svg class="w-4 h-4 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Procesando…';
+  errEl.classList.add('hidden');
+
+  try {
+    var ahora = new Date().toISOString();
+
+    // ① UPDATE entregas_qr → completado
+    var r1 = await sb.from('entregas_qr')
+      .update({ estado: 'completado', fecha_completado: ahora })
+      .eq('token', data.token)
+      .eq('estado', 'pendiente');
+
+    if (r1.error) throw { step: 1, msg: 'Error al registrar QR: ' + r1.error.message };
+
+    // ② UPDATE viajes_operativos → entregado
+    var r2 = await sb.from('viajes_operativos')
+      .update({ estado: 'entregado' })
+      .eq('id', data.viaje_id);
+
+    if (r2.error) {
+      // Rollback ①
+      await sb.from('entregas_qr')
+        .update({ estado: 'pendiente', fecha_completado: null })
+        .eq('token', data.token);
+      throw { step: 2, msg: 'Error al actualizar viaje: ' + r2.error.message };
+    }
+
+    // ③ UPDATE produccion_rep → entregado (para todas las cargas del transportista en este empresa)
+    var r3 = await sb.from('produccion_rep')
+      .update({ estado: 'entregado' })
+      .eq('transportista_asignado_id', data.uid)
+      .eq('empresa_id', data.empresa_id)
+      .eq('estado', 'en_camino');
+
+    if (r3.error) {
+      // Rollback ① y ②
+      await Promise.all([
+        sb.from('entregas_qr')
+          .update({ estado: 'pendiente', fecha_completado: null })
+          .eq('token', data.token),
+        sb.from('viajes_operativos')
+          .update({ estado: 'en_camino' })
+          .eq('id', data.viaje_id),
+      ]);
+      throw { step: 3, msg: 'Error al actualizar cargas: ' + r3.error.message };
+    }
+
+    // ✓ Todo exitoso
+    _pendingEntrega = null;
+    _meEstado('me-success');
+
+  } catch (err) {
+    console.error('[Damu] confirmarEntrega paso', err.step || '?', ':', err.msg || err);
+    errEl.textContent = err.msg || err.message || 'Error al confirmar la entrega. Intenta de nuevo.';
+    errEl.classList.remove('hidden');
+    btn.disabled = false;
+    btn.innerHTML = '<svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Confirmar entrega';
+  }
+}
+
+function cerrarModalEntrega(reiniciar) {
+  var modal = document.getElementById('modal-entrega');
+  if (modal) modal.classList.add('hidden');
+  document.body.style.overflow = '';
+  _meEstado('me-loading'); // resetear al estado base para próxima apertura
+  if (reiniciar) {
+    document.getElementById('reader').innerHTML = '';
+    iniciarEscaner();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
