@@ -413,10 +413,6 @@ async function doRegistro(email, pwd) {
     setLoading(false);
   } else {
     var role = selectedRole;
-    // Insertar en perfiles para que el primer login encuentre el rol correcto
-    supabase.from('perfiles')
-      .upsert({ user_id: data.user.id, rol: role }, { onConflict: 'user_id,rol', ignoreDuplicates: true })
-      .then(function () {});
     persistirSesion(data.user, role);
     setMsg('ok', '✓ Cuenta creada exitosamente. Redirigiendo a tu plataforma…');
     await _cachearEmpresaLogin(data.user, role).catch(function () {});
