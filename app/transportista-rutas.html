@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mis Rutas — Damu SGC</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth-guard.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
+
+<!-- ══ NAV privado — renderizado dinámicamente por auth-guard.js ══ -->
+<nav id="app-nav" class="bg-slate-900 sticky top-0 z-50 h-16 shadow-xl"></nav>
+
+<!-- ══════════════════════════════ HERO ══════════════════════════════ -->
+<header class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 text-white py-8 px-8">
+  <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <span class="inline-block bg-white/10 border border-white/20 text-slate-300 text-xs font-bold px-3 py-1 rounded-full mb-3">🚚 Módulo Transportista</span>
+      <h1 class="text-2xl md:text-3xl font-black leading-tight mb-2">Mis Rutas Disponibles</h1>
+      <p class="text-slate-400 text-sm max-w-lg">Selecciona la ruta que realizarás y las cargas que llevarás. El productor recibirá el QR de entrega automáticamente.</p>
+    </div>
+    <div id="empresa-badge" class="hidden bg-white/10 border border-white/20 rounded-xl px-5 py-3 text-center">
+      <p class="text-slate-400 text-xs mb-0.5 font-semibold uppercase tracking-wide">Empresa vinculada</p>
+      <p id="empresa-badge-nombre" class="text-white font-black text-sm">—</p>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════════════════════════ MAIN ══════════════════════════════ -->
+<main class="max-w-6xl mx-auto w-full px-4 py-8 flex-1 space-y-8">
+
+  <!-- ─── SECCIÓN A: Rutas disponibles ──────────────────────────── -->
+  <section>
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-lg font-black text-slate-700">Rutas disponibles</h2>
+        <p class="text-xs text-slate-400 mt-0.5">Presiona "Tomar ruta" para seleccionarla — solo puedes tomar una a la vez</p>
+      </div>
+      <span id="rutas-count" class="bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold px-3 py-1.5 rounded-full">—</span>
+    </div>
+    <div id="wrap-rutas" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="col-span-full py-12 text-center text-slate-400 text-sm">
+        <div class="animate-pulse">Cargando rutas...</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── SECCIÓN B: Cargas disponibles ─────────────────────────── -->
+  <section>
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-lg font-black text-slate-700">Cargas disponibles</h2>
+        <p class="text-xs text-slate-400 mt-0.5">Marca las cargas que transportarás en el viaje seleccionado</p>
+      </div>
+      <span id="cargas-count" class="bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold px-3 py-1.5 rounded-full">—</span>
+    </div>
+    <div id="wrap-cargas" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="col-span-full py-12 text-center text-slate-400 text-sm">
+        <div class="animate-pulse">Cargando cargas...</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── PANEL DE CONFIRMACIÓN ─────────────────────────────────── -->
+  <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+    <div>
+      <h2 class="text-base font-black text-slate-700 mb-1">Confirmar operación</h2>
+      <p class="text-xs text-slate-400">Una vez confirmado, la ruta quedará asignada a ti y el productor recibirá el código QR para entregarte las cargas.</p>
+    </div>
+
+    <button id="btn-confirmar" onclick="confirmarRuta()" disabled
+      class="w-full bg-slate-200 text-slate-400 font-bold py-4 rounded-2xl cursor-not-allowed flex items-center justify-center gap-3 text-sm">
+      <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <span id="btn-confirmar-label">Selecciona una ruta para continuar</span>
+    </button>
+
+    <div id="msg-global" class="hidden"></div>
+  </section>
+
+</main>
+
+<!-- ══════════════════════════════ FOOTER ══════════════════════════════ -->
+<footer class="bg-slate-900 text-slate-400 text-xs py-5 border-t border-slate-800 mt-auto">
+  <div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-3">
+    <p><strong class="text-white">Damu SGC</strong> — Trazabilidad Ley REP · Chile</p>
+    <div class="flex gap-4 flex-wrap justify-center">
+      <a href="../auth/portal.html?action=login"  class="hover:text-white transition-colors">Portal</a>
+      <a href="dashboard-kpi.html"                class="hover:text-white transition-colors">Dashboard</a>
+      <a href="transportista-historial.html"       class="hover:text-white transition-colors">Mi Historial</a>
+    </div>
+    <p class="text-slate-600">© 2026 Damu SGC</p>
+  </div>
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// TRANSPORTISTA RUTAS — selección de ruta y cargas para un viaje
+// ═══════════════════════════════════════════════════════════════════
+
+var _uid               = null;
+var _empresaId         = null;
+var _rutasData         = {};       // id → viaje object
+var _rutaSeleccionada  = null;
+var _cargasSeleccionadas = new Set();
+
+var _CATEGORIAS = {
+  envases:    { label: 'Envases y Embalajes',        icon: '📦' },
+  electricos: { label: 'Eléctricos y Electrónicos',  icon: '🔌' },
+  neumaticos: { label: 'Neumáticos',                 icon: '🔄' },
+  pilas:      { label: 'Pilas y Baterías',           icon: '🔋' },
+  aceites:    { label: 'Aceites Lubricantes',        icon: '🛢️' },
+  textil:     { label: 'Textiles',                   icon: '👕' },
+};
+
+// ─────────────────────────────────────────────────────────────────
+async function _init() {
+  var sb = window.__damuSupabase;
+  if (!sb) return;
+
+  try {
+    var sesRes = await sb.auth.getSession();
+    if (!sesRes.data || !sesRes.data.session) return;
+    _uid = sesRes.data.session.user.id;
+
+    // 1. Resolver empresa_id desde cache o Supabase
+    var empresaId = localStorage.getItem('damu_empresa_id');
+    if (!empresaId) {
+      var te = await sb.from('transportistas_empresa')
+        .select('empresa_id, empresas(nombre)')
+        .eq('user_id_transportista', _uid)
+        .eq('activo', true)
+        .maybeSingle();
+
+      if (!te.data) {
+        // Sin vínculo → dashboard mostrará el onboarding
+        window.location.href = 'dashboard-kpi.html';
+        return;
+      }
+      empresaId = te.data.empresa_id;
+      var nombre = (te.data.empresas && te.data.empresas.nombre) || '';
+      localStorage.setItem('damu_empresa_id',     empresaId);
+      localStorage.setItem('damu_empresa_nombre', nombre);
+      _mostrarEmpresaBadge(nombre);
+    } else {
+      _mostrarEmpresaBadge(localStorage.getItem('damu_empresa_nombre') || '');
+    }
+    _empresaId = empresaId;
+
+    // 2 & 3. Consultas en paralelo
+    await Promise.all([cargarRutas(sb), cargarCargas(sb)]);
+
+  } catch (err) {
+    console.error('[Damu] _init:', err);
+    _setMsg('err', '❌ Error al cargar datos: ' + (err.message || err));
+  }
+}
+
+function _mostrarEmpresaBadge(nombre) {
+  var badge = document.getElementById('empresa-badge');
+  var nomEl = document.getElementById('empresa-badge-nombre');
+  if (badge) badge.classList.remove('hidden');
+  if (nomEl) nomEl.textContent = nombre || 'Empresa';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SECCIÓN A — Rutas
+// ═══════════════════════════════════════════════════════════════════
+
+async function cargarRutas(sb) {
+  try {
+    var rRes = await sb.from('viajes_operativos')
+      .select('id, origen, destino, distancia_km, created_at, estado, transportista_id')
+      .eq('empresa_id', _empresaId)
+      .in('estado', ['disponible', 'en_camino'])
+      .order('created_at', { ascending: false });
+
+    if (rRes.error) throw rRes.error;
+
+    // Filtro client-side: disponibles + en_camino asignadas a este transportista
+    var rutas = (rRes.data || []).filter(function(v) {
+      return v.estado === 'disponible'
+          || (v.estado === 'en_camino' && v.transportista_id === _uid);
+    });
+
+    var countEl = document.getElementById('rutas-count');
+    if (countEl) countEl.textContent = rutas.length + ' ruta' + (rutas.length !== 1 ? 's' : '');
+
+    _rutasData = {};
+    rutas.forEach(function(v) { _rutasData[v.id] = v; });
+
+    renderRutas(rutas);
+  } catch (err) {
+    _setWrapError('wrap-rutas', err.message);
+  }
+}
+
+function renderRutas(rutas) {
+  var wrap = document.getElementById('wrap-rutas');
+
+  if (!rutas.length) {
+    wrap.innerHTML = _emptyState('🗺️', 'Sin rutas disponibles',
+      'El productor aún no ha publicado rutas. Vuelve más tarde.');
+    return;
+  }
+
+  wrap.innerHTML = rutas.map(function(v) {
+    var fecha  = new Date(v.created_at).toLocaleDateString('es-CL',
+      { day: '2-digit', month: '2-digit', year: '2-digit' });
+    var esMia  = v.estado === 'en_camino' && v.transportista_id === _uid;
+
+    var badgeCls = esMia
+      ? 'bg-amber-100 text-amber-700 border border-amber-200'
+      : 'bg-blue-100 text-blue-700 border border-blue-200';
+    var badgeTxt = esMia ? '🚛 En camino (tuya)' : '🟢 Disponible';
+    var btnTxt   = esMia ? '✓ En camino' : 'Tomar ruta';
+
+    return '<div id="ruta-card-' + v.id + '" class="ruta-card bg-white rounded-2xl border-2 border-slate-200 p-5 transition-all hover:shadow-md hover:border-blue-200 flex flex-col gap-4">'
+
+      // Badge + fecha
+      + '<div class="flex items-start justify-between">'
+        + '<span class="text-xs font-bold px-2.5 py-1 rounded-full ' + badgeCls + '">' + badgeTxt + '</span>'
+        + '<span class="text-xs text-slate-400">' + fecha + '</span>'
+      + '</div>'
+
+      // Origen → Destino
+      + '<div class="flex items-stretch gap-3 flex-1">'
+        + '<div class="flex flex-col items-center gap-1 flex-shrink-0 pt-1">'
+          + '<div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>'
+          + '<div class="w-0.5 flex-1 bg-slate-200 my-0.5"></div>'
+          + '<div class="w-2.5 h-2.5 rounded-full bg-blue-500"></div>'
+        + '</div>'
+        + '<div class="flex-1 min-w-0 space-y-2">'
+          + '<div>'
+            + '<p class="text-xs text-slate-400 leading-none mb-0.5">Origen</p>'
+            + '<p class="text-sm font-semibold text-slate-700 truncate">' + _esc(v.origen || '—') + '</p>'
+          + '</div>'
+          + '<div>'
+            + '<p class="text-xs text-slate-400 leading-none mb-0.5">Destino</p>'
+            + '<p class="text-sm font-semibold text-slate-700 truncate">' + _esc(v.destino || '—') + '</p>'
+          + '</div>'
+        + '</div>'
+      + '</div>'
+
+      // Distancia + botón
+      + '<div class="flex items-center justify-between pt-3 border-t border-slate-100">'
+        + '<span class="text-xs text-slate-500 font-medium">📏 '
+          + (v.distancia_km ? v.distancia_km + ' km' : '—') + '</span>'
+        + '<button id="btn-tomar-' + v.id + '" onclick="tomarRuta(\'' + v.id + '\')"'
+          + ' class="bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors">'
+          + btnTxt
+        + '</button>'
+      + '</div>'
+
+    + '</div>';
+  }).join('');
+
+  // Pre-seleccionar si ya hay una ruta en_camino del transportista
+  var rutaMia = rutas.find(function(v) {
+    return v.estado === 'en_camino' && v.transportista_id === _uid;
+  });
+  if (rutaMia) tomarRuta(rutaMia.id);
+}
+
+function tomarRuta(id) {
+  // Resetear todas las cards
+  document.querySelectorAll('.ruta-card').forEach(function(card) {
+    card.classList.remove('border-blue-500', 'ring-2', 'ring-blue-200', 'shadow-md');
+    card.classList.add('border-slate-200');
+  });
+  document.querySelectorAll('[id^="btn-tomar-"]').forEach(function(btn) {
+    btn.textContent = 'Tomar ruta';
+    btn.className = 'bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors';
+  });
+
+  // Activar la seleccionada
+  var card = document.getElementById('ruta-card-' + id);
+  var btn  = document.getElementById('btn-tomar-' + id);
+  if (card) {
+    card.classList.remove('border-slate-200');
+    card.classList.add('border-blue-500', 'ring-2', 'ring-blue-200', 'shadow-md');
+  }
+  if (btn) {
+    btn.textContent = '✓ Seleccionada';
+    btn.className = 'bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-xl';
+  }
+
+  _rutaSeleccionada = _rutasData[id] || null;
+  _actualizarBotonConfirmar();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SECCIÓN B — Cargas
+// ═══════════════════════════════════════════════════════════════════
+
+async function cargarCargas(sb) {
+  try {
+    var cRes = await sb.from('produccion_rep')
+      .select('id, categoria, toneladas, created_at')
+      .eq('empresa_id', _empresaId)
+      .eq('estado', 'disponible')
+      .order('created_at', { ascending: false });
+
+    if (cRes.error) throw cRes.error;
+
+    var cargas  = cRes.data || [];
+    var countEl = document.getElementById('cargas-count');
+    if (countEl) countEl.textContent = cargas.length + ' carga' + (cargas.length !== 1 ? 's' : '');
+
+    renderCargas(cargas);
+  } catch (err) {
+    _setWrapError('wrap-cargas', err.message);
+  }
+}
+
+function renderCargas(cargas) {
+  var wrap = document.getElementById('wrap-cargas');
+
+  if (!cargas.length) {
+    wrap.innerHTML = _emptyState('📦', 'Sin cargas disponibles',
+      'El productor aún no tiene producción registrada con estado disponible.');
+    return;
+  }
+
+  wrap.innerHTML = cargas.map(function(c) {
+    var fecha = new Date(c.created_at).toLocaleDateString('es-CL',
+      { day: '2-digit', month: '2-digit', year: '2-digit' });
+    var info  = _CATEGORIAS[c.categoria] || { label: c.categoria || 'REP', icon: '♻️' };
+    var tons  = c.toneladas != null
+      ? c.toneladas.toLocaleString('es-CL') + ' t'
+      : '— t';
+
+    return '<label id="carga-card-' + c.id + '" class="carga-card flex items-start gap-4 bg-white rounded-2xl border-2 border-slate-200 p-5 cursor-pointer transition-all hover:border-emerald-200 hover:shadow-sm">'
+      + '<input type="checkbox" value="' + _esc(c.id) + '" onchange="toggleCarga(this)"'
+        + ' class="mt-1 w-5 h-5 accent-emerald-600 flex-shrink-0 cursor-pointer"/>'
+      + '<div class="flex-1 min-w-0">'
+        + '<div class="flex items-center gap-2 mb-2">'
+          + '<span class="text-xl leading-none">' + info.icon + '</span>'
+          + '<span class="text-sm font-bold text-slate-800">' + _esc(info.label) + '</span>'
+        + '</div>'
+        + '<p class="text-2xl font-black text-emerald-700 leading-none">'
+          + tons
+        + '</p>'
+        + '<p class="text-xs text-slate-400 mt-2">Registrado el ' + fecha + '</p>'
+      + '</div>'
+    + '</label>';
+  }).join('');
+}
+
+function toggleCarga(checkbox) {
+  var id   = checkbox.value;
+  var card = document.getElementById('carga-card-' + id);
+
+  if (checkbox.checked) {
+    _cargasSeleccionadas.add(id);
+    if (card) {
+      card.classList.remove('border-slate-200');
+      card.classList.add('border-emerald-500', 'ring-2', 'ring-emerald-200');
+    }
+  } else {
+    _cargasSeleccionadas.delete(id);
+    if (card) {
+      card.classList.remove('border-emerald-500', 'ring-2', 'ring-emerald-200');
+      card.classList.add('border-slate-200');
+    }
+  }
+  _actualizarBotonConfirmar();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CONFIRMACIÓN
+// ═══════════════════════════════════════════════════════════════════
+
+function _actualizarBotonConfirmar() {
+  var btn = document.getElementById('btn-confirmar');
+  var lbl = document.getElementById('btn-confirmar-label');
+  if (!btn) return;
+
+  var ok = !!_rutaSeleccionada && _cargasSeleccionadas.size > 0;
+  btn.disabled = !ok;
+  btn.className = ok
+    ? 'w-full bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold py-4 rounded-2xl transition-colors flex items-center justify-center gap-3 text-sm'
+    : 'w-full bg-slate-200 text-slate-400 font-bold py-4 rounded-2xl cursor-not-allowed flex items-center justify-center gap-3 text-sm';
+
+  if (!lbl) return;
+  if (!_rutaSeleccionada) {
+    lbl.textContent = 'Selecciona una ruta para continuar';
+  } else if (_cargasSeleccionadas.size === 0) {
+    lbl.textContent = 'Selecciona al menos una carga para continuar';
+  } else {
+    var n = _cargasSeleccionadas.size;
+    lbl.textContent = 'Confirmar ruta · ' + n + ' carga' + (n !== 1 ? 's' : '') + ' seleccionada' + (n !== 1 ? 's' : '');
+  }
+}
+
+async function confirmarRuta() {
+  if (!_rutaSeleccionada || _cargasSeleccionadas.size === 0) return;
+
+  var sb = window.__damuSupabase;
+  if (!sb) { _setMsg('err', 'Error de conexión.'); return; }
+
+  var btn = document.getElementById('btn-confirmar');
+  var lbl = document.getElementById('btn-confirmar-label');
+  if (btn) btn.disabled = true;
+  if (lbl) lbl.textContent = 'Procesando…';
+  _clearMsg();
+
+  try {
+    // UPDATE viajes_operativos → en_camino
+    var vRes = await sb.from('viajes_operativos')
+      .update({ estado: 'en_camino', transportista_id: _uid })
+      .eq('id', _rutaSeleccionada.id);
+    if (vRes.error) throw vRes.error;
+
+    // UPDATE produccion_rep → en_camino para cada carga seleccionada
+    var cargasArr = Array.from(_cargasSeleccionadas);
+    var pRes = await sb.from('produccion_rep')
+      .update({ estado: 'en_camino', transportista_asignado_id: _uid })
+      .in('id', cargasArr);
+    if (pRes.error) throw pRes.error;
+
+    // INSERT entregas_qr con token único
+    var qrRes = await sb.from('entregas_qr').insert({
+      viaje_id:         _rutaSeleccionada.id,
+      empresa_id:       _empresaId,
+      transportista_id: _uid,
+      token:            crypto.randomUUID(),
+      estado:           'pendiente',
+    });
+    if (qrRes.error && qrRes.error.code !== '23505') throw qrRes.error;
+
+    // Éxito → mensaje + redirigir
+    if (btn) btn.className = 'w-full bg-emerald-700 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-3 text-sm cursor-not-allowed';
+    _setMsg('ok', '✓ Ruta confirmada. El productor recibirá el código QR para entregarte.');
+    setTimeout(function () { window.location.href = 'transportista-historial.html'; }, 2000);
+
+  } catch (err) {
+    console.error('[Damu] confirmarRuta:', err);
+    _setMsg('err', '❌ ' + (err.message || 'Error al confirmar la ruta.'));
+    if (btn) { btn.disabled = false; _actualizarBotonConfirmar(); }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════════
+
+function _emptyState(icon, title, sub) {
+  return '<div class="col-span-full py-14 text-center">'
+    + '<span class="text-5xl block mb-3">' + icon + '</span>'
+    + '<p class="text-sm font-bold text-slate-600 mb-1">' + _esc(title) + '</p>'
+    + '<p class="text-xs text-slate-400">' + _esc(sub) + '</p>'
+    + '</div>';
+}
+
+function _setWrapError(wrapId, msg) {
+  var el = document.getElementById(wrapId);
+  if (!el) return;
+  el.innerHTML = '<div class="col-span-full py-12 text-center">'
+    + '<span class="text-3xl block mb-2">⚠️</span>'
+    + '<p class="text-sm text-red-500 font-medium">' + _esc(msg) + '</p>'
+    + '</div>';
+}
+
+function _setMsg(tipo, txt) {
+  var el = document.getElementById('msg-global');
+  if (!el) return;
+  el.textContent = txt;
+  el.className = 'text-sm font-semibold px-5 py-3.5 rounded-xl border '
+    + (tipo === 'ok'
+      ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+      : 'bg-red-50 border-red-200 text-red-700');
+  el.classList.remove('hidden');
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function _clearMsg() {
+  var el = document.getElementById('msg-global');
+  if (el) el.classList.add('hidden');
+}
+
+function _esc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+_init();
+</script>
+</body>
+</html>
