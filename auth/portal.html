@@ -400,12 +400,28 @@ async function doLogin(email, pwd) {
     .eq('activo', true);
   var roles = (rolesRes.data || []).map(function (r) { return r.rol; });
 
-  // Fallback: cuenta pre-migración sin filas en perfiles → usar selectedRole e insertar
+  // Rol grabado en metadata al momento del signup (más confiable que el botón seleccionado ahora)
+  var metaRole = (user.user_metadata && user.user_metadata.role) || null;
+  console.log('[login] perfiles roles:', roles, '| selectedRole:', selectedRole, '| meta.role:', metaRole);
+
+  // Fallback: sin fila en perfiles → preferir metadata de signup, luego botón seleccionado
   if (roles.length === 0) {
-    roles = [selectedRole];
+    var inferredRole = metaRole || selectedRole;
+    console.log('[login] perfiles vacío → inferredRole:', inferredRole);
+    roles = [inferredRole];
     supabase.from('perfiles')
-      .upsert({ user_id: user.id, rol: selectedRole }, { onConflict: 'user_id,rol', ignoreDuplicates: true })
+      .upsert({ user_id: user.id, rol: inferredRole }, { onConflict: 'user_id,rol', ignoreDuplicates: true })
       .then(function () {});
+  }
+
+  // Corrección para usuarios afectados: si metadata dice un rol que no está en perfiles,
+  // se agrega → el selector de módulo aparecerá para que el usuario elija correctamente
+  if (metaRole && !roles.includes(metaRole)) {
+    console.log('[login] metadata.role', metaRole, 'no está en perfiles → añadiéndolo');
+    supabase.from('perfiles')
+      .upsert({ user_id: user.id, rol: metaRole }, { onConflict: 'user_id,rol', ignoreDuplicates: true })
+      .then(function () {});
+    roles.push(metaRole);
   }
 
   if (roles.length === 1) {
@@ -453,6 +469,10 @@ async function doRegistro(email, pwd) {
     setLoading(false);
   } else {
     var role = selectedRole;
+    // Insertar en perfiles para que el primer login encuentre el rol correcto
+    supabase.from('perfiles')
+      .upsert({ user_id: data.user.id, rol: role }, { onConflict: 'user_id,rol', ignoreDuplicates: true })
+      .then(function () {});
     persistirSesion(data.user, role);
     setMsg('ok', '✓ Cuenta creada exitosamente. Redirigiendo a tu plataforma…');
     await _cachearEmpresaLogin(data.user, role).catch(function () {});
