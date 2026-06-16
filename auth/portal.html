@@ -234,30 +234,14 @@ async function checkSession() {
   try {
     var res = await supabase.auth.getUser();
     if (res.error || !res.data || !res.data.user) return;
-    var uid = res.data.user.id;
 
-    // Consultar rol real desde perfiles (NO localStorage — puede estar desactualizado)
-    var rolesRes = await supabase
-      .from('perfiles').select('rol').eq('user_id', uid).eq('activo', true);
-    var roles = (rolesRes.data || []).map(function(r) { return r.rol; });
+    // El módulo al que redirigir es el que el usuario usó la última vez
+    var role = localStorage.getItem('damu_role') || localStorage.getItem('damu_perfil') || null;
+    if (!role) return; // Sin rol previo → mostrar formulario para que elija
 
-    if (roles.length === 0) {
-      // Sin perfiles — mostrar formulario para que el usuario elija rol y se loguee
-      return;
-    }
-
-    if (roles.length === 1) {
-      // Un solo rol: redirigir directo
-      var role = roles[0];
-      localStorage.setItem('damu_role', role);
-      setMsg('ok', '✓ Sesión activa. Redirigiendo...');
-      document.getElementById('btn-submit').disabled = true;
-      setTimeout(function () { redirigir(role); }, 900);
-    } else {
-      // Múltiples roles: mostrar selector
-      setMsg('ok', '✓ Sesión activa. Selecciona con qué módulo deseas ingresar.');
-      _mostrarSelectorRol(res.data.user);
-    }
+    setMsg('ok', '✓ Sesión activa. Redirigiendo...');
+    document.getElementById('btn-submit').disabled = true;
+    setTimeout(function () { redirigir(role); }, 900);
 
   } catch (e) { /* sin sesión o error de red → mostrar formulario */ }
 }
