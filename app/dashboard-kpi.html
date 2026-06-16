@@ -1009,12 +1009,122 @@ function _copiarFallback(texto, callback) {
   document.body.removeChild(el);
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// ONBOARDING — Vinculación de transportista (gate previo al dashboard)
+// ═══════════════════════════════════════════════════════════════════
+
+async function _verificarVinculoTransportista(sb) {
+  if (!sb) return false;
+  if (localStorage.getItem('damu_empresa_id')) return true; // cache hit
+
+  try {
+    var sesRes = await sb.auth.getSession();
+    if (!sesRes.data || !sesRes.data.session) return false;
+    var uid = sesRes.data.session.user.id;
+
+    var te = await sb.from('transportistas_empresa')
+      .select('empresa_id, empresas(nombre)')
+      .eq('user_id_transportista', uid)
+      .eq('activo', true)
+      .maybeSingle();
+
+    if (te.data) {
+      localStorage.setItem('damu_empresa_id',     te.data.empresa_id);
+      localStorage.setItem('damu_empresa_nombre', (te.data.empresas && te.data.empresas.nombre) || '');
+      return true;
+    }
+    return false;
+  } catch (_) { return false; }
+}
+
+async function vincularDesdeOnboarding() {
+  var codigoEl = document.getElementById('onb-codigo');
+  var btn      = document.getElementById('onb-btn');
+  var codigo   = (codigoEl.value || '').trim().toUpperCase();
+
+  if (!codigo || codigo.length !== 8) {
+    _setOnbMsg('err', '⚠️ El código debe tener exactamente 8 caracteres.');
+    return;
+  }
+
+  var sb = window.__damuSupabase;
+  if (!sb) { _setOnbMsg('err', 'Error de conexión.'); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg> Buscando…';
+
+  try {
+    var sesRes = await sb.auth.getSession();
+    if (!sesRes.data || !sesRes.data.session) {
+      _setOnbMsg('err', 'Sesión no activa. Vuelve a iniciar sesión.');
+      return;
+    }
+    var uid = sesRes.data.session.user.id;
+
+    // a. Buscar empresa por código de invitación
+    var empRes = await sb.from('empresas')
+      .select('id, nombre')
+      .eq('codigo_invitacion', codigo)
+      .maybeSingle();
+
+    if (!empRes.data) {
+      _setOnbMsg('err', '❌ Código no válido. Verifica el código con tu productor REP.');
+      return;
+    }
+
+    var empresa = empRes.data;
+
+    // b. INSERT en transportistas_empresa
+    var insRes = await sb.from('transportistas_empresa').insert({
+      user_id_transportista: uid,
+      empresa_id:            empresa.id,
+      codigo_invitacion:     codigo,
+      activo:                true,
+    }).select('id').single();
+
+    if (insRes.error && insRes.error.code !== '23505') throw insRes.error;
+
+    // c. Cachear empresa en localStorage
+    localStorage.setItem('damu_empresa_id',     empresa.id);
+    localStorage.setItem('damu_empresa_nombre', empresa.nombre);
+
+    // d. Mensaje de éxito → recargar
+    _setOnbMsg('ok', '✓ Vinculado con ' + empresa.nombre + '. Cargando tus rutas...');
+    setTimeout(function () { window.location.reload(); }, 1200);
+
+  } catch (err) {
+    _setOnbMsg('err', '❌ ' + (err.message || 'Error al procesar la solicitud.'));
+    btn.disabled = false;
+    btn.innerHTML = '<svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg> Vincular';
+  }
+}
+
+function _setOnbMsg(tipo, txt) {
+  var el = document.getElementById('onb-msg');
+  if (!el) return;
+  el.textContent = txt;
+  el.className   = 'text-xs text-center font-semibold '
+    + (tipo === 'ok' ? 'text-emerald-600' : 'text-red-600');
+  el.classList.remove('hidden');
+}
+
 // ── Cargar al iniciar ──────────────────────────────────────────
 // __damuSupabase está disponible de forma síncrona desde auth-guard.js
 async function _init() {
+  var sb     = window.__damuSupabase;
+  var perfil = localStorage.getItem('damu_role') || '';
+
+  // Transportista: verificar vínculo ANTES de cargar cualquier contenido del dashboard
+  if (perfil === 'transportista') {
+    var vinculado = await _verificarVinculoTransportista(sb);
+    if (!vinculado) {
+      document.getElementById('overlay-vinculacion').classList.remove('hidden');
+      return; // No cargar nada más hasta que se vincule
+    }
+  }
+
   cargarEmpresaTMS(); // no-op silencioso si rol es productor
   await cargarDatosDB();
-  var sb = window.__damuSupabase;
   if (!sb) return;
   var sesRes = await sb.auth.getSession();
   var uid    = sesRes.data && sesRes.data.session ? sesRes.data.session.user.id : null;
@@ -1026,6 +1136,20 @@ async function _init() {
   cargarEstadoRed(); // no-op silencioso si no hay acopios
 }
 _init();
+
+// Uppercase automático + Enter en el input de vinculación
+(function () {
+  var inp = document.getElementById('onb-codigo');
+  if (!inp) return;
+  inp.addEventListener('input', function () {
+    var pos = this.selectionStart;
+    this.value = this.value.toUpperCase();
+    this.setSelectionRange(pos, pos);
+  });
+  inp.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') vincularDesdeOnboarding();
+  });
+}());
 </script>
 </body>
 </html>
