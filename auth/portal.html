@@ -374,53 +374,13 @@ async function doLogin(email, pwd) {
   }
 
   var user = data.user;
-  console.log('[login] user_metadata:', user.user_metadata);
 
-  // Consultar roles activos en perfiles para este usuario
-  var rolesRes = await supabase
-    .from('perfiles')
-    .select('rol')
-    .eq('user_id', user.id)
-    .eq('activo', true);
-  var roles = (rolesRes.data || []).map(function (r) { return r.rol; });
-
-  // Rol grabado en metadata al momento del signup (más confiable que el botón seleccionado ahora)
-  var metaRole = (user.user_metadata && user.user_metadata.role) || null;
-  console.log('[login] perfiles roles:', roles, '| selectedRole:', selectedRole, '| meta.role:', metaRole);
-
-  // Fallback: sin fila en perfiles → preferir metadata de signup, luego botón seleccionado
-  if (roles.length === 0) {
-    var inferredRole = metaRole || selectedRole;
-    console.log('[login] perfiles vacío → inferredRole:', inferredRole);
-    roles = [inferredRole];
-    supabase.from('perfiles')
-      .upsert({ user_id: user.id, rol: inferredRole }, { onConflict: 'user_id,rol', ignoreDuplicates: true })
-      .then(function () {});
-  }
-
-  // Corrección para usuarios afectados: si metadata dice un rol que no está en perfiles,
-  // se agrega → el selector de módulo aparecerá para que el usuario elija correctamente
-  if (metaRole && !roles.includes(metaRole)) {
-    console.log('[login] metadata.role', metaRole, 'no está en perfiles → añadiéndolo');
-    supabase.from('perfiles')
-      .upsert({ user_id: user.id, rol: metaRole }, { onConflict: 'user_id,rol', ignoreDuplicates: true })
-      .then(function () {});
-    roles.push(metaRole);
-  }
-
-  if (roles.length === 1) {
-    // Un solo rol: entrar directo sin preguntar
-    var role = roles[0];
-    persistirSesion(user, role);
-    setMsg('ok', '✓ Acceso concedido. Redirigiendo a tu plataforma…');
-    await _cachearEmpresaLogin(user, role).catch(function () {});
-    setTimeout(function () { redirigir(role); }, 900);
-  } else {
-    // Doble perfil: mostrar selector de módulo
-    setLoading(false);
-    setMsg('ok', '✓ Acceso concedido. Selecciona con qué módulo deseas ingresar.');
-    _mostrarSelectorRol(user);
-  }
+  // El módulo lo decide el botón que presionó el usuario — sin consulta a perfiles
+  var role = selectedRole;
+  persistirSesion(user, role);
+  setMsg('ok', '✓ Acceso concedido. Redirigiendo a tu plataforma…');
+  await _cachearEmpresaLogin(user, role).catch(function () {});
+  setTimeout(function () { redirigir(role); }, 900);
 }
 
 // ─────────────────────────────────────────────────────────────────
