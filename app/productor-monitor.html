@@ -218,10 +218,23 @@ async function cargarMonitoreo() {
       .maybeSingle();
 
     if (!eRes.data) {
-      document.getElementById('banner-sin-empresa').classList.remove('hidden');
-      ['wrap-transportistas','wrap-rutas-mon','wrap-qr-mon','wrap-entregas']
-        .forEach(function(id) { setVacio(id, 'Sin empresa REP asociada.'); });
-      return;
+      // Crear empresa automáticamente para este productor
+      var userEmail = sesRes.data.session.user.email || _sessionUid;
+      var empR = await sb.from('empresas')
+        .upsert(
+          { nombre: userEmail, user_id_productor: _sessionUid },
+          { onConflict: 'user_id_productor', ignoreDuplicates: false }
+        )
+        .select('id, nombre, codigo_invitacion')
+        .single();
+
+      if (empR.error || !empR.data) {
+        document.getElementById('banner-sin-empresa').classList.remove('hidden');
+        ['wrap-transportistas','wrap-rutas-mon','wrap-qr-mon','wrap-entregas']
+          .forEach(function(id) { setVacio(id, 'Sin empresa REP asociada.'); });
+        return;
+      }
+      eRes = { data: empR.data };
     }
 
     _empresaId = eRes.data.id;
