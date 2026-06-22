@@ -262,14 +262,39 @@ CREATE TABLE IF NOT EXISTS public.empresas (
 -- ── 15. Tabla transportistas_empresa ──────────────────────────────────────
 --    Vínculo N:M. user_id_transportista es la FK al usuario transportista.
 --    El transportista se auto-inserta usando el codigo_invitacion del productor.
+--    user_id_productor: columna desnormalizada para evitar subquery circular
+--    en las políticas RLS del productor (rompe ciclo con empresas).
 CREATE TABLE IF NOT EXISTS public.transportistas_empresa (
   id                    uuid        NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id_transportista uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   empresa_id            uuid        NOT NULL REFERENCES public.empresas(id) ON DELETE CASCADE,
+  user_id_productor     uuid        REFERENCES auth.users(id),
   activo                boolean     NOT NULL DEFAULT true,
   created_at            timestamptz NOT NULL DEFAULT now(),
   UNIQUE (user_id_transportista, empresa_id)
 );
+
+-- Backfill de filas existentes (si la columna ya tiene datos no hace nada)
+UPDATE public.transportistas_empresa te
+   SET user_id_productor = e.user_id_productor
+  FROM public.empresas e
+ WHERE te.empresa_id = e.id
+   AND te.user_id_productor IS NULL;
+
+-- Trigger BEFORE INSERT: auto-rellena user_id_productor desde empresas
+CREATE OR REPLACE FUNCTION public._fn_fill_productor_id()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  SELECT e.user_id_productor INTO NEW.user_id_productor
+  FROM public.empresas e WHERE e.id = NEW.empresa_id;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_fill_productor ON public.transportistas_empresa;
+CREATE TRIGGER trg_fill_productor
+  BEFORE INSERT ON public.transportistas_empresa
+  FOR EACH ROW EXECUTE FUNCTION public._fn_fill_productor_id();
 
 -- ── 16. empresa_id en tablas operativas ───────────────────────────────────
 --    Nullable → los datos pre-FASE1 siguen visibles con las políticas "own".
