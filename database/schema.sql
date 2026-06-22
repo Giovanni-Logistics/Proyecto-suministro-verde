@@ -941,3 +941,73 @@ $$;
 
 ALTER TABLE public.transportistas_empresa
   ADD COLUMN IF NOT EXISTS codigo_invitacion text;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- HOTFIX — Romper ciclo de recursión infinita entre políticas RLS
+--
+-- CAUSA: dos políticas se referencian mutuamente:
+--   • te_select_productor  (transportistas_empresa → empresas)
+--   • empresa_select_transportista (empresas → transportistas_empresa)
+-- Cualquier tabla cuya política haga un subquery a transportistas_empresa
+-- activa ese ciclo (produccion_rep, viajes_operativos, flota_vehiculos, etc.)
+--
+-- SOLUCIÓN: función SECURITY DEFINER que consulta transportistas_empresa
+-- sin ejecutar RLS, rompiendo el ciclo de forma definitiva.
+-- ════════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION public._fn_mis_empresas()
+RETURNS SETOF uuid
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT empresa_id
+  FROM public.transportistas_empresa
+  WHERE user_id_transportista = auth.uid() AND activo = true;
+$$;
+
+-- empresas: política que originaba el ciclo
+DROP POLICY IF EXISTS "empresa_select_transportista" ON public.empresas;
+CREATE POLICY "empresa_select_transportista"
+  ON public.empresas FOR SELECT
+  USING (id IN (SELECT public._fn_mis_empresas()));
+
+-- viajes_operativos
+DROP POLICY IF EXISTS "viajes_select_empresa_member" ON public.viajes_operativos;
+CREATE POLICY "viajes_select_empresa_member"
+  ON public.viajes_operativos FOR SELECT
+  USING (empresa_id IS NOT NULL AND empresa_id IN (SELECT public._fn_mis_empresas()));
+
+DROP POLICY IF EXISTS "viajes_insert_empresa" ON public.viajes_operativos;
+CREATE POLICY "viajes_insert_empresa"
+  ON public.viajes_operativos FOR INSERT
+  WITH CHECK (empresa_id IS NULL OR empresa_id IN (SELECT public._fn_mis_empresas()));
+
+-- certificados_rep
+DROP POLICY IF EXISTS "certs_select_empresa_member" ON public.certificados_rep;
+CREATE POLICY "certs_select_empresa_member"
+  ON public.certificados_rep FOR SELECT
+  USING (empresa_id IS NOT NULL AND empresa_id IN (SELECT public._fn_mis_empresas()));
+
+-- flota_vehiculos
+DROP POLICY IF EXISTS "flota_select_empresa_member" ON public.flota_vehiculos;
+CREATE POLICY "flota_select_empresa_member"
+  ON public.flota_vehiculos FOR SELECT
+  USING (empresa_id IS NOT NULL AND empresa_id IN (SELECT public._fn_mis_empresas()));
+
+DROP POLICY IF EXISTS "flota_insert_empresa_member" ON public.flota_vehiculos;
+CREATE POLICY "flota_insert_empresa_member"
+  ON public.flota_vehiculos FOR INSERT
+  WITH CHECK (empresa_id IS NULL OR empresa_id IN (SELECT public._fn_mis_empresas()));
+
+-- produccion_rep (parche anterior)
+DROP POLICY IF EXISTS "prod_select_trans_vinculado" ON public.produccion_rep;
+CREATE POLICY "prod_select_trans_vinculado"
+  ON public.produccion_rep FOR SELECT
+  USING (empresa_id IS NOT NULL AND empresa_id IN (SELECT public._fn_mis_empresas()));
+
+-- entregas_qr (parche anterior)
+DROP POLICY IF EXISTS "qr_insert_trans" ON public.entregas_qr;
+CREATE POLICY "qr_insert_trans"
+  ON public.entregas_qr FOR INSERT
+  WITH CHECK (
+    transportista_id = auth.uid()
+    AND empresa_id IN (SELECT public._fn_mis_empresas())
+  );
