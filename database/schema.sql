@@ -291,6 +291,12 @@ CREATE INDEX IF NOT EXISTS idx_acopio_empresa      ON public.puntos_acopio      
 -- ── 18. RLS — empresas ────────────────────────────────────────────────────
 ALTER TABLE public.empresas ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "empresa_select_own"            ON public.empresas;
+DROP POLICY IF EXISTS "empresa_insert_own"            ON public.empresas;
+DROP POLICY IF EXISTS "empresa_update_own"            ON public.empresas;
+DROP POLICY IF EXISTS "empresa_select_transportista"  ON public.empresas;
+DROP POLICY IF EXISTS "empresa_select_by_codigo"      ON public.empresas;
+
 CREATE POLICY "empresa_select_own"
   ON public.empresas FOR SELECT
   USING (user_id_productor = auth.uid());
@@ -303,7 +309,9 @@ CREATE POLICY "empresa_update_own"
   ON public.empresas FOR UPDATE
   USING (user_id_productor = auth.uid());
 
--- Transportista vinculado lee los datos de la empresa (nombre, código, etc.)
+-- Transportista vinculado lee los datos de la empresa.
+-- NOTA: esta política se reemplaza en el HOTFIX al final del archivo;
+-- esta versión original se mantiene aquí solo como referencia inicial.
 CREATE POLICY "empresa_select_transportista"
   ON public.empresas FOR SELECT
   USING (
@@ -313,12 +321,8 @@ CREATE POLICY "empresa_select_transportista"
     )
   );
 
--- Cualquier usuario autenticado puede buscar empresa por codigo_invitacion
--- (necesario para el flujo "Unirse a empresa")
-CREATE POLICY "empresa_select_by_codigo"
-  ON public.empresas FOR SELECT
-  TO authenticated
-  USING (activo = true AND codigo_invitacion IS NOT NULL);
+-- Eliminada: reemplazada por fn_buscar_empresa_por_codigo RPC
+-- CREATE POLICY "empresa_select_by_codigo" ...
 
 -- ── 19. RLS — transportistas_empresa ──────────────────────────────────────
 ALTER TABLE public.transportistas_empresa ENABLE ROW LEVEL SECURITY;
