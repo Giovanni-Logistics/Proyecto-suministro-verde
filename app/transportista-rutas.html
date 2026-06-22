@@ -409,30 +409,21 @@ async function confirmarRuta() {
   _clearMsg();
 
   try {
-    // UPDATE viajes_operativos → en_camino
-    var vRes = await sb.from('viajes_operativos')
-      .update({ estado: 'en_camino', transportista_id: _uid })
-      .eq('id', _rutaSeleccionada.id);
-    if (vRes.error) throw vRes.error;
-
-    // UPDATE produccion_rep → en_camino para cada carga seleccionada
-    var cargasArr = Array.from(_cargasSeleccionadas);
-    var pRes = await sb.from('produccion_rep')
-      .update({ estado: 'en_camino', transportista_asignado_id: _uid })
-      .in('id', cargasArr);
-    if (pRes.error) throw pRes.error;
-
-    // INSERT entregas_qr con token único
-    var qrRes = await sb.from('entregas_qr').insert({
-      viaje_id:         _rutaSeleccionada.id,
-      empresa_id:       _empresaId,
-      transportista_id: _uid,
-      token:            crypto.randomUUID(),
-      estado:           'pendiente',
+    // Operación atómica: un solo UPDATE con AND estado='disponible' en el servidor
+    // garantiza que dos transportistas simultáneos no puedan tomar la misma ruta.
+    var rpcRes = await sb.rpc('fn_tomar_ruta', {
+      p_viaje_id:   _rutaSeleccionada.id,
+      p_cargas_ids: Array.from(_cargasSeleccionadas),
+      p_empresa_id: _empresaId,
     });
-    if (qrRes.error && qrRes.error.code !== '23505') throw qrRes.error;
 
-    // Éxito → mensaje + redirigir
+    if (rpcRes.error) throw rpcRes.error;
+
+    var resultado = rpcRes.data && rpcRes.data[0];
+    if (!resultado || !resultado.ok) {
+      throw new Error(resultado ? resultado.mensaje : 'Error desconocido al tomar la ruta.');
+    }
+
     if (btn) btn.className = 'w-full bg-emerald-700 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-3 text-sm cursor-not-allowed';
     _setMsg('ok', '✓ Ruta confirmada. El productor recibirá el código QR para entregarte.');
     setTimeout(function () { window.location.href = 'transportista-historial.html'; }, 2000);
