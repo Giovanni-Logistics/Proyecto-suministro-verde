@@ -300,6 +300,8 @@ async function cargarMonitoreo() {
     renderActividadQR(viajes, transportistas);
     renderKPIs(transportistas, viajes);
 
+    _suscribirRealtime(sb);
+
   } catch (err) {
     console.error('[Damu] cargarMonitoreo:', err);
     ['wrap-transportistas','wrap-rutas-mon','wrap-qr-mon','wrap-entregas']
