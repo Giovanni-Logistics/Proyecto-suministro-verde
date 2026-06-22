@@ -325,32 +325,30 @@ CREATE POLICY "empresa_select_transportista"
 -- CREATE POLICY "empresa_select_by_codigo" ...
 
 -- ── 19. RLS — transportistas_empresa ──────────────────────────────────────
+-- IMPORTANTE: las políticas te_select/insert/delete_productor usan la columna
+-- user_id_productor (desnormalizada) para evitar un subquery circular a empresas.
+-- Ver HOTFIX v2 al final del archivo para la columna, backfill y trigger.
 ALTER TABLE public.transportistas_empresa ENABLE ROW LEVEL SECURITY;
 
--- Productor ve y gestiona los vínculos de su empresa
+DROP POLICY IF EXISTS "te_select_productor" ON public.transportistas_empresa;
+DROP POLICY IF EXISTS "te_insert_productor" ON public.transportistas_empresa;
+DROP POLICY IF EXISTS "te_delete_productor" ON public.transportistas_empresa;
+DROP POLICY IF EXISTS "te_select_self"      ON public.transportistas_empresa;
+DROP POLICY IF EXISTS "te_insert_self"      ON public.transportistas_empresa;
+
+-- Productor: comparación directa de columna (sin subquery a empresas → sin ciclo RLS)
+-- La columna user_id_productor se rellena automáticamente por el trigger trg_fill_productor
 CREATE POLICY "te_select_productor"
   ON public.transportistas_empresa FOR SELECT
-  USING (
-    empresa_id IN (
-      SELECT id FROM public.empresas WHERE user_id_productor = auth.uid()
-    )
-  );
+  USING (user_id_productor = auth.uid());
 
 CREATE POLICY "te_insert_productor"
   ON public.transportistas_empresa FOR INSERT
-  WITH CHECK (
-    empresa_id IN (
-      SELECT id FROM public.empresas WHERE user_id_productor = auth.uid()
-    )
-  );
+  WITH CHECK (user_id_productor = auth.uid());
 
 CREATE POLICY "te_delete_productor"
   ON public.transportistas_empresa FOR DELETE
-  USING (
-    empresa_id IN (
-      SELECT id FROM public.empresas WHERE user_id_productor = auth.uid()
-    )
-  );
+  USING (user_id_productor = auth.uid());
 
 -- Transportista ve y crea su propio vínculo (auto-unión por código)
 CREATE POLICY "te_select_self"
