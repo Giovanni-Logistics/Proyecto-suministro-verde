@@ -370,6 +370,33 @@ function _copiarFallback(text, cb) {
   document.body.removeChild(el);
 }
 
+async function regenerarCodigo() {
+  var sb = window.__damuSupabase;
+  if (!sb || !_empresaId) return;
+  var msg = document.getElementById('regen-msg');
+  var nuevoCodigo = crypto.randomUUID().slice(0, 8).toUpperCase();
+  try {
+    var upd = await sb.from('empresas').update({ codigo_invitacion: nuevoCodigo }).eq('id', _empresaId);
+    if (upd.error) throw upd.error;
+    _codigoInv = nuevoCodigo;
+    localStorage.setItem('damu_codigo_invitacion', nuevoCodigo);
+    var display = document.getElementById('codigo-display');
+    if (display) display.textContent = nuevoCodigo;
+    if (msg) {
+      msg.className = 'text-xs font-semibold px-3 py-2 rounded-lg border bg-amber-50 border-amber-200 text-amber-700';
+      msg.textContent = '⚠ Código regenerado. Los transportistas con el código anterior deberán vincularse de nuevo.';
+      msg.classList.remove('hidden');
+      setTimeout(function() { msg.classList.add('hidden'); }, 8000);
+    }
+  } catch (err) {
+    if (msg) {
+      msg.className = 'text-xs font-semibold px-3 py-2 rounded-lg border bg-red-50 border-red-200 text-red-700';
+      msg.textContent = '❌ Error al regenerar: ' + err.message;
+      msg.classList.remove('hidden');
+    }
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // TAREA 2/3 — Entregas activas
 // ═══════════════════════════════════════════════════════════════════
