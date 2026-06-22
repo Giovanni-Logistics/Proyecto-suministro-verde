@@ -1226,9 +1226,37 @@ function _setGuardarMsg(tipo, texto) {
 }
 
 // ═══════════════════════════ BANNER EMPRESA ═══════════════════════════
-function _cargarBannerEmpresa() {
-  var nombre  = localStorage.getItem('damu_empresa_nombre') || '';
-  var codigo  = localStorage.getItem('damu_codigo_invitacion') || '';
+async function _cargarBannerEmpresa() {
+  var nombre = localStorage.getItem('damu_empresa_nombre') || '';
+  var codigo = localStorage.getItem('damu_codigo_invitacion') || '';
+
+  if (!nombre || !codigo) {
+    var sb = window.__damuSupabase;
+    if (sb) {
+      try {
+        var sesRes = await sb.auth.getSession();
+        if (sesRes.data && sesRes.data.session) {
+          var uid  = sesRes.data.session.user.id;
+          var eRes = await sb.from('empresas')
+            .select('id, nombre, codigo_invitacion')
+            .eq('user_id_productor', uid)
+            .maybeSingle();
+          if (eRes.data) {
+            nombre = eRes.data.nombre || nombre;
+            codigo = eRes.data.codigo_invitacion || codigo;
+            if (!codigo) {
+              codigo = crypto.randomUUID().slice(0, 8).toUpperCase();
+              await sb.from('empresas').update({ codigo_invitacion: codigo }).eq('id', eRes.data.id);
+            }
+            if (nombre) localStorage.setItem('damu_empresa_nombre', nombre);
+            if (codigo) localStorage.setItem('damu_codigo_invitacion', codigo);
+            if (eRes.data.id) localStorage.setItem('damu_empresa_id', eRes.data.id);
+          }
+        }
+      } catch (_) {}
+    }
+  }
+
   if (!nombre && !codigo) return;
   var banner = document.getElementById('empresa-prod-banner');
   var nomEl  = document.getElementById('prod-empresa-nombre');
