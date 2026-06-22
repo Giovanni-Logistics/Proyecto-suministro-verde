@@ -42,6 +42,10 @@ ALTER TABLE public.viajes_operativos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.certificados_rep  ENABLE ROW LEVEL SECURITY;
 
 -- ── 5. Políticas RLS — viajes_operativos ─────────────────────────────────
+DROP POLICY IF EXISTS "viajes_select_own"  ON public.viajes_operativos;
+DROP POLICY IF EXISTS "viajes_insert_own"  ON public.viajes_operativos;
+DROP POLICY IF EXISTS "viajes_delete_own"  ON public.viajes_operativos;
+
 CREATE POLICY "viajes_select_own"
   ON public.viajes_operativos FOR SELECT
   USING (user_id = auth.uid());
@@ -55,6 +59,10 @@ CREATE POLICY "viajes_delete_own"
   USING (user_id = auth.uid());
 
 -- ── 6. Políticas RLS — certificados_rep ──────────────────────────────────
+DROP POLICY IF EXISTS "certs_select_own"   ON public.certificados_rep;
+DROP POLICY IF EXISTS "certs_insert_own"   ON public.certificados_rep;
+DROP POLICY IF EXISTS "certs_delete_own"   ON public.certificados_rep;
+
 CREATE POLICY "certs_select_own"
   ON public.certificados_rep FOR SELECT
   USING (user_id = auth.uid());
