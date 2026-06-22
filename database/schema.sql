@@ -1116,15 +1116,35 @@ CREATE POLICY "flota_insert_empresa_member"
     )
   );
 
+-- prod_select_trans_vinculado ELIMINADA — causaba ciclo 42P17.
+-- El transportista accede a cargas vía fn_cargas_empresa (SECURITY DEFINER).
 DROP POLICY IF EXISTS "prod_select_trans_vinculado" ON public.produccion_rep;
-CREATE POLICY "prod_select_trans_vinculado"
-  ON public.produccion_rep FOR SELECT
-  USING (
-    empresa_id IS NOT NULL AND empresa_id IN (
-      SELECT te.empresa_id FROM public.transportistas_empresa te
-      WHERE te.user_id_transportista = auth.uid() AND te.activo = true
-    )
-  );
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- RPC: transportista consulta cargas disponibles de su empresa
+-- SECURITY DEFINER = se ejecuta como el dueño de la función (sin RLS),
+-- pero valida manualmente que el usuario sea transportista activo de la empresa.
+-- ════════════════════════════════════════════════════════════════════════════
+CREATE OR REPLACE FUNCTION public.fn_cargas_empresa(p_empresa_id uuid)
+RETURNS TABLE(
+  id          uuid,
+  categoria   text,
+  toneladas   numeric,
+  estado      text,
+  created_at  timestamptz
+)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT p.id, p.categoria, p.toneladas, p.estado, p.created_at
+  FROM   public.produccion_rep p
+  WHERE  p.empresa_id = p_empresa_id
+    AND  p.estado = 'disponible'
+    AND  EXISTS (
+           SELECT 1 FROM public.transportistas_empresa te
+           WHERE  te.user_id_transportista = auth.uid()
+             AND  te.empresa_id = p_empresa_id
+             AND  te.activo = true
+         );
+$$;
 
 DROP POLICY IF EXISTS "qr_insert_trans" ON public.entregas_qr;
 CREATE POLICY "qr_insert_trans"
