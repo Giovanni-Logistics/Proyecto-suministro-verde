@@ -998,48 +998,22 @@ ALTER TABLE public.transportistas_empresa
   ADD COLUMN IF NOT EXISTS codigo_invitacion text;
 
 -- ════════════════════════════════════════════════════════════════════════════
--- HOTFIX v2 — Romper ciclo RLS por desnormalización (solución definitiva)
---
--- CAUSA raíz:
---   te_select_productor  (transportistas_empresa → subquery empresas)
---   empresa_select_transportista (empresas → subquery transportistas_empresa)
---   → ciclo infinito que se dispara desde cualquier tabla que consulte
---     transportistas_empresa dentro de una política RLS.
---
--- SOLUCIÓN: agregar user_id_productor como columna directa en
---   transportistas_empresa. Las políticas del productor pasan a usar
---   user_id_productor = auth.uid() (comparación de columna, sin subquery).
---   Esto rompe el ciclo sin depender de SECURITY DEFINER ni BYPASSRLS.
+-- CONSOLIDACIÓN FINAL — Re-aplica las políticas críticas como autoridad final.
+-- Toda la lógica de ciclo RLS ya está resuelta en la sección 15 y 19.
+-- Este bloque garantiza idempotencia en ejecuciones parciales previas.
 -- ════════════════════════════════════════════════════════════════════════════
 
--- 1. Columna desnormalizada
+-- Garantiza que user_id_productor existe (idempotente)
 ALTER TABLE public.transportistas_empresa
   ADD COLUMN IF NOT EXISTS user_id_productor uuid REFERENCES auth.users(id);
 
--- 2. Backfill de filas existentes
 UPDATE public.transportistas_empresa te
    SET user_id_productor = e.user_id_productor
   FROM public.empresas e
  WHERE te.empresa_id = e.id
    AND te.user_id_productor IS NULL;
 
--- 3. Trigger BEFORE INSERT para auto-rellenar en vínculos futuros
-CREATE OR REPLACE FUNCTION public._fn_fill_productor_id()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-BEGIN
-  SELECT user_id_productor INTO NEW.user_id_productor
-  FROM public.empresas WHERE id = NEW.empresa_id;
-  RETURN NEW;
-END;
-$$;
-
-DROP TRIGGER IF EXISTS trg_fill_productor ON public.transportistas_empresa;
-CREATE TRIGGER trg_fill_productor
-  BEFORE INSERT ON public.transportistas_empresa
-  FOR EACH ROW EXECUTE FUNCTION public._fn_fill_productor_id();
-
--- 4. Reemplazar políticas del productor en transportistas_empresa
---    por comparación directa de columna (sin subquery a empresas)
+-- Re-aplica las políticas del productor con columna directa (sin subquery)
 DROP POLICY IF EXISTS "te_select_productor" ON public.transportistas_empresa;
 CREATE POLICY "te_select_productor"
   ON public.transportistas_empresa FOR SELECT
