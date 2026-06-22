@@ -153,6 +153,18 @@ async function _init() {
     // 2 & 3. Consultas en paralelo
     await Promise.all([cargarRutas(sb), cargarCargas(sb)]);
 
+    // Realtime: refrescar rutas y cargas si otro transportista toma una ruta
+    sb.channel('rutas-' + _empresaId)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'viajes_operativos',
+        filter: 'empresa_id=eq.' + _empresaId,
+      }, function() { cargarRutas(sb); })
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'produccion_rep',
+        filter: 'empresa_id=eq.' + _empresaId,
+      }, function() { cargarCargas(sb); })
+      .subscribe();
+
   } catch (err) {
     console.error('[Damu] _init:', err);
     _setMsg('err', '❌ Error al cargar datos: ' + (err.message || err));
