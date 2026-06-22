@@ -606,19 +606,15 @@ async function unirseEmpresa() {
     }
     var uid = sesRes.data.session.user.id;
 
-    // 1. Buscar empresa por código
-    var empRes = await sb.from('empresas')
-      .select('id, nombre')
-      .eq('codigo_invitacion', codigo)
-      .eq('activo', true)
-      .maybeSingle();
+    // 1. Buscar empresa por código mediante RPC (evita exponer todas las empresas activas)
+    var empRes = await sb.rpc('fn_buscar_empresa_por_codigo', { p_codigo: codigo });
+    if (empRes.error) throw empRes.error;
+    var empresa = empRes.data && empRes.data[0];
 
-    if (!empRes.data) {
+    if (!empresa) {
       _setJoinMsg('err', 'Código no encontrado. Verifica con tu productor REP.');
       return;
     }
-
-    var empresa = empRes.data;
 
     // 2. Insertar vínculo (ON CONFLICT → ya existe)
     var insRes = await sb.from('transportistas_empresa').insert({
