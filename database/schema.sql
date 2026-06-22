@@ -658,3 +658,286 @@ BEGIN
             capacidad_kg;
 END;
 $$;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- PARCHE CRÍTICO 1 — Columnas faltantes en viajes_operativos
+-- Permite el flujo de estados disponible → en_camino → entregado
+-- y vincular cada viaje al transportista que lo tomó.
+-- ════════════════════════════════════════════════════════════════════════════
+
+ALTER TABLE public.viajes_operativos
+  ADD COLUMN IF NOT EXISTS empresa_id        uuid REFERENCES public.empresas(id),
+  ADD COLUMN IF NOT EXISTS estado            text NOT NULL DEFAULT 'disponible'
+    CONSTRAINT viajes_estado_chk CHECK (estado IN ('disponible','en_camino','entregado')),
+  ADD COLUMN IF NOT EXISTS transportista_id  uuid REFERENCES auth.users(id);
+
+ALTER TABLE public.viajes_operativos REPLICA IDENTITY FULL;
+
+CREATE INDEX IF NOT EXISTS idx_viajes_emp_est  ON public.viajes_operativos (empresa_id, estado);
+CREATE INDEX IF NOT EXISTS idx_viajes_tra_est  ON public.viajes_operativos (transportista_id, estado);
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- PARCHE CRÍTICO 2 — Tabla produccion_rep
+-- Registra las declaraciones de producción ligadas al ciclo logístico.
+-- ════════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.produccion_rep (
+  id                           uuid          NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id                      uuid          NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  empresa_id                   uuid          REFERENCES public.empresas(id),
+  categoria                    text          NOT NULL DEFAULT 'envases'
+    CONSTRAINT prod_cat_chk CHECK (categoria IN ('envases','neumaticos','pilas','raee','aceites')),
+  toneladas                    numeric(10,2) NOT NULL DEFAULT 0,
+  costo_estimado               numeric(14,2) NOT NULL DEFAULT 0,
+  meta_valorizacion_porcentaje numeric(5,2)  NOT NULL DEFAULT 0,
+  riesgo_multa_estimado        numeric(14,2) NOT NULL DEFAULT 0,
+  estado                       text          NOT NULL DEFAULT 'disponible'
+    CONSTRAINT prod_est_chk CHECK (estado IN ('disponible','en_camino','entregado')),
+  transportista_asignado_id    uuid          REFERENCES auth.users(id),
+  created_at                   timestamptz   NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.produccion_rep REPLICA IDENTITY FULL;
+ALTER TABLE public.produccion_rep ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX IF NOT EXISTS idx_prod_emp_est  ON public.produccion_rep (empresa_id, estado);
+CREATE INDEX IF NOT EXISTS idx_prod_uid_at   ON public.produccion_rep (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_prod_tra_est  ON public.produccion_rep (transportista_asignado_id, estado);
+
+-- RLS produccion_rep: productor lee/escribe los suyos
+CREATE POLICY "prod_select_own"
+  ON public.produccion_rep FOR SELECT USING (user_id = auth.uid());
+
+CREATE POLICY "prod_insert_own"
+  ON public.produccion_rep FOR INSERT WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "prod_update_own"
+  ON public.produccion_rep FOR UPDATE USING (user_id = auth.uid());
+
+CREATE POLICY "prod_delete_own"
+  ON public.produccion_rep FOR DELETE USING (user_id = auth.uid());
+
+-- RLS produccion_rep: transportista vinculado a la empresa puede leer (para mostrar cargas)
+CREATE POLICY "prod_select_trans_vinculado"
+  ON public.produccion_rep FOR SELECT
+  USING (
+    empresa_id IS NOT NULL AND empresa_id IN (
+      SELECT te.empresa_id FROM public.transportistas_empresa te
+      WHERE te.user_id_transportista = auth.uid() AND te.activo = true
+    )
+  );
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- PARCHE CRÍTICO 3 — Tabla entregas_qr
+-- Token único por viaje que el transportista escanea para confirmar entrega.
+-- ════════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.entregas_qr (
+  id               uuid        NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  viaje_id         uuid        NOT NULL REFERENCES public.viajes_operativos(id) ON DELETE CASCADE,
+  empresa_id       uuid        NOT NULL REFERENCES public.empresas(id),
+  transportista_id uuid        NOT NULL REFERENCES auth.users(id),
+  token            uuid        NOT NULL DEFAULT gen_random_uuid(),
+  estado           text        NOT NULL DEFAULT 'pendiente'
+    CONSTRAINT qr_est_chk CHECK (estado IN ('pendiente','completado')),
+  fecha_completado timestamptz,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (viaje_id),
+  UNIQUE (token)
+);
+
+ALTER TABLE public.entregas_qr ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX IF NOT EXISTS idx_qr_token      ON public.entregas_qr (token);
+CREATE INDEX IF NOT EXISTS idx_qr_emp_est    ON public.entregas_qr (empresa_id, estado);
+CREATE INDEX IF NOT EXISTS idx_qr_trans_est  ON public.entregas_qr (transportista_id, estado);
+
+-- RLS entregas_qr: transportista inserta su propio registro
+CREATE POLICY "qr_insert_trans"
+  ON public.entregas_qr FOR INSERT
+  WITH CHECK (
+    transportista_id = auth.uid()
+    AND empresa_id IN (
+      SELECT te.empresa_id FROM public.transportistas_empresa te
+      WHERE te.user_id_transportista = auth.uid() AND te.activo = true
+    )
+  );
+
+-- RLS entregas_qr: productor ve los QR de su empresa
+CREATE POLICY "qr_select_productor"
+  ON public.entregas_qr FOR SELECT
+  USING (
+    empresa_id IN (
+      SELECT e.id FROM public.empresas e WHERE e.user_id_productor = auth.uid()
+    )
+  );
+
+-- RLS entregas_qr: transportista ve los suyos
+CREATE POLICY "qr_select_trans"
+  ON public.entregas_qr FOR SELECT
+  USING (transportista_id = auth.uid());
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- PARCHE CRÍTICO 4 — RPC fn_tomar_ruta (operación atómica anti-race-condition)
+-- Un solo UPDATE con AND estado='disponible' garantiza que sólo un
+-- transportista pueda tomar cada ruta, sin importar la concurrencia.
+-- ════════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION public.fn_tomar_ruta(
+  p_viaje_id   uuid,
+  p_cargas_ids uuid[],
+  p_empresa_id uuid
+)
+RETURNS TABLE(ok boolean, mensaje text, qr_token uuid)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  _uid        uuid := auth.uid();
+  _rows_viaje int;
+  _token      uuid := gen_random_uuid();
+BEGIN
+  -- Verificar vínculo activo con la empresa
+  IF NOT EXISTS (
+    SELECT 1 FROM public.transportistas_empresa
+    WHERE user_id_transportista = _uid AND empresa_id = p_empresa_id AND activo = true
+  ) THEN
+    RETURN QUERY SELECT false, 'No autorizado: no estás vinculado a esta empresa.'::text, NULL::uuid;
+    RETURN;
+  END IF;
+
+  -- Tomar la ruta atómicamente (falla si ya está en_camino o entregada)
+  UPDATE public.viajes_operativos
+     SET estado = 'en_camino', transportista_id = _uid
+   WHERE id = p_viaje_id
+     AND estado = 'disponible'
+     AND empresa_id = p_empresa_id;
+  GET DIAGNOSTICS _rows_viaje = ROW_COUNT;
+
+  IF _rows_viaje = 0 THEN
+    RETURN QUERY SELECT false, 'La ruta ya fue tomada por otro transportista.'::text, NULL::uuid;
+    RETURN;
+  END IF;
+
+  -- Asignar las cargas seleccionadas
+  UPDATE public.produccion_rep
+     SET estado = 'en_camino', transportista_asignado_id = _uid
+   WHERE id = ANY(p_cargas_ids)
+     AND estado = 'disponible'
+     AND empresa_id = p_empresa_id;
+
+  -- Crear el token QR para confirmación de entrega
+  INSERT INTO public.entregas_qr (viaje_id, empresa_id, transportista_id, token, estado)
+  VALUES (p_viaje_id, p_empresa_id, _uid, _token, 'pendiente')
+  ON CONFLICT (viaje_id) DO UPDATE
+    SET token = _token, transportista_id = _uid, estado = 'pendiente', fecha_completado = NULL;
+
+  RETURN QUERY SELECT true, 'Ruta tomada correctamente.'::text, _token;
+END;
+$$;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- PARCHE CRÍTICO 5 — RPC fn_confirmar_entrega (atómica, reemplaza rollback manual)
+-- Combina los 3 UPDATEs del cliente en una sola función con garantía ACID.
+-- ════════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION public.fn_confirmar_entrega(
+  p_token      uuid,
+  p_empresa_id uuid
+)
+RETURNS TABLE(ok boolean, mensaje text)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  _uid      uuid := auth.uid();
+  _viaje_id uuid;
+BEGIN
+  -- Marcar QR como completado y obtener viaje_id (atómico — si el token ya fue usado, no retorna filas)
+  UPDATE public.entregas_qr
+     SET estado = 'completado', fecha_completado = now()
+   WHERE token = p_token
+     AND estado = 'pendiente'
+     AND transportista_id = _uid
+  RETURNING viaje_id INTO _viaje_id;
+
+  IF _viaje_id IS NULL THEN
+    RETURN QUERY SELECT false, 'QR inválido, ya utilizado, o no pertenece a tu usuario.'::text;
+    RETURN;
+  END IF;
+
+  -- Marcar viaje como entregado
+  UPDATE public.viajes_operativos
+     SET estado = 'entregado'
+   WHERE id = _viaje_id AND estado = 'en_camino';
+
+  -- Marcar todas las cargas asignadas al transportista en esta empresa como entregadas
+  UPDATE public.produccion_rep
+     SET estado = 'entregado'
+   WHERE transportista_asignado_id = _uid
+     AND empresa_id = p_empresa_id
+     AND estado = 'en_camino';
+
+  RETURN QUERY SELECT true, 'Entrega confirmada correctamente.'::text;
+END;
+$$;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- PARCHE ALTO 1 — Triggers de validación de transición de estado
+-- Impiden retrocesos de estado o saltos inválidos (ej: disponible → entregado).
+-- ════════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION public._fn_validar_estado_viaje()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF OLD.estado = NEW.estado THEN RETURN NEW; END IF;
+  IF OLD.estado = 'disponible' AND NEW.estado = 'en_camino'  THEN RETURN NEW; END IF;
+  IF OLD.estado = 'en_camino'  AND NEW.estado = 'entregado'  THEN RETURN NEW; END IF;
+  -- Permitir reversión a disponible sólo si el viaje no llegó a entregado (para rollback de fn_tomar_ruta)
+  IF OLD.estado = 'en_camino'  AND NEW.estado = 'disponible' THEN RETURN NEW; END IF;
+  RAISE EXCEPTION 'Transición de estado inválida en viaje: % → %', OLD.estado, NEW.estado;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_validar_estado_viaje ON public.viajes_operativos;
+CREATE TRIGGER trg_validar_estado_viaje
+  BEFORE UPDATE OF estado ON public.viajes_operativos
+  FOR EACH ROW EXECUTE FUNCTION public._fn_validar_estado_viaje();
+
+CREATE OR REPLACE FUNCTION public._fn_validar_estado_produccion()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF OLD.estado = NEW.estado THEN RETURN NEW; END IF;
+  IF OLD.estado = 'disponible' AND NEW.estado = 'en_camino'  THEN RETURN NEW; END IF;
+  IF OLD.estado = 'en_camino'  AND NEW.estado = 'entregado'  THEN RETURN NEW; END IF;
+  RAISE EXCEPTION 'Transición de estado inválida en produccion_rep: % → %', OLD.estado, NEW.estado;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_validar_estado_produccion ON public.produccion_rep;
+CREATE TRIGGER trg_validar_estado_produccion
+  BEFORE UPDATE OF estado ON public.produccion_rep
+  FOR EACH ROW EXECUTE FUNCTION public._fn_validar_estado_produccion();
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- PARCHE ALTO 2 — Reemplazar RLS abierta por RPC segura para búsqueda de empresa
+-- La política empresa_select_by_codigo exponía TODAS las empresas activas a
+-- cualquier usuario autenticado. Se elimina y se reemplaza por una función
+-- que devuelve sólo id+nombre (sin datos sensibles) para el código exacto.
+-- ════════════════════════════════════════════════════════════════════════════
+
+DROP POLICY IF EXISTS "empresa_select_by_codigo" ON public.empresas;
+
+CREATE OR REPLACE FUNCTION public.fn_buscar_empresa_por_codigo(p_codigo text)
+RETURNS TABLE(id uuid, nombre text)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT e.id, e.nombre
+  FROM public.empresas e
+  WHERE upper(trim(e.codigo_invitacion)) = upper(trim(p_codigo))
+    AND e.activo = true
+  LIMIT 1;
+$$;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- PARCHE BAJO — Columna de auditoría en transportistas_empresa
+-- El frontend ya guarda codigo_invitacion al momento del vínculo; formalizar la columna.
+-- ════════════════════════════════════════════════════════════════════════════
+
+ALTER TABLE public.transportistas_empresa
+  ADD COLUMN IF NOT EXISTS codigo_invitacion text;
