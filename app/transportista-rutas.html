@@ -310,11 +310,7 @@ function tomarRuta(id) {
 
 async function cargarCargas(sb) {
   try {
-    var cRes = await sb.from('produccion_rep')
-      .select('id, categoria, toneladas, created_at')
-      .eq('empresa_id', _empresaId)
-      .eq('estado', 'disponible')
-      .order('created_at', { ascending: false });
+    var cRes = await sb.rpc('fn_cargas_empresa', { p_empresa_id: _empresaId });
 
     if (cRes.error) throw cRes.error;
 
