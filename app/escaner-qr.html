@@ -862,69 +862,38 @@ async function _procesarEntregaQR(payload) {
 }
 
 async function confirmarEntrega() {
-  var sb  = window.__damuSupabase;
-  var btn = document.getElementById('me-btn-confirmar');
+  var sb    = window.__damuSupabase;
+  var btn   = document.getElementById('me-btn-confirmar');
   var errEl = document.getElementById('me-confirm-err');
-  var data = _pendingEntrega;
+  var data  = _pendingEntrega;
 
   if (!sb || !data) return;
 
-  // Bloquear botón durante el proceso
   btn.disabled = true;
   btn.innerHTML = '<svg class="w-4 h-4 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Procesando…';
   errEl.classList.add('hidden');
 
   try {
-    var ahora = new Date().toISOString();
+    // Operación atómica ACID: el servidor valida el token, marca el QR,
+    // actualiza el viaje y cierra las cargas en una sola transacción.
+    var rpcRes = await sb.rpc('fn_confirmar_entrega', {
+      p_token:      data.token,
+      p_empresa_id: data.empresa_id,
+    });
 
-    // ① UPDATE entregas_qr → completado
-    var r1 = await sb.from('entregas_qr')
-      .update({ estado: 'completado', fecha_completado: ahora })
-      .eq('token', data.token)
-      .eq('estado', 'pendiente');
+    if (rpcRes.error) throw rpcRes.error;
 
-    if (r1.error) throw { step: 1, msg: 'Error al registrar QR: ' + r1.error.message };
-
-    // ② UPDATE viajes_operativos → entregado
-    var r2 = await sb.from('viajes_operativos')
-      .update({ estado: 'entregado' })
-      .eq('id', data.viaje_id);
-
-    if (r2.error) {
-      // Rollback ①
-      await sb.from('entregas_qr')
-        .update({ estado: 'pendiente', fecha_completado: null })
-        .eq('token', data.token);
-      throw { step: 2, msg: 'Error al actualizar viaje: ' + r2.error.message };
+    var resultado = rpcRes.data && rpcRes.data[0];
+    if (!resultado || !resultado.ok) {
+      throw new Error(resultado ? resultado.mensaje : 'Error desconocido al confirmar la entrega.');
     }
 
-    // ③ UPDATE produccion_rep → entregado (para todas las cargas del transportista en este empresa)
-    var r3 = await sb.from('produccion_rep')
-      .update({ estado: 'entregado' })
-      .eq('transportista_asignado_id', data.uid)
-      .eq('empresa_id', data.empresa_id)
-      .eq('estado', 'en_camino');
-
-    if (r3.error) {
-      // Rollback ① y ②
-      await Promise.all([
-        sb.from('entregas_qr')
-          .update({ estado: 'pendiente', fecha_completado: null })
-          .eq('token', data.token),
-        sb.from('viajes_operativos')
-          .update({ estado: 'en_camino' })
-          .eq('id', data.viaje_id),
-      ]);
-      throw { step: 3, msg: 'Error al actualizar cargas: ' + r3.error.message };
-    }
-
-    // ✓ Todo exitoso
     _pendingEntrega = null;
     _meEstado('me-success');
 
   } catch (err) {
-    console.error('[Damu] confirmarEntrega paso', err.step || '?', ':', err.msg || err);
-    errEl.textContent = err.msg || err.message || 'Error al confirmar la entrega. Intenta de nuevo.';
+    console.error('[Damu] confirmarEntrega:', err);
+    errEl.textContent = err.message || 'Error al confirmar la entrega. Intenta de nuevo.';
     errEl.classList.remove('hidden');
     btn.disabled = false;
     btn.innerHTML = '<svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Confirmar entrega';
