@@ -122,6 +122,7 @@ CREATE INDEX IF NOT EXISTS idx_flota_user    ON public.flota_vehiculos  (user_id
 --    Escritura solo vía service_role (administración de la plataforma).
 ALTER TABLE public.puntos_acopio ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "acopio_select_authed" ON public.puntos_acopio;
 CREATE POLICY "acopio_select_authed"
   ON public.puntos_acopio FOR SELECT
   TO authenticated
@@ -129,6 +130,11 @@ CREATE POLICY "acopio_select_authed"
 
 -- ── 11. RLS — flota_vehiculos ─────────────────────────────────────────────
 ALTER TABLE public.flota_vehiculos ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "flota_select_own"  ON public.flota_vehiculos;
+DROP POLICY IF EXISTS "flota_insert_own"  ON public.flota_vehiculos;
+DROP POLICY IF EXISTS "flota_update_own"  ON public.flota_vehiculos;
+DROP POLICY IF EXISTS "flota_delete_own"  ON public.flota_vehiculos;
 
 CREATE POLICY "flota_select_own"
   ON public.flota_vehiculos FOR SELECT
