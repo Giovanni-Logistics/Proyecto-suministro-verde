@@ -263,7 +263,7 @@ CREATE TABLE IF NOT EXISTS public.empresas (
 --    Vínculo N:M. user_id_transportista es la FK al usuario transportista.
 --    El transportista se auto-inserta usando el codigo_invitacion del productor.
 --    user_id_productor: columna desnormalizada para evitar subquery circular
---    en las políticas RLS del productor (rompe ciclo con empresas).
+--    en las políticas RLS del productor (rompe ciclo 42P17 con empresas).
 CREATE TABLE IF NOT EXISTS public.transportistas_empresa (
   id                    uuid        NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id_transportista uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -274,7 +274,12 @@ CREATE TABLE IF NOT EXISTS public.transportistas_empresa (
   UNIQUE (user_id_transportista, empresa_id)
 );
 
--- Backfill de filas existentes (si la columna ya tiene datos no hace nada)
+-- Para bases de datos existentes: agrega la columna si aún no está
+-- (CREATE TABLE IF NOT EXISTS es no-op para tablas ya existentes)
+ALTER TABLE public.transportistas_empresa
+  ADD COLUMN IF NOT EXISTS user_id_productor uuid REFERENCES auth.users(id);
+
+-- Backfill de filas existentes
 UPDATE public.transportistas_empresa te
    SET user_id_productor = e.user_id_productor
   FROM public.empresas e
