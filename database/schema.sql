@@ -943,71 +943,146 @@ ALTER TABLE public.transportistas_empresa
   ADD COLUMN IF NOT EXISTS codigo_invitacion text;
 
 -- ════════════════════════════════════════════════════════════════════════════
--- HOTFIX — Romper ciclo de recursión infinita entre políticas RLS
+-- HOTFIX v2 — Romper ciclo RLS por desnormalización (solución definitiva)
 --
--- CAUSA: dos políticas se referencian mutuamente:
---   • te_select_productor  (transportistas_empresa → empresas)
---   • empresa_select_transportista (empresas → transportistas_empresa)
--- Cualquier tabla cuya política haga un subquery a transportistas_empresa
--- activa ese ciclo (produccion_rep, viajes_operativos, flota_vehiculos, etc.)
+-- CAUSA raíz:
+--   te_select_productor  (transportistas_empresa → subquery empresas)
+--   empresa_select_transportista (empresas → subquery transportistas_empresa)
+--   → ciclo infinito que se dispara desde cualquier tabla que consulte
+--     transportistas_empresa dentro de una política RLS.
 --
--- SOLUCIÓN: función SECURITY DEFINER que consulta transportistas_empresa
--- sin ejecutar RLS, rompiendo el ciclo de forma definitiva.
+-- SOLUCIÓN: agregar user_id_productor como columna directa en
+--   transportistas_empresa. Las políticas del productor pasan a usar
+--   user_id_productor = auth.uid() (comparación de columna, sin subquery).
+--   Esto rompe el ciclo sin depender de SECURITY DEFINER ni BYPASSRLS.
 -- ════════════════════════════════════════════════════════════════════════════
 
-CREATE OR REPLACE FUNCTION public._fn_mis_empresas()
-RETURNS SETOF uuid
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT empresa_id
-  FROM public.transportistas_empresa
-  WHERE user_id_transportista = auth.uid() AND activo = true;
+-- 1. Columna desnormalizada
+ALTER TABLE public.transportistas_empresa
+  ADD COLUMN IF NOT EXISTS user_id_productor uuid REFERENCES auth.users(id);
+
+-- 2. Backfill de filas existentes
+UPDATE public.transportistas_empresa te
+   SET user_id_productor = e.user_id_productor
+  FROM public.empresas e
+ WHERE te.empresa_id = e.id
+   AND te.user_id_productor IS NULL;
+
+-- 3. Trigger BEFORE INSERT para auto-rellenar en vínculos futuros
+CREATE OR REPLACE FUNCTION public._fn_fill_productor_id()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  SELECT user_id_productor INTO NEW.user_id_productor
+  FROM public.empresas WHERE id = NEW.empresa_id;
+  RETURN NEW;
+END;
 $$;
 
--- empresas: política que originaba el ciclo
+DROP TRIGGER IF EXISTS trg_fill_productor ON public.transportistas_empresa;
+CREATE TRIGGER trg_fill_productor
+  BEFORE INSERT ON public.transportistas_empresa
+  FOR EACH ROW EXECUTE FUNCTION public._fn_fill_productor_id();
+
+-- 4. Reemplazar políticas del productor en transportistas_empresa
+--    por comparación directa de columna (sin subquery a empresas)
+DROP POLICY IF EXISTS "te_select_productor" ON public.transportistas_empresa;
+CREATE POLICY "te_select_productor"
+  ON public.transportistas_empresa FOR SELECT
+  USING (user_id_productor = auth.uid());
+
+DROP POLICY IF EXISTS "te_insert_productor" ON public.transportistas_empresa;
+CREATE POLICY "te_insert_productor"
+  ON public.transportistas_empresa FOR INSERT
+  WITH CHECK (user_id_productor = auth.uid());
+
+DROP POLICY IF EXISTS "te_delete_productor" ON public.transportistas_empresa;
+CREATE POLICY "te_delete_productor"
+  ON public.transportistas_empresa FOR DELETE
+  USING (user_id_productor = auth.uid());
+
+-- 5. empresa_select_transportista: ahora transportistas_empresa tiene políticas
+--    simples (sin subquery a empresas), por lo que el subquery desde empresas
+--    hacia transportistas_empresa ya no genera ciclo.
+--    La política queda igual que el original.
 DROP POLICY IF EXISTS "empresa_select_transportista" ON public.empresas;
 CREATE POLICY "empresa_select_transportista"
   ON public.empresas FOR SELECT
-  USING (id IN (SELECT public._fn_mis_empresas()));
+  USING (
+    id IN (
+      SELECT te.empresa_id FROM public.transportistas_empresa te
+      WHERE te.user_id_transportista = auth.uid() AND te.activo = true
+    )
+  );
 
--- viajes_operativos
+-- 6. Resto de tablas: subqueries a transportistas_empresa ya son seguros
+--    porque sus políticas son comparaciones directas de columna.
 DROP POLICY IF EXISTS "viajes_select_empresa_member" ON public.viajes_operativos;
 CREATE POLICY "viajes_select_empresa_member"
   ON public.viajes_operativos FOR SELECT
-  USING (empresa_id IS NOT NULL AND empresa_id IN (SELECT public._fn_mis_empresas()));
+  USING (
+    empresa_id IS NOT NULL AND empresa_id IN (
+      SELECT te.empresa_id FROM public.transportistas_empresa te
+      WHERE te.user_id_transportista = auth.uid() AND te.activo = true
+    )
+  );
 
 DROP POLICY IF EXISTS "viajes_insert_empresa" ON public.viajes_operativos;
 CREATE POLICY "viajes_insert_empresa"
   ON public.viajes_operativos FOR INSERT
-  WITH CHECK (empresa_id IS NULL OR empresa_id IN (SELECT public._fn_mis_empresas()));
+  WITH CHECK (
+    empresa_id IS NULL OR empresa_id IN (
+      SELECT te.empresa_id FROM public.transportistas_empresa te
+      WHERE te.user_id_transportista = auth.uid() AND te.activo = true
+    )
+  );
 
--- certificados_rep
 DROP POLICY IF EXISTS "certs_select_empresa_member" ON public.certificados_rep;
 CREATE POLICY "certs_select_empresa_member"
   ON public.certificados_rep FOR SELECT
-  USING (empresa_id IS NOT NULL AND empresa_id IN (SELECT public._fn_mis_empresas()));
+  USING (
+    empresa_id IS NOT NULL AND empresa_id IN (
+      SELECT te.empresa_id FROM public.transportistas_empresa te
+      WHERE te.user_id_transportista = auth.uid() AND te.activo = true
+    )
+  );
 
--- flota_vehiculos
 DROP POLICY IF EXISTS "flota_select_empresa_member" ON public.flota_vehiculos;
 CREATE POLICY "flota_select_empresa_member"
   ON public.flota_vehiculos FOR SELECT
-  USING (empresa_id IS NOT NULL AND empresa_id IN (SELECT public._fn_mis_empresas()));
+  USING (
+    empresa_id IS NOT NULL AND empresa_id IN (
+      SELECT te.empresa_id FROM public.transportistas_empresa te
+      WHERE te.user_id_transportista = auth.uid() AND te.activo = true
+    )
+  );
 
 DROP POLICY IF EXISTS "flota_insert_empresa_member" ON public.flota_vehiculos;
 CREATE POLICY "flota_insert_empresa_member"
   ON public.flota_vehiculos FOR INSERT
-  WITH CHECK (empresa_id IS NULL OR empresa_id IN (SELECT public._fn_mis_empresas()));
+  WITH CHECK (
+    empresa_id IS NULL OR empresa_id IN (
+      SELECT te.empresa_id FROM public.transportistas_empresa te
+      WHERE te.user_id_transportista = auth.uid() AND te.activo = true
+    )
+  );
 
--- produccion_rep (parche anterior)
 DROP POLICY IF EXISTS "prod_select_trans_vinculado" ON public.produccion_rep;
 CREATE POLICY "prod_select_trans_vinculado"
   ON public.produccion_rep FOR SELECT
-  USING (empresa_id IS NOT NULL AND empresa_id IN (SELECT public._fn_mis_empresas()));
+  USING (
+    empresa_id IS NOT NULL AND empresa_id IN (
+      SELECT te.empresa_id FROM public.transportistas_empresa te
+      WHERE te.user_id_transportista = auth.uid() AND te.activo = true
+    )
+  );
 
--- entregas_qr (parche anterior)
 DROP POLICY IF EXISTS "qr_insert_trans" ON public.entregas_qr;
 CREATE POLICY "qr_insert_trans"
   ON public.entregas_qr FOR INSERT
   WITH CHECK (
     transportista_id = auth.uid()
-    AND empresa_id IN (SELECT public._fn_mis_empresas())
+    AND empresa_id IN (
+      SELECT te.empresa_id FROM public.transportistas_empresa te
+      WHERE te.user_id_transportista = auth.uid() AND te.activo = true
+    )
   );
