@@ -360,10 +360,10 @@ CREATE POLICY "te_insert_self"
   WITH CHECK (user_id_transportista = auth.uid());
 
 -- ── 20. RLS aditivas — viajes_operativos ──────────────────────────────────
---    Las políticas "viajes_select_own" / "viajes_insert_own" NO se modifican.
---    PostgreSQL evalúa múltiples SELECT policies con lógica OR.
+DROP POLICY IF EXISTS "viajes_select_empresa"        ON public.viajes_operativos;
+DROP POLICY IF EXISTS "viajes_select_empresa_member" ON public.viajes_operativos;
+DROP POLICY IF EXISTS "viajes_insert_empresa"        ON public.viajes_operativos;
 
--- Productor ve todos los viajes de su empresa
 CREATE POLICY "viajes_select_empresa"
   ON public.viajes_operativos FOR SELECT
   USING (
@@ -372,7 +372,6 @@ CREATE POLICY "viajes_select_empresa"
     )
   );
 
--- Transportista vinculado ve viajes de la empresa
 CREATE POLICY "viajes_select_empresa_member"
   ON public.viajes_operativos FOR SELECT
   USING (
@@ -382,7 +381,6 @@ CREATE POLICY "viajes_select_empresa_member"
     )
   );
 
--- Transportista puede insertar viajes vinculados a su empresa
 CREATE POLICY "viajes_insert_empresa"
   ON public.viajes_operativos FOR INSERT
   WITH CHECK (
@@ -393,6 +391,9 @@ CREATE POLICY "viajes_insert_empresa"
   );
 
 -- ── 21. RLS aditivas — certificados_rep ───────────────────────────────────
+DROP POLICY IF EXISTS "certs_select_empresa"        ON public.certificados_rep;
+DROP POLICY IF EXISTS "certs_select_empresa_member" ON public.certificados_rep;
+
 CREATE POLICY "certs_select_empresa"
   ON public.certificados_rep FOR SELECT
   USING (
@@ -411,6 +412,10 @@ CREATE POLICY "certs_select_empresa_member"
   );
 
 -- ── 22. RLS aditivas — flota_vehiculos ────────────────────────────────────
+DROP POLICY IF EXISTS "flota_select_empresa"        ON public.flota_vehiculos;
+DROP POLICY IF EXISTS "flota_select_empresa_member" ON public.flota_vehiculos;
+DROP POLICY IF EXISTS "flota_insert_empresa_member" ON public.flota_vehiculos;
+
 CREATE POLICY "flota_select_empresa"
   ON public.flota_vehiculos FOR SELECT
   USING (
@@ -438,8 +443,9 @@ CREATE POLICY "flota_insert_empresa_member"
   );
 
 -- ── 23. RLS aditivas — puntos_acopio ──────────────────────────────────────
---    La política "acopio_select_authed" existente cubre los puntos globales.
---    Estas políticas añaden visibilidad por empresa cuando empresa_id está seteado.
+DROP POLICY IF EXISTS "acopio_select_empresa"        ON public.puntos_acopio;
+DROP POLICY IF EXISTS "acopio_select_empresa_member" ON public.puntos_acopio;
+
 CREATE POLICY "acopio_select_empresa"
   ON public.puntos_acopio FOR SELECT
   USING (
