@@ -310,6 +310,31 @@ async function cargarMonitoreo() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// REALTIME — suscripción única a cambios de la empresa
+// Se activa sola la primera vez que cargarMonitoreo() termina bien.
+// REPLICA IDENTITY FULL debe estar habilitado en las tablas para que
+// los eventos UPDATE incluyan los valores anteriores y actuales.
+// ═══════════════════════════════════════════════════════════════════
+function _suscribirRealtime(sb) {
+  if (_realtimeChannel || !_empresaId) return;
+
+  _realtimeChannel = sb.channel('monitor-' + _empresaId)
+    .on('postgres_changes', {
+      event: 'UPDATE', schema: 'public', table: 'viajes_operativos',
+      filter: 'empresa_id=eq.' + _empresaId,
+    }, function() { cargarMonitoreo(); })
+    .on('postgres_changes', {
+      event: '*', schema: 'public', table: 'produccion_rep',
+      filter: 'empresa_id=eq.' + _empresaId,
+    }, function() { cargarMonitoreo(); })
+    .on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'transportistas_empresa',
+      filter: 'empresa_id=eq.' + _empresaId,
+    }, function() { cargarMonitoreo(); })
+    .subscribe();
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // TAREA 1 — Código de invitación
 // ═══════════════════════════════════════════════════════════════════
 
