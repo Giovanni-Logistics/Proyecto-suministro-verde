@@ -497,6 +497,7 @@ CREATE TRIGGER trg_auto_empresa_productor
 -- Permite al transportista vinculado actualizar la carga del punto de acopio
 -- al escanear un bulto. Solo afecta puntos sin empresa_id (red compartida) o
 -- puntos de la empresa a la que el transportista está vinculado.
+DROP POLICY IF EXISTS "acopio_update_linked_or_shared" ON public.puntos_acopio;
 CREATE POLICY "acopio_update_linked_or_shared"
   ON public.puntos_acopio FOR UPDATE
   USING (
