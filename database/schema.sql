@@ -757,6 +757,14 @@ CREATE INDEX IF NOT EXISTS idx_prod_uid_at   ON public.produccion_rep (user_id, 
 CREATE INDEX IF NOT EXISTS idx_prod_tra_est  ON public.produccion_rep (transportista_asignado_id, estado);
 
 -- RLS produccion_rep: productor lee/escribe los suyos
+-- Transportista accede a cargas vía fn_cargas_empresa (SECURITY DEFINER),
+-- no por política directa — evita el ciclo RLS 42P17.
+DROP POLICY IF EXISTS "prod_select_own"            ON public.produccion_rep;
+DROP POLICY IF EXISTS "prod_insert_own"            ON public.produccion_rep;
+DROP POLICY IF EXISTS "prod_update_own"            ON public.produccion_rep;
+DROP POLICY IF EXISTS "prod_delete_own"            ON public.produccion_rep;
+DROP POLICY IF EXISTS "prod_select_trans_vinculado" ON public.produccion_rep;
+
 CREATE POLICY "prod_select_own"
   ON public.produccion_rep FOR SELECT USING (user_id = auth.uid());
 
@@ -768,16 +776,6 @@ CREATE POLICY "prod_update_own"
 
 CREATE POLICY "prod_delete_own"
   ON public.produccion_rep FOR DELETE USING (user_id = auth.uid());
-
--- RLS produccion_rep: transportista vinculado a la empresa puede leer (para mostrar cargas)
-CREATE POLICY "prod_select_trans_vinculado"
-  ON public.produccion_rep FOR SELECT
-  USING (
-    empresa_id IS NOT NULL AND empresa_id IN (
-      SELECT te.empresa_id FROM public.transportistas_empresa te
-      WHERE te.user_id_transportista = auth.uid() AND te.activo = true
-    )
-  );
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- PARCHE CRÍTICO 3 — Tabla entregas_qr
