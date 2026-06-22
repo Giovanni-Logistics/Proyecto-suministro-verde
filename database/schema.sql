@@ -181,6 +181,10 @@ CREATE INDEX IF NOT EXISTS idx_perfiles_user ON public.perfiles (user_id, activo
 -- RLS: cada usuario solo ve y gestiona sus propias filas
 ALTER TABLE public.perfiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "perfiles_select_own"  ON public.perfiles;
+DROP POLICY IF EXISTS "perfiles_insert_own"  ON public.perfiles;
+DROP POLICY IF EXISTS "perfiles_update_own"  ON public.perfiles;
+
 CREATE POLICY "perfiles_select_own"
   ON public.perfiles FOR SELECT
   USING (user_id = auth.uid());
